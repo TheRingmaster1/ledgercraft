@@ -32,6 +32,7 @@ pub struct LedgerApp {
     show_about: bool,
     show_prefs: bool,
     show_tutorial: bool,
+    tutorial: tutorial::Tutorial,
     prefs: Prefs,
     /// What is on disk, so changes are saved once rather than every frame.
     saved_prefs: Prefs,
@@ -80,6 +81,7 @@ impl LedgerApp {
             show_about: false,
             show_prefs: false,
             show_tutorial: false,
+            tutorial: tutorial::Tutorial::default(),
             prefs: Prefs::default(),
             saved_prefs: Prefs::default(),
             licenses: LicenseWindow::default(),
@@ -634,7 +636,12 @@ impl LedgerApp {
         }
         self.licenses.ui(ctx);
         prefs::window(ctx, &mut self.show_prefs, &mut self.prefs);
-        tutorial::window(ctx, &mut self.show_tutorial, &mut self.prefs);
+        let target = tutorial::window(ctx, &mut self.show_tutorial, &mut self.prefs, &mut self.tutorial);
+        match target {
+            Some(tutorial::Target::Page(page)) => self.page = page,
+            Some(tutorial::Target::Sample) => self.request(Pending::Sample, ctx),
+            None => {}
+        }
     }
 }
 

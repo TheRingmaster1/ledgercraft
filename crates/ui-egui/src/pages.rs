@@ -360,7 +360,7 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
 }
 
 pub(crate) fn register(ui: &mut Ui, c: &Company, account: AccountId, out: &mut Vec<Action>) {
-    if ui.link("← Chart of Accounts").clicked() {
+    if ui.link("< Back to Chart of Accounts").clicked() {
         out.push(Action::Go(Page::Accounts));
     }
     let report = account_register(c, account);
