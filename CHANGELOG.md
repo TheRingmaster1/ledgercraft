@@ -18,6 +18,9 @@ fixes to a release. See docs/releasing.md.
 ### Added
 - Help > Preferences: choose the grey used to shade At A Glance rows. Saved
   per user and kept between launches.
+- Preferences are grouped under a selectable Global section (styled like the
+  selected side bar item) that shows or hides Row Shading; the shading preview
+  is boxed.
 
 ### Changed
 - Home: "At A Glance" heading, with a divider in the side bar colour between

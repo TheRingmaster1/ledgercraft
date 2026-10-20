@@ -107,6 +107,9 @@ fn save_to(path: &Path, prefs: &Prefs) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Width of the shaded preview rows in the Preferences window.
+const PREVIEW_WIDTH: f32 = 280.0;
+
 /// The Preferences window. Changes apply straight away; the app saves them.
 pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
     egui::Window::new("Preferences")
@@ -114,14 +117,44 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
         .collapsible(false)
         .resizable(false)
         .show(ctx, |ui| {
-            ui.label(RichText::new("Home page").strong());
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                ui.label("At A Glance row shading");
-                grey_picker(ui, &mut prefs.stripe_grey);
+            // Sections, styled like the selected side bar item. Only Global
+            // for now; selecting it shows its settings, clicking again hides them.
+            let id = egui::Id::new("prefs_global_selected");
+            let mut global = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(true);
+            ui.scope(|ui| {
+                ui.visuals_mut().selection.bg_fill = theme::ACCENT;
+                let text = RichText::new("Global").size(15.0);
+                let text = if global {
+                    text.color(Color32::WHITE)
+                } else {
+                    text
+                };
+                if ui.selectable_label(global, text).clicked() {
+                    global = !global;
+                    ui.data_mut(|d| d.insert_temp(id, global));
+                }
             });
-            ui.add_space(4.0);
-            // A preview of how the shaded rows will look.
+            if global {
+                ui.add_space(4.0);
+                global_section(ui, prefs);
+            }
+        });
+}
+
+/// Global preferences: the At A Glance row shading, with a preview.
+fn global_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
+    ui.horizontal(|ui| {
+        ui.label("Row Shading");
+        grey_picker(ui, &mut prefs.stripe_grey);
+    });
+    ui.add_space(4.0);
+    // A preview of how the shaded rows will look, in a 2 pt black box.
+    egui::Frame::none()
+        .stroke(egui::Stroke::new(2.0_f32, Color32::BLACK))
+        .inner_margin(6.0)
+        .show(ui, |ui| {
+            ui.visuals_mut().override_text_color = Some(ui.visuals().strong_text_color());
+            ui.set_width(PREVIEW_WIDTH);
             for (i, label) in ["Checking", "Savings", "Customers owe you"]
                 .into_iter()
                 .enumerate()
@@ -133,8 +166,10 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
                 });
                 if i % 2 == 1 {
                     let rect = row.response.rect;
-                    let rect =
-                        egui::Rect::from_min_size(rect.min, egui::vec2(280.0, rect.height()));
+                    let rect = egui::Rect::from_min_size(
+                        rect.min,
+                        egui::vec2(PREVIEW_WIDTH, rect.height()),
+                    );
                     let shape = egui::Shape::rect_filled(
                         rect.expand2(egui::vec2(0.0, 2.0)),
                         2.0,
@@ -143,18 +178,18 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
                     ui.painter().set(background, shape);
                 }
             }
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                if ui.button("Reset to default").clicked() {
-                    *prefs = Prefs::default();
-                }
-                ui.label(
-                    RichText::new("Saved automatically.")
-                        .small()
-                        .color(theme::MUTED),
-                );
-            });
         });
+    ui.add_space(6.0);
+    ui.horizontal(|ui| {
+        if ui.button("Reset to default").clicked() {
+            *prefs = Prefs::default();
+        }
+        ui.label(
+            RichText::new("Saved automatically.")
+                .small()
+                .color(theme::MUTED),
+        );
+    });
 }
 
 /// A horizontal light-to-dark grey bar: click or drag to pick a grey level.
