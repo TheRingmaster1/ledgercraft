@@ -9,6 +9,7 @@ mod forms;
 mod hints;
 mod licenses;
 mod pages;
+mod prefs;
 mod theme;
 mod widgets;
 

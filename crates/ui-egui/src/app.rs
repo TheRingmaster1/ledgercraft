@@ -7,6 +7,7 @@ use ledgercraft_ledger::Company;
 use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
+use crate::prefs::{self, Prefs};
 use crate::{forms, theme, Action, FormKind, Page, Reset};
 
 /// Something waiting for the user to decide what to do with unsaved changes.
@@ -29,6 +30,10 @@ pub struct LedgerApp {
     pending: Option<Pending>,
     allow_close: bool,
     show_about: bool,
+    show_prefs: bool,
+    prefs: Prefs,
+    /// What is on disk, so changes are saved once rather than every frame.
+    saved_prefs: Prefs,
     licenses: LicenseWindow,
     show_nav: bool,
     title: String,
@@ -51,7 +56,12 @@ const SIDE_BAR: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key
 impl LedgerApp {
     pub fn new(cc: &eframe::CreationContext<'_>, session: Session) -> Self {
         theme::apply(&cc.egui_ctx);
-        Self::with_session(session)
+        let prefs = Prefs::load();
+        Self {
+            prefs,
+            saved_prefs: prefs,
+            ..Self::with_session(session)
+        }
     }
 
     fn with_session(session: Session) -> Self {
@@ -66,6 +76,9 @@ impl LedgerApp {
             pending: None,
             allow_close: false,
             show_about: false,
+            show_prefs: false,
+            prefs: Prefs::default(),
+            saved_prefs: Prefs::default(),
             licenses: LicenseWindow::default(),
             show_nav: true,
             title: String::new(),
@@ -96,6 +109,27 @@ impl LedgerApp {
             }
         }
         self.window_scale = scale;
+    }
+
+    /// Row Shading applies to every striped list in the app: egui's striped
+    /// grids take their colour from `faint_bg_color` (and nothing else does).
+    fn apply_prefs(&self, ctx: &egui::Context) {
+        let stripe = self.prefs.stripe();
+        if ctx.style().visuals.faint_bg_color != stripe {
+            ctx.style_mut(|s| s.visuals.faint_bg_color = stripe);
+        }
+    }
+
+    /// Save changed preferences once the mouse is released, so dragging the
+    /// shading picker writes the file once rather than every frame.
+    fn save_prefs(&mut self, ctx: &egui::Context) {
+        if self.prefs == self.saved_prefs || ctx.input(|i| i.pointer.any_down()) {
+            return;
+        }
+        if let Err(e) = self.prefs.save() {
+            self.error(format!("Could not save preferences: {e}"));
+        }
+        self.saved_prefs = self.prefs;
     }
 
     fn info(&mut self, msg: impl Into<String>) {
@@ -433,6 +467,10 @@ impl LedgerApp {
                     }
                 });
                 ui.menu_button("Help", |ui| {
+                    if ui.button("Preferences…").clicked() {
+                        ui.close_menu();
+                        self.show_prefs = true;
+                    }
                     if ui.button("Licenses").clicked() {
                         ui.close_menu();
                         self.licenses.show_tab(LicenseTab::Summary);
@@ -572,6 +610,7 @@ impl LedgerApp {
             self.licenses.show_tab(LicenseTab::Summary);
         }
         self.licenses.ui(ctx);
+        prefs::window(ctx, &mut self.show_prefs, &mut self.prefs);
     }
 }
 
@@ -588,6 +627,8 @@ impl eframe::App for LedgerApp {
             self.title = title;
         }
         self.fit_window(ctx);
+        self.apply_prefs(ctx);
+        self.save_prefs(ctx);
 
         self.shortcuts(ctx);
         self.menu_bar(ctx);
@@ -607,9 +648,10 @@ impl eframe::App for LedgerApp {
                 Page::Transactions => pages::transactions(ui, company, &mut actions),
                 Page::Reports => pages::reports(ui, company, &mut self.reports, &mut actions),
                 _ => {
+                    let stripe = self.prefs.stripe();
                     let salt = ("page", format!("{page:?}"));
                     egui::ScrollArea::vertical().id_salt(salt).show(ui, |ui| match page {
-                        Page::Home => pages::home(ui, company, &mut actions),
+                        Page::Home => pages::home(ui, company, stripe, &mut actions),
                         Page::Items => pages::items(ui, company, &mut self.lists, &mut actions),
                         Page::Form(FormKind::Invoice) => {
                             forms::invoice(ui, company, &mut self.forms.invoice, &mut actions)

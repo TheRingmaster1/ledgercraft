@@ -13,10 +13,28 @@ fixes to a release. See docs/releasing.md.
   monitors; it no longer opens larger than the screen.
 - Home: At A Glance shows its amounts, and no longer overlaps the workflow
   buttons in a narrow window (it moves below them).
+- The desktop app builds on Linux (a source file name differed only in case).
+
+### Added
+- Help > Preferences: choose the grey used to shade At A Glance rows. Saved
+  per user and kept between launches.
+- Preferences are grouped under a selectable Global section (styled like the
+  selected side bar item) that shows or hides Row Shading; the shading preview
+  is boxed.
+- Row Shading applies to every striped list in the app (Chart of Accounts,
+  customers, vendors, transactions, form lines, registers and reports), not only
+  At A Glance.
+- All text uses one dark colour across the app (text with its own colour, such
+  as the side bar, links, hints and negative amounts, keeps it).
+- Preferences: the Row Shading bar no longer shows a number, and its default
+  is the middle of the bar (grey 205).
 
 ### Changed
 - Home: "At A Glance" heading, with a divider in the side bar colour between
   the workflow and At A Glance.
+- Home: every other At A Glance row is shaded grey, and the Workflow and
+  At A Glance headings are underlined.
+- Home: all At A Glance labels and amounts use the same dark text colour.
 
 ## [0.1.0] - unreleased
 
