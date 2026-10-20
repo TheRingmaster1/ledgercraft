@@ -379,10 +379,11 @@ impl LedgerApp {
     fn menu_bar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("menu").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
+                let mut tops = Vec::new();
                 if !self.show_nav && ui.button(">").on_hover_text("Show side bar (Ctrl+B)").clicked() {
                     self.show_nav = true;
                 }
-                ui.menu_button("File", |ui| {
+                tops.push(ui.menu_button("File", |ui| {
                     if ui.button("New Company").clicked() {
                         ui.close_menu();
                         self.request(Pending::New, ctx);
@@ -409,8 +410,8 @@ impl LedgerApp {
                         ui.close_menu();
                         self.request(Pending::Quit, ctx);
                     }
-                });
-                ui.menu_button("Edit", |ui| {
+                }).response);
+                tops.push(ui.menu_button("Edit", |ui| {
                     let undo = self.session.undo_label().map(|l| format!("Undo {l}"));
                     if ui.add_enabled(undo.is_some(), egui::Button::new(undo.unwrap_or_else(|| "Undo".into()))).clicked() {
                         ui.close_menu();
@@ -421,13 +422,13 @@ impl LedgerApp {
                         ui.close_menu();
                         self.redo();
                     }
-                });
-                ui.menu_button("View", |ui| {
+                }).response);
+                tops.push(ui.menu_button("View", |ui| {
                     if ui.checkbox(&mut self.show_nav, "Side Bar    Ctrl+B").clicked() {
                         ui.close_menu();
                     }
-                });
-                ui.menu_button("Lists", |ui| {
+                }).response);
+                tops.push(ui.menu_button("Lists", |ui| {
                     for (label, page) in [
                         ("Chart of Accounts", Page::Accounts),
                         ("Customers", Page::Customers),
@@ -439,34 +440,34 @@ impl LedgerApp {
                             self.page = page;
                         }
                     }
-                });
-                ui.menu_button("Customers", |ui| {
+                }).response);
+                tops.push(ui.menu_button("Customers", |ui| {
                     for kind in [FormKind::Invoice, FormKind::ReceivePayment, FormKind::Deposit] {
                         if ui.button(kind.title()).clicked() {
                             ui.close_menu();
                             self.page = Page::Form(kind);
                         }
                     }
-                });
-                ui.menu_button("Vendors", |ui| {
+                }).response);
+                tops.push(ui.menu_button("Vendors", |ui| {
                     for kind in [FormKind::Bill, FormKind::PayBills] {
                         if ui.button(kind.title()).clicked() {
                             ui.close_menu();
                             self.page = Page::Form(kind);
                         }
                     }
-                });
-                ui.menu_button("Banking", |ui| {
+                }).response);
+                tops.push(ui.menu_button("Banking", |ui| {
                     for kind in [FormKind::Check, FormKind::Deposit, FormKind::Journal] {
                         if ui.button(kind.title()).clicked() {
                             ui.close_menu();
                             self.page = Page::Form(kind);
                         }
                     }
-                });
+                }).response);
                 // A real menu: each report opens directly, rather than
                 // duplicating the side bar's "Reports" link.
-                ui.menu_button("Reports", |ui| {
+                tops.push(ui.menu_button("Reports", |ui| {
                     for kind in ledgercraft_reports::ReportKind::ALL {
                         if ui.button(kind.label()).clicked() {
                             ui.close_menu();
@@ -474,8 +475,8 @@ impl LedgerApp {
                             self.page = Page::Reports;
                         }
                     }
-                });
-                ui.menu_button("Help", |ui| {
+                }).response);
+                tops.push(ui.menu_button("Help", |ui| {
                     if ui.button("Preferences…").clicked() {
                         ui.close_menu();
                         self.show_prefs = true;
@@ -499,7 +500,10 @@ impl LedgerApp {
                         ui.close_menu();
                         self.show_about = true;
                     }
-                });
+                }).response);
+                if self.prefs.hover_menus {
+                    open_menus_on_hover(ui, &tops);
+                }
             });
         });
     }
@@ -632,6 +636,43 @@ impl LedgerApp {
         prefs::window(ctx, &mut self.show_prefs, &mut self.prefs);
         tutorial::window(ctx, &mut self.show_tutorial, &mut self.prefs);
     }
+}
+
+/// Help > Preferences > Open Menus On Hover. egui opens a top-level menu on a
+/// click, or on hover only once another menu is open; this opens the hovered
+/// one straight away (where a click would) and closes the open menu when the
+/// pointer leaves both the menu bar and the menu.
+fn open_menus_on_hover(ui: &egui::Ui, tops: &[egui::Response]) {
+    use egui::menu::{BarState, MenuResponse, MenuRoot};
+    let Some(pointer) = ui.ctx().pointer_hover_pos() else {
+        return;
+    };
+    let bar_id = ui.id();
+    let mut bar = BarState::load(ui.ctx(), bar_id);
+    let response = match bar.as_ref() {
+        None => match tops.iter().find(|b| b.hovered()) {
+            Some(button) => {
+                let margin = egui::Frame::menu(ui.style()).total_margin().left;
+                let gap = ui.style().spacing.menu_spacing;
+                MenuResponse::Create(
+                    button.rect.left_bottom() + egui::vec2(-margin, gap),
+                    button.id,
+                )
+            }
+            None => return,
+        },
+        Some(open) => {
+            // A little slack so crossing the gap under the bar does not close it.
+            let over_bar = ui.min_rect().expand(6.0).contains(pointer);
+            if over_bar || open.menu_state.read().area_contains(pointer) {
+                return;
+            }
+            MenuResponse::Close
+        }
+    };
+    MenuRoot::handle_menu_response(&mut bar, response);
+    bar.store(ui.ctx(), bar_id);
+    ui.ctx().request_repaint();
 }
 
 impl eframe::App for LedgerApp {
