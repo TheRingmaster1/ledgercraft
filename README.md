@@ -110,6 +110,12 @@ Copyright (c) 2026 Jeffrey Parke and the LedgerCraft contributors. Required
 notices are in [NOTICE](NOTICE); bundled assets (none yet) are listed in
 [ATTRIBUTION.md](ATTRIBUTION.md).
 
+### Contributors
+
+Thanks to everyone who has contributed to LedgerCraft:
+
+* [@Mr-Sidez](https://github.com/Mr-Sidez)
+
 The project structure and contributor conventions are inspired by the
 [ArtCraft "Crafting Apps"](https://github.com/storytold) (clean-room Rust
 reimplementations of creative and office tools). LedgerCraft is not part of
