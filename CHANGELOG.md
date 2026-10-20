@@ -9,6 +9,8 @@ fixes to a release. See docs/releasing.md.
 
 ### Fixed
 - Clear on the Create Invoice form no longer closes the app.
+- The window can be resized on setups that mix Retina and standard-resolution
+  monitors; it no longer opens larger than the screen.
 
 ## [0.1.0] - unreleased
 
