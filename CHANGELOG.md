@@ -7,6 +7,17 @@ fixes to a release. See docs/releasing.md.
 
 ## [Unreleased]
 
+### Fixed
+- Clear on the Create Invoice form no longer closes the app.
+- The window can be resized on setups that mix Retina and standard-resolution
+  monitors; it no longer opens larger than the screen.
+- Home: At A Glance shows its amounts, and no longer overlaps the workflow
+  buttons in a narrow window (it moves below them).
+
+### Changed
+- Home: "At A Glance" heading, with a divider in the side bar colour between
+  the workflow and At A Glance.
+
 ## [0.1.0] - unreleased
 
 First public pre-alpha.

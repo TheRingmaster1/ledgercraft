@@ -32,7 +32,12 @@ pub struct LedgerApp {
     licenses: LicenseWindow,
     show_nav: bool,
     title: String,
+    /// Scale the window size limits were last set for (0 = not yet).
+    window_scale: f32,
 }
+
+/// Smallest window the layout still works in, in ui points.
+const MIN_WINDOW: egui::Vec2 = egui::vec2(900.0, 560.0);
 
 const SAVE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::S);
 const OPEN: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::O);
@@ -46,6 +51,10 @@ const SIDE_BAR: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key
 impl LedgerApp {
     pub fn new(cc: &eframe::CreationContext<'_>, session: Session) -> Self {
         theme::apply(&cc.egui_ctx);
+        Self::with_session(session)
+    }
+
+    fn with_session(session: Session) -> Self {
         Self {
             session,
             page: Page::Home,
@@ -60,7 +69,33 @@ impl LedgerApp {
             licenses: LicenseWindow::default(),
             show_nav: true,
             title: String::new(),
+            window_scale: 0.0,
         }
+    }
+
+    /// Set the minimum window size, and on the first frame fit the window to
+    /// its monitor. egui-winit 0.29 converts `ViewportBuilder` sizes with the
+    /// primary monitor's scale, so with a Retina main display and a 1x
+    /// external one the window opened at double size and could not shrink.
+    /// Viewport commands use the window's own scale, so set the limits here
+    /// and again whenever the window moves to a monitor with another scale.
+    fn fit_window(&mut self, ctx: &egui::Context) {
+        let scale = ctx.pixels_per_point();
+        if scale == self.window_scale {
+            return;
+        }
+        ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(MIN_WINDOW));
+        if self.window_scale == 0.0 {
+            let (inner, monitor) =
+                ctx.input(|i| (i.viewport().inner_rect, i.viewport().monitor_size));
+            if let (Some(inner), Some(monitor)) = (inner, monitor) {
+                let fitted = inner.size().min(monitor * 0.9).max(MIN_WINDOW);
+                if fitted != inner.size() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(fitted));
+                }
+            }
+        }
+        self.window_scale = scale;
     }
 
     fn info(&mut self, msg: impl Into<String>) {
@@ -258,10 +293,14 @@ impl LedgerApp {
             Action::Error(e) => self.error(e),
             Action::ClearStatus => self.info("Ready"),
             Action::ExportCsv { name, csv } => self.export_csv(&name, &csv),
+<<<<<<< HEAD
             Action::ExportXlsx { name, data } => match data {
                 Ok(bytes) => self.export_xlsx(&name, &bytes),
                 Err(e) => self.error(e),
             },
+=======
+            Action::ClearStatus => self.info("Ready"),
+>>>>>>> 5f829dc4a75e26b505b8bc83681a13ff1c5d720c
         }
     }
 
@@ -551,6 +590,7 @@ impl eframe::App for LedgerApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.title = title;
         }
+        self.fit_window(ctx);
 
         self.shortcuts(ctx);
         self.menu_bar(ctx);
@@ -604,5 +644,22 @@ impl eframe::App for LedgerApp {
             self.apply(action);
         }
         self.dialogs(ctx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ledgercraft_engine::new_company;
+
+    // Regression: Clear on a form sent ClearStatus, which hit a `panic!` and
+    // closed the app.
+    #[test]
+    fn clear_status_resets_the_status_bar() {
+        let mut app = LedgerApp::with_session(Session::new(new_company("Clear Co")));
+        app.error("Invoice 1001 is missing a customer");
+        app.apply(Action::ClearStatus);
+        assert_eq!(app.status, "Ready");
+        assert!(!app.status_is_error);
     }
 }
