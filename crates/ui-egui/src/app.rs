@@ -293,14 +293,11 @@ impl LedgerApp {
             Action::Error(e) => self.error(e),
             Action::ClearStatus => self.info("Ready"),
             Action::ExportCsv { name, csv } => self.export_csv(&name, &csv),
-<<<<<<< HEAD
             Action::ExportXlsx { name, data } => match data {
                 Ok(bytes) => self.export_xlsx(&name, &bytes),
                 Err(e) => self.error(e),
-            },
-=======
-            Action::ClearStatus => self.info("Ready"),
->>>>>>> 5f829dc4a75e26b505b8bc83681a13ff1c5d720c
+            }
+
         }
     }
 
