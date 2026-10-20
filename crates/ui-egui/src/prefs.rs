@@ -19,6 +19,9 @@ const MAX_BYTES: u64 = 64 * 1024;
 /// Lightest and darkest shading offered, as grey levels (0 black, 255 white).
 /// Darker than this and the black row text gets hard to read.
 pub(crate) const STRIPE_GREY_RANGE: std::ops::RangeInclusive<u8> = 160..=250;
+/// The default shading: the middle of the picker's range.
+const DEFAULT_STRIPE_GREY: u8 =
+    ((*STRIPE_GREY_RANGE.start() as u16 + *STRIPE_GREY_RANGE.end() as u16) / 2) as u8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -29,7 +32,9 @@ pub(crate) struct Prefs {
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { stripe_grey: 0xdc }
+        Self {
+            stripe_grey: DEFAULT_STRIPE_GREY,
+        }
     }
 }
 
@@ -218,11 +223,6 @@ fn grey_picker(ui: &mut egui::Ui, grey: &mut u8) {
     let x = rect.left() + t * rect.width();
     let marker = egui::Rect::from_x_y_ranges(x - 2.0..=x + 2.0, rect.y_range().expand(3.0));
     ui.painter().rect_filled(marker, 1.0, theme::ACCENT);
-    ui.label(
-        RichText::new(format!("{grey}"))
-            .monospace()
-            .color(theme::MUTED),
-    );
 }
 
 #[cfg(test)]
@@ -264,6 +264,11 @@ mod tests {
         fs::write(&path, "{\"future_setting\": true}").unwrap();
         assert_eq!(load_from(&path), Prefs::default());
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn default_is_the_middle_of_the_picker() {
+        assert_eq!(Prefs::default().stripe_grey, 205);
     }
 
     #[test]

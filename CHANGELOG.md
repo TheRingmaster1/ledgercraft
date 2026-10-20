@@ -26,6 +26,8 @@ fixes to a release. See docs/releasing.md.
   At A Glance.
 - All text uses one dark colour across the app (text with its own colour, such
   as the side bar, links, hints and negative amounts, keeps it).
+- Preferences: the Row Shading bar no longer shows a number, and its default
+  is the middle of the bar (grey 205).
 
 ### Changed
 - Home: "At A Glance" heading, with a divider in the side bar colour between
