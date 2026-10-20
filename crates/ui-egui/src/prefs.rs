@@ -153,7 +153,6 @@ fn global_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
         .stroke(egui::Stroke::new(2.0_f32, Color32::BLACK))
         .inner_margin(6.0)
         .show(ui, |ui| {
-            ui.visuals_mut().override_text_color = Some(ui.visuals().strong_text_color());
             ui.set_width(PREVIEW_WIDTH);
             for (i, label) in ["Checking", "Savings", "Customers owe you"]
                 .into_iter()

@@ -148,13 +148,11 @@ const DIVIDER_GAP: f32 = 12.0;
 const GLANCE_MIN_WIDTH: f32 = 280.0;
 
 /// One At A Glance line: the label on the left, the amount right-aligned,
-/// on a rounded `stripe` background when one is given. All in the strong text
-/// colour so the shaded rows stay readable (negative amounts stay red).
+/// on a rounded `stripe` background when one is given.
 fn glance_row(ui: &mut Ui, stripe: Option<Color32>, label: &str, hint: bool, amount: Money) {
     let background = ui.painter().add(egui::Shape::Noop);
     let row = ui
         .horizontal(|ui| {
-            ui.visuals_mut().override_text_color = Some(ui.visuals().strong_text_color());
             ui.add_space(4.0);
             if hint {
                 widgets::hint_label(ui, label);

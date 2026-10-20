@@ -24,6 +24,8 @@ fixes to a release. See docs/releasing.md.
 - Row Shading applies to every striped list in the app (Chart of Accounts,
   customers, vendors, transactions, form lines, registers and reports), not only
   At A Glance.
+- All text uses one dark colour across the app (text with its own colour, such
+  as the side bar, links, hints and negative amounts, keeps it).
 
 ### Changed
 - Home: "At A Glance" heading, with a divider in the side bar colour between

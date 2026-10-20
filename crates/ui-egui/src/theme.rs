@@ -27,6 +27,9 @@ pub(crate) fn apply(ctx: &egui::Context) {
     v.selection.bg_fill = ACCENT_SOFT;
     v.selection.stroke.color = ACCENT;
     v.hyperlink_color = ACCENT;
+    // One dark text colour everywhere; text with its own colour (side bar,
+    // links, muted hints, negative amounts) keeps it.
+    v.override_text_color = Some(v.strong_text_color());
     style.visuals = v;
     style.spacing.item_spacing = egui::vec2(8.0, 6.0);
     style.spacing.button_padding = egui::vec2(10.0, 4.0);
