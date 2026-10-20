@@ -1,7 +1,7 @@
 //! The list and overview pages: Home, Chart of Accounts, Customers, Vendors,
 //! Items, Transactions, Reports and account registers.
 
-use eframe::egui::{self, RichText, Ui};
+use eframe::egui::{self, Color32, RichText, Ui};
 use ledgercraft_core::{Date, Money};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
@@ -147,7 +147,40 @@ const DIVIDER_GAP: f32 = 12.0;
 /// Narrowest the At A Glance column gets before it moves below the workflow.
 const GLANCE_MIN_WIDTH: f32 = 280.0;
 
-pub(crate) fn home(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
+/// One At A Glance line: the label on the left, the amount right-aligned,
+/// on a rounded `stripe` background when one is given.
+fn glance_row(
+    ui: &mut Ui,
+    stripe: Option<Color32>,
+    label: &str,
+    hint: bool,
+    amount: Money,
+    strong: bool,
+) {
+    let background = ui.painter().add(egui::Shape::Noop);
+    let row = ui
+        .horizontal(|ui| {
+            ui.add_space(4.0);
+            if hint {
+                widgets::hint_label(ui, label);
+            } else {
+                ui.label(label);
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_space(4.0);
+                money_label(ui, amount, strong);
+            });
+        })
+        .response
+        .rect;
+    if let Some(colour) = stripe {
+        let shape = egui::Shape::rect_filled(row.expand2(egui::vec2(0.0, 2.0)), 2.0, colour);
+        ui.painter().set(background, shape);
+    }
+}
+
+/// `stripe` shades every other At A Glance row (Help > Preferences).
+pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Action>) {
     title(ui, &c.info.name);
     let balances = widgets::balances(c);
     let total_of = |kind: AccountType| {
@@ -171,7 +204,7 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
         .unwrap_or(Money::ZERO);
 
     let mut workflow = |ui: &mut Ui| {
-        ui.label(RichText::new("Workflow").strong());
+        ui.label(RichText::new("Workflow").strong().underline());
         ui.add_space(4.0);
         ui.label(RichText::new("Vendors").color(theme::MUTED));
         ui.horizontal(|ui| {
@@ -197,27 +230,25 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
         });
     };
     let glance = |ui: &mut Ui| {
-        ui.label(RichText::new("At A Glance").strong());
+        ui.label(RichText::new("At A Glance").strong().underline());
         ui.add_space(4.0);
-        egui::Grid::new("glance").num_columns(2).spacing([24.0, 6.0]).show(ui, |ui| {
-            for a in c.sorted_accounts().into_iter().filter(|a| a.kind == AccountType::Bank && a.active) {
-                ui.label(a.name.as_str());
-                money_label(ui, balances.get(&a.id).copied().unwrap_or(Money::ZERO), false);
-                ui.end_row();
-            }
-            widgets::hint_label(ui, "Customers owe you");
-            money_label(ui, total_of(AccountType::AccountsReceivable), true);
-            ui.end_row();
-            widgets::hint_label(ui, "You owe vendors");
-            money_label(ui, total_of(AccountType::AccountsPayable), true);
-            ui.end_row();
-            widgets::hint_label(ui, "Credit cards");
-            money_label(ui, total_of(AccountType::CreditCard), false);
-            ui.end_row();
-            ui.label(format!("Net income since {fy_start}"));
-            money_label(ui, net_income, true);
-            ui.end_row();
-        });
+        let mut shade = false;
+        let mut row = |ui: &mut Ui, label: &str, hint: bool, amount: Money, strong: bool| {
+            glance_row(ui, shade.then_some(stripe), label, hint, amount, strong);
+            shade = !shade;
+        };
+        for a in c.sorted_accounts().into_iter().filter(|a| a.kind == AccountType::Bank && a.active) {
+            let balance = balances.get(&a.id).copied().unwrap_or(Money::ZERO);
+            row(ui, a.name.as_str(), false, balance, false);
+        }
+        let receivable = total_of(AccountType::AccountsReceivable);
+        let payable = total_of(AccountType::AccountsPayable);
+        let cards = total_of(AccountType::CreditCard);
+        row(ui, "Customers owe you", true, receivable, true);
+        row(ui, "You owe vendors", true, payable, true);
+        row(ui, "Credit cards", true, cards, false);
+        let since = format!("Net income since {fy_start}");
+        row(ui, &since, false, net_income, true);
     };
 
     // Side by side, split down the middle, while At A Glance still fits next to

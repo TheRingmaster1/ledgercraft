@@ -13,10 +13,17 @@ fixes to a release. See docs/releasing.md.
   monitors; it no longer opens larger than the screen.
 - Home: At A Glance shows its amounts, and no longer overlaps the workflow
   buttons in a narrow window (it moves below them).
+- The desktop app builds on Linux (a source file name differed only in case).
+
+### Added
+- Help > Preferences: choose the grey used to shade At A Glance rows. Saved
+  per user and kept between launches.
 
 ### Changed
 - Home: "At A Glance" heading, with a divider in the side bar colour between
   the workflow and At A Glance.
+- Home: every other At A Glance row is shaded grey, and the Workflow and
+  At A Glance headings are underlined.
 
 ## [0.1.0] - unreleased
 
