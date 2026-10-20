@@ -396,6 +396,7 @@ pub(crate) fn receive_payment(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out
     }
     if clear {
         *f = PaymentForm::default();
+        out.push(Action::ClearStatus);
     }
 }
 
@@ -447,6 +448,7 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
     }
     if clear {
         *f = PaymentForm::default();
+        out.push(Action::ClearStatus);
     }
 }
 
@@ -644,6 +646,7 @@ pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Ac
     }
     if clear {
         *f = LinesForm::default();
+        out.push(Action::ClearStatus);
     }
 }
 
@@ -695,6 +698,7 @@ pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<A
     }
     if clear {
         *f = LinesForm::default();
+        out.push(Action::ClearStatus);
     }
 }
 
@@ -756,6 +760,7 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
     }
     if clear {
         *f = LinesForm::default();
+        out.push(Action::ClearStatus);
     }
 }
 
@@ -832,6 +837,7 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
     }
     if clear {
         *f = JournalForm::default();
+        out.push(Action::ClearStatus);
     }
 }
 
