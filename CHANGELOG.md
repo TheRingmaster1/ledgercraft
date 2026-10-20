@@ -14,6 +14,8 @@ fixes to a release. See docs/releasing.md.
 - Home: At A Glance shows its amounts, and no longer overlaps the workflow
   buttons in a narrow window (it moves below them).
 - The desktop app builds on Linux (a source file name differed only in case).
+- Preferences: Reset To Default under Row Shading resets only the shading; it
+  no longer turns the tutorial back on.
 
 ### Added
 - Help > Preferences: choose the grey used to shade At A Glance rows. Saved

@@ -50,6 +50,12 @@ impl Prefs {
         Color32::from_gray(grey)
     }
 
+    /// Row Shading's Reset To Default: back to the default shade only, leaving
+    /// the other preferences as they are.
+    pub(crate) fn reset_shading(&mut self) {
+        self.stripe_grey = Self::default().stripe_grey;
+    }
+
     /// The saved preferences, or the defaults if there are none or they
     /// cannot be read.
     pub(crate) fn load() -> Self {
@@ -190,7 +196,7 @@ fn global_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         if ui.button("Reset to default").clicked() {
-            *prefs = Prefs::default();
+            prefs.reset_shading();
         }
         ui.label(
             RichText::new("Saved automatically.")
@@ -288,6 +294,19 @@ mod tests {
         save_to(&path, &off).unwrap();
         assert!(!load_from(&path).show_tutorial);
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    // Regression: Reset To Default replaced every preference, so it also
+    // turned the tutorial back on.
+    #[test]
+    fn reset_shading_leaves_other_preferences_alone() {
+        let mut prefs = Prefs {
+            stripe_grey: 170,
+            show_tutorial: false,
+        };
+        prefs.reset_shading();
+        assert_eq!(prefs.stripe_grey, Prefs::default().stripe_grey);
+        assert!(!prefs.show_tutorial);
     }
 
     #[test]
