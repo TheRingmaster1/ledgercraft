@@ -1792,6 +1792,8 @@ dependencies = [
  "ledgercraft-ledger",
  "ledgercraft-reports",
  "rfd",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
