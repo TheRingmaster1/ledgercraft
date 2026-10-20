@@ -54,10 +54,12 @@ impl Prefs {
         Color32::from_gray(grey)
     }
 
-    /// Row Shading's Reset To Default: back to the default shade only, leaving
-    /// the other preferences as they are.
-    pub(crate) fn reset_shading(&mut self) {
-        self.stripe_grey = Self::default().stripe_grey;
+    /// Global's Reset To Default: the row shading and Open Menus On Hover go
+    /// back to their defaults; the tutorial setting is left as it is.
+    pub(crate) fn reset_global(&mut self) {
+        let defaults = Self::default();
+        self.stripe_grey = defaults.stripe_grey;
+        self.hover_menus = defaults.hover_menus;
     }
 
     /// The saved preferences, or the defaults if there are none or they
@@ -203,7 +205,7 @@ fn global_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         if ui.button("Reset To Default").clicked() {
-            prefs.reset_shading();
+            prefs.reset_global();
         }
         ui.label(
             RichText::new("Saved automatically.")
@@ -318,18 +320,18 @@ mod tests {
     }
 
     // Regression: Reset To Default replaced every preference, so it also
-    // turned the tutorial back on.
+    // turned the tutorial back on. It resets what Global shows, and only that.
     #[test]
-    fn reset_shading_leaves_other_preferences_alone() {
+    fn reset_global_resets_shading_and_hover_but_not_the_tutorial() {
         let mut prefs = Prefs {
             stripe_grey: 170,
             show_tutorial: false,
             hover_menus: true,
         };
-        prefs.reset_shading();
+        prefs.reset_global();
         assert_eq!(prefs.stripe_grey, Prefs::default().stripe_grey);
+        assert!(!prefs.hover_menus);
         assert!(!prefs.show_tutorial);
-        assert!(prefs.hover_menus);
     }
 
     #[test]
