@@ -21,6 +21,9 @@ fixes to a release. See docs/releasing.md.
 - Preferences are grouped under a selectable Global section (styled like the
   selected side bar item) that shows or hides Row Shading; the shading preview
   is boxed.
+- Row Shading applies to every striped list in the app (Chart of Accounts,
+  customers, vendors, transactions, form lines, registers and reports), not only
+  At A Glance.
 
 ### Changed
 - Home: "At A Glance" heading, with a divider in the side bar colour between

@@ -23,7 +23,7 @@ pub(crate) const STRIPE_GREY_RANGE: std::ops::RangeInclusive<u8> = 160..=250;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct Prefs {
-    /// Grey level behind every other At A Glance row on the Home page.
+    /// Grey level behind every other row of every list in the app.
     pub(crate) stripe_grey: u8,
 }
 
@@ -141,7 +141,7 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
         });
 }
 
-/// Global preferences: the At A Glance row shading, with a preview.
+/// Global preferences: the row shading used by every list, with a preview.
 fn global_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     ui.horizontal(|ui| {
         ui.label("Row Shading");

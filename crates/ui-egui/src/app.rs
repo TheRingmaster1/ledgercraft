@@ -111,6 +111,15 @@ impl LedgerApp {
         self.window_scale = scale;
     }
 
+    /// Row Shading applies to every striped list in the app: egui's striped
+    /// grids take their colour from `faint_bg_color` (and nothing else does).
+    fn apply_prefs(&self, ctx: &egui::Context) {
+        let stripe = self.prefs.stripe();
+        if ctx.style().visuals.faint_bg_color != stripe {
+            ctx.style_mut(|s| s.visuals.faint_bg_color = stripe);
+        }
+    }
+
     /// Save changed preferences once the mouse is released, so dragging the
     /// shading picker writes the file once rather than every frame.
     fn save_prefs(&mut self, ctx: &egui::Context) {
@@ -618,6 +627,7 @@ impl eframe::App for LedgerApp {
             self.title = title;
         }
         self.fit_window(ctx);
+        self.apply_prefs(ctx);
         self.save_prefs(ctx);
 
         self.shortcuts(ctx);
