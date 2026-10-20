@@ -24,6 +24,7 @@ fixes to a release. See docs/releasing.md.
   the workflow and At A Glance.
 - Home: every other At A Glance row is shaded grey, and the Workflow and
   At A Glance headings are underlined.
+- Home: all At A Glance labels and amounts use the same dark text colour.
 
 ## [0.1.0] - unreleased
 

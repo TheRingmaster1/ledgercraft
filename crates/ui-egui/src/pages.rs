@@ -148,18 +148,13 @@ const DIVIDER_GAP: f32 = 12.0;
 const GLANCE_MIN_WIDTH: f32 = 280.0;
 
 /// One At A Glance line: the label on the left, the amount right-aligned,
-/// on a rounded `stripe` background when one is given.
-fn glance_row(
-    ui: &mut Ui,
-    stripe: Option<Color32>,
-    label: &str,
-    hint: bool,
-    amount: Money,
-    strong: bool,
-) {
+/// on a rounded `stripe` background when one is given. All in the strong text
+/// colour so the shaded rows stay readable (negative amounts stay red).
+fn glance_row(ui: &mut Ui, stripe: Option<Color32>, label: &str, hint: bool, amount: Money) {
     let background = ui.painter().add(egui::Shape::Noop);
     let row = ui
         .horizontal(|ui| {
+            ui.visuals_mut().override_text_color = Some(ui.visuals().strong_text_color());
             ui.add_space(4.0);
             if hint {
                 widgets::hint_label(ui, label);
@@ -168,7 +163,7 @@ fn glance_row(
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(4.0);
-                money_label(ui, amount, strong);
+                money_label(ui, amount, true);
             });
         })
         .response
@@ -233,22 +228,22 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
         ui.label(RichText::new("At A Glance").strong().underline());
         ui.add_space(4.0);
         let mut shade = false;
-        let mut row = |ui: &mut Ui, label: &str, hint: bool, amount: Money, strong: bool| {
-            glance_row(ui, shade.then_some(stripe), label, hint, amount, strong);
+        let mut row = |ui: &mut Ui, label: &str, hint: bool, amount: Money| {
+            glance_row(ui, shade.then_some(stripe), label, hint, amount);
             shade = !shade;
         };
         for a in c.sorted_accounts().into_iter().filter(|a| a.kind == AccountType::Bank && a.active) {
             let balance = balances.get(&a.id).copied().unwrap_or(Money::ZERO);
-            row(ui, a.name.as_str(), false, balance, false);
+            row(ui, a.name.as_str(), false, balance);
         }
         let receivable = total_of(AccountType::AccountsReceivable);
         let payable = total_of(AccountType::AccountsPayable);
         let cards = total_of(AccountType::CreditCard);
-        row(ui, "Customers owe you", true, receivable, true);
-        row(ui, "You owe vendors", true, payable, true);
-        row(ui, "Credit cards", true, cards, false);
+        row(ui, "Customers owe you", true, receivable);
+        row(ui, "You owe vendors", true, payable);
+        row(ui, "Credit cards", true, cards);
         let since = format!("Net income since {fy_start}");
-        row(ui, &since, false, net_income, true);
+        row(ui, &since, false, net_income);
     };
 
     // Side by side, split down the middle, while At A Glance still fits next to
