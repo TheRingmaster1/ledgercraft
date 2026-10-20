@@ -28,12 +28,16 @@ const DEFAULT_STRIPE_GREY: u8 =
 pub(crate) struct Prefs {
     /// Grey level behind every other row of every list in the app.
     pub(crate) stripe_grey: u8,
+    /// Open the Tutorial window when the app starts. Cleared by its
+    /// "Never show again" box; Help > Tutorial sets it again.
+    pub(crate) show_tutorial: bool,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
         Self {
             stripe_grey: DEFAULT_STRIPE_GREY,
+            show_tutorial: true,
         }
     }
 }
@@ -239,7 +243,10 @@ mod tests {
     #[test]
     fn round_trip_through_disk() {
         let path = temp_file("round-trip");
-        let prefs = Prefs { stripe_grey: 190 };
+        let prefs = Prefs {
+            stripe_grey: 190,
+            show_tutorial: false,
+        };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
         let _ = fs::remove_dir_all(path.parent().unwrap());
@@ -267,6 +274,23 @@ mod tests {
     }
 
     #[test]
+    fn tutorial_shows_until_turned_off() {
+        assert!(Prefs::default().show_tutorial);
+        let path = temp_file("tutorial");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        // A file saved before the setting existed still shows the tutorial.
+        fs::write(&path, "{\"stripe_grey\": 190}").unwrap();
+        assert!(load_from(&path).show_tutorial);
+        let off = Prefs {
+            show_tutorial: false,
+            ..Prefs::default()
+        };
+        save_to(&path, &off).unwrap();
+        assert!(!load_from(&path).show_tutorial);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
     fn default_is_the_middle_of_the_picker() {
         assert_eq!(Prefs::default().stripe_grey, 205);
     }
@@ -274,11 +298,19 @@ mod tests {
     #[test]
     fn stripe_stays_readable() {
         assert_eq!(
-            Prefs { stripe_grey: 0 }.stripe(),
+            Prefs {
+                stripe_grey: 0,
+                ..Prefs::default()
+            }
+            .stripe(),
             Color32::from_gray(*STRIPE_GREY_RANGE.start())
         );
         assert_eq!(
-            Prefs { stripe_grey: 255 }.stripe(),
+            Prefs {
+                stripe_grey: 255,
+                ..Prefs::default()
+            }
+            .stripe(),
             Color32::from_gray(*STRIPE_GREY_RANGE.end())
         );
     }
