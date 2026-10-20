@@ -8,7 +8,7 @@ use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
-use crate::{forms, theme, Action, FormKind, Page, Reset};
+use crate::{forms, theme, tutorial, Action, FormKind, Page, Reset};
 
 /// Something waiting for the user to decide what to do with unsaved changes.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -31,6 +31,7 @@ pub struct LedgerApp {
     allow_close: bool,
     show_about: bool,
     show_prefs: bool,
+    show_tutorial: bool,
     prefs: Prefs,
     /// What is on disk, so changes are saved once rather than every frame.
     saved_prefs: Prefs,
@@ -58,6 +59,7 @@ impl LedgerApp {
         theme::apply(&cc.egui_ctx);
         let prefs = Prefs::load();
         Self {
+            show_tutorial: prefs.show_tutorial,
             prefs,
             saved_prefs: prefs,
             ..Self::with_session(session)
@@ -77,6 +79,7 @@ impl LedgerApp {
             allow_close: false,
             show_about: false,
             show_prefs: false,
+            show_tutorial: false,
             prefs: Prefs::default(),
             saved_prefs: Prefs::default(),
             licenses: LicenseWindow::default(),
@@ -130,6 +133,12 @@ impl LedgerApp {
             self.error(format!("Could not save preferences: {e}"));
         }
         self.saved_prefs = self.prefs;
+    }
+
+    /// Help > Tutorial > Show at Next Launch: undo "Never show again".
+    fn tutorial_at_next_launch(&mut self) {
+        self.prefs.show_tutorial = true;
+        self.info("The tutorial will open the next time LedgerCraft starts.");
     }
 
     fn info(&mut self, msg: impl Into<String>) {
@@ -471,6 +480,16 @@ impl LedgerApp {
                         ui.close_menu();
                         self.show_prefs = true;
                     }
+                    ui.menu_button("Tutorial", |ui| {
+                        if ui.button("Show Tutorial").clicked() {
+                            ui.close_menu();
+                            self.show_tutorial = true;
+                        }
+                        if ui.button("Show at Next Launch").clicked() {
+                            ui.close_menu();
+                            self.tutorial_at_next_launch();
+                        }
+                    });
                     if ui.button("Licenses").clicked() {
                         ui.close_menu();
                         self.licenses.show_tab(LicenseTab::Summary);
@@ -611,6 +630,7 @@ impl LedgerApp {
         }
         self.licenses.ui(ctx);
         prefs::window(ctx, &mut self.show_prefs, &mut self.prefs);
+        tutorial::window(ctx, &mut self.show_tutorial, &mut self.prefs);
     }
 }
 
@@ -700,5 +720,15 @@ mod tests {
         app.apply(Action::ClearStatus);
         assert_eq!(app.status, "Ready");
         assert!(!app.status_is_error);
+    }
+
+    #[test]
+    fn show_at_next_launch_turns_the_tutorial_back_on() {
+        let mut app = LedgerApp::with_session(Session::new(new_company("Tutorial Co")));
+        app.prefs.show_tutorial = false;
+        app.tutorial_at_next_launch();
+        assert!(app.prefs.show_tutorial);
+        // Only flags the next launch; it does not open the window now.
+        assert!(!app.show_tutorial);
     }
 }

@@ -28,6 +28,10 @@ fixes to a release. See docs/releasing.md.
   as the side bar, links, hints and negative amounts, keeps it).
 - Preferences: the Row Shading bar no longer shows a number, and its default
   is the middle of the bar (grey 205).
+- A Tutorial window (blank for now) opens at launch until "Never show again"
+  is ticked; the choice is saved with the preferences. Help > Tutorial opens it
+  on demand (Show Tutorial) or turns it back on for the next launch (Show at
+  Next Launch).
 
 ### Changed
 - Home: "At A Glance" heading, with a divider in the side bar colour between

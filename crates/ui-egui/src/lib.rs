@@ -11,6 +11,7 @@ mod licenses;
 mod pages;
 mod prefs;
 mod theme;
+mod tutorial;
 mod widgets;
 
 pub use app::LedgerApp;
