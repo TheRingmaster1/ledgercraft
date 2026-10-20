@@ -7,6 +7,9 @@ fixes to a release. See docs/releasing.md.
 
 ## [Unreleased]
 
+### Fixed
+- Clear on the Create Invoice form no longer closes the app.
+
 ## [0.1.0] - unreleased
 
 First public pre-alpha.

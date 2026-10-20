@@ -46,6 +46,10 @@ const SIDE_BAR: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key
 impl LedgerApp {
     pub fn new(cc: &eframe::CreationContext<'_>, session: Session) -> Self {
         theme::apply(&cc.egui_ctx);
+        Self::with_session(session)
+    }
+
+    fn with_session(session: Session) -> Self {
         Self {
             session,
             page: Page::Home,
@@ -241,10 +245,7 @@ impl LedgerApp {
             }
             Action::Error(e) => self.error(e),
             Action::ExportCsv { name, csv } => self.export_csv(&name, &csv),
-            Action::ClearStatus => {
-                let todo = "not yet implemented";
-                panic!("{todo}")
-            },
+            Action::ClearStatus => self.info("Ready"),
         }
     }
 
@@ -591,5 +592,22 @@ impl eframe::App for LedgerApp {
             self.apply(action);
         }
         self.dialogs(ctx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ledgercraft_engine::new_company;
+
+    // Regression: Clear on a form sent ClearStatus, which hit a `panic!` and
+    // closed the app.
+    #[test]
+    fn clear_status_resets_the_status_bar() {
+        let mut app = LedgerApp::with_session(Session::new(new_company("Clear Co")));
+        app.error("Invoice 1001 is missing a customer");
+        app.apply(Action::ClearStatus);
+        assert_eq!(app.status, "Ready");
+        assert!(!app.status_is_error);
     }
 }
