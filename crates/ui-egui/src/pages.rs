@@ -140,6 +140,13 @@ fn arrow(ui: &mut Ui) {
     ui.painter().line_segment([tip, egui::pos2(tip.x - 7.0, y + 6.0)], stroke);
 }
 
+/// Width of the divider between the Home page columns, in ui points.
+const DIVIDER_WIDTH: f32 = 5.0;
+/// Space either side of the Home page divider.
+const DIVIDER_GAP: f32 = 12.0;
+/// Narrowest the At A Glance column gets before it moves below the workflow.
+const GLANCE_MIN_WIDTH: f32 = 280.0;
+
 pub(crate) fn home(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
     title(ui, &c.info.name);
     let balances = widgets::balances(c);
@@ -163,56 +170,101 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
         })
         .unwrap_or(Money::ZERO);
 
-    ui.columns(2, |cols| {
-        if let [left, right] = cols {
-            left.label(RichText::new("Workflow").strong());
-            left.add_space(4.0);
-            left.label(RichText::new("Vendors").color(theme::MUTED));
-            left.horizontal(|ui| {
-                flow_button(ui, "Enter Bills", Page::Form(FormKind::Bill), out);
-                arrow(ui);
-                flow_button(ui, "Pay Bills", Page::Form(FormKind::PayBills), out);
-            });
-            left.add_space(10.0);
-            left.label(RichText::new("Customers").color(theme::MUTED));
-            left.horizontal(|ui| {
-                flow_button(ui, "Create Invoices", Page::Form(FormKind::Invoice), out);
-                arrow(ui);
-                flow_button(ui, "Receive Payments", Page::Form(FormKind::ReceivePayment), out);
-                arrow(ui);
-                flow_button(ui, "Record Deposits", Page::Form(FormKind::Deposit), out);
-            });
-            left.add_space(10.0);
-            left.label(RichText::new("Banking and company").color(theme::MUTED));
-            left.horizontal(|ui| {
-                flow_button(ui, "Write Checks", Page::Form(FormKind::Check), out);
-                flow_button(ui, "Journal Entry", Page::Form(FormKind::Journal), out);
-                flow_button(ui, "Chart of Accounts", Page::Accounts, out);
-            });
+    let mut workflow = |ui: &mut Ui| {
+        ui.label(RichText::new("Workflow").strong());
+        ui.add_space(4.0);
+        ui.label(RichText::new("Vendors").color(theme::MUTED));
+        ui.horizontal(|ui| {
+            flow_button(ui, "Enter Bills", Page::Form(FormKind::Bill), out);
+            arrow(ui);
+            flow_button(ui, "Pay Bills", Page::Form(FormKind::PayBills), out);
+        });
+        ui.add_space(10.0);
+        ui.label(RichText::new("Customers").color(theme::MUTED));
+        ui.horizontal(|ui| {
+            flow_button(ui, "Create Invoices", Page::Form(FormKind::Invoice), out);
+            arrow(ui);
+            flow_button(ui, "Receive Payments", Page::Form(FormKind::ReceivePayment), out);
+            arrow(ui);
+            flow_button(ui, "Record Deposits", Page::Form(FormKind::Deposit), out);
+        });
+        ui.add_space(10.0);
+        ui.label(RichText::new("Banking and company").color(theme::MUTED));
+        ui.horizontal(|ui| {
+            flow_button(ui, "Write Checks", Page::Form(FormKind::Check), out);
+            flow_button(ui, "Journal Entry", Page::Form(FormKind::Journal), out);
+            flow_button(ui, "Chart of Accounts", Page::Accounts, out);
+        });
+    };
+    let glance = |ui: &mut Ui| {
+        ui.label(RichText::new("At A Glance").strong());
+        ui.add_space(4.0);
+        egui::Grid::new("glance").num_columns(2).spacing([24.0, 6.0]).show(ui, |ui| {
+            for a in c.sorted_accounts().into_iter().filter(|a| a.kind == AccountType::Bank && a.active) {
+                ui.label(a.name.as_str());
+                money_label(ui, balances.get(&a.id).copied().unwrap_or(Money::ZERO), false);
+                ui.end_row();
+            }
+            widgets::hint_label(ui, "Customers owe you");
+            money_label(ui, total_of(AccountType::AccountsReceivable), true);
+            ui.end_row();
+            widgets::hint_label(ui, "You owe vendors");
+            money_label(ui, total_of(AccountType::AccountsPayable), true);
+            ui.end_row();
+            widgets::hint_label(ui, "Credit cards");
+            money_label(ui, total_of(AccountType::CreditCard), false);
+            ui.end_row();
+            ui.label(format!("Net income since {fy_start}"));
+            money_label(ui, net_income, true);
+            ui.end_row();
+        });
+    };
 
-            right.label(RichText::new("At a glance").strong());
-            right.add_space(4.0);
-            egui::Grid::new("glance").num_columns(2).spacing([24.0, 6.0]).show(right, |ui| {
-                for a in c.sorted_accounts().into_iter().filter(|a| a.kind == AccountType::Bank && a.active) {
-                    ui.label(a.name.as_str());
-                    money_label(ui, balances.get(&a.id).copied().unwrap_or(Money::ZERO), false);
-                    ui.end_row();
-                }
-                widgets::hint_label(ui, "Customers owe you");
-                money_label(ui, total_of(AccountType::AccountsReceivable), true);
-                ui.end_row();
-                widgets::hint_label(ui, "You owe vendors");
-                money_label(ui, total_of(AccountType::AccountsPayable), true);
-                ui.end_row();
-                widgets::hint_label(ui, "Credit cards");
-                money_label(ui, total_of(AccountType::CreditCard), false);
-                ui.end_row();
-                ui.label(format!("Net income since {fy_start}"));
-                money_label(ui, net_income, true);
-                ui.end_row();
-            });
-        }
-    });
+    // Side by side, split down the middle, while At A Glance still fits next to
+    // the workflow buttons; otherwise At A Glance moves below them. The
+    // workflow's natural width is measured each frame and used on the next.
+    let width_id = ui.id().with("home_workflow_width");
+    let workflow_width = ui.data(|d| d.get_temp::<f32>(width_id)).unwrap_or(0.0);
+    let full = ui.available_width();
+    let left_width = workflow_width.max((full - DIVIDER_WIDTH) / 2.0 - DIVIDER_GAP);
+    let measured = if full - left_width - DIVIDER_WIDTH - 2.0 * DIVIDER_GAP >= GLANCE_MIN_WIDTH {
+        ui.horizontal_top(|ui| {
+            let size = egui::vec2(left_width, ui.available_height());
+            let left = ui.allocate_ui_with_layout(
+                size,
+                egui::Layout::top_down(egui::Align::Min),
+                &mut workflow,
+            );
+            let left = left.response.rect;
+            ui.add_space((left_width - left.width()).max(0.0) + DIVIDER_GAP);
+            let x = ui.cursor().left();
+            ui.add_space(DIVIDER_WIDTH + DIVIDER_GAP);
+            let right = ui.vertical(glance).response.rect;
+            let divider = egui::Rect::from_x_y_ranges(
+                x..=x + DIVIDER_WIDTH,
+                left.top()..=left.bottom().max(right.bottom()),
+            );
+            ui.painter().rect_filled(divider, 0.0, theme::NAV_BG);
+            left.width()
+        })
+        .inner
+    } else {
+        let left = ui.vertical(&mut workflow).response.rect;
+        ui.add_space(DIVIDER_GAP);
+        let (divider, _) =
+            ui.allocate_exact_size(egui::vec2(full, DIVIDER_WIDTH), egui::Sense::hover());
+        ui.painter().rect_filled(divider, 0.0, theme::NAV_BG);
+        ui.add_space(DIVIDER_GAP);
+        ui.vertical(|ui| {
+            ui.set_max_width(full.min(2.0 * GLANCE_MIN_WIDTH));
+            glance(ui);
+        });
+        left.width()
+    };
+    if measured != workflow_width {
+        ui.data_mut(|d| d.insert_temp(width_id, measured));
+        ui.ctx().request_repaint();
+    }
 }
 
 // ----- chart of accounts -----------------------------------------------------------

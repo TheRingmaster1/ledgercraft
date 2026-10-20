@@ -59,8 +59,9 @@ fn main() -> ExitCode {
         renderer: eframe::Renderer::Wgpu,
         viewport: egui::ViewportBuilder::default()
             .with_title("LedgerCraft")
-            .with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([900.0, 560.0]),
+            // The minimum size is set by `LedgerApp` once the window's
+            // monitor scale is known (see `LedgerApp::fit_window`).
+            .with_inner_size([1280.0, 800.0]),
         ..Default::default()
     };
     let result = eframe::run_native(
