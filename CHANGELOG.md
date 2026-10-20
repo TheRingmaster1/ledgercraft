@@ -14,6 +14,8 @@ fixes to a release. See docs/releasing.md.
 - Home: At A Glance shows its amounts, and no longer overlaps the workflow
   buttons in a narrow window (it moves below them).
 - The desktop app builds on Linux (a source file name differed only in case).
+- Preferences: Reset To Default under Row Shading resets only the shading; it
+  no longer turns the tutorial back on.
 
 ### Added
 - Help > Preferences: choose the grey used to shade At A Glance rows. Saved
@@ -32,6 +34,8 @@ fixes to a release. See docs/releasing.md.
   is ticked; the choice is saved with the preferences. Help > Tutorial opens it
   on demand (Show Tutorial) or turns it back on for the next launch (Show at
   Next Launch).
+- Preferences: Open Menus On Hover (off by default) opens File, Edit, View and
+  the other top menus when the pointer rests on them instead of on a click.
 
 ### Changed
 - Home: "At A Glance" heading, with a divider in the side bar colour between

@@ -31,6 +31,9 @@ pub(crate) struct Prefs {
     /// Open the Tutorial window when the app starts. Cleared by its
     /// "Never show again" box; Help > Tutorial sets it again.
     pub(crate) show_tutorial: bool,
+    /// Open the top menus (File, Edit, …) when the pointer rests on them,
+    /// instead of on a click.
+    pub(crate) hover_menus: bool,
 }
 
 impl Default for Prefs {
@@ -38,6 +41,7 @@ impl Default for Prefs {
         Self {
             stripe_grey: DEFAULT_STRIPE_GREY,
             show_tutorial: true,
+            hover_menus: false,
         }
     }
 }
@@ -48,6 +52,12 @@ impl Prefs {
             .stripe_grey
             .clamp(*STRIPE_GREY_RANGE.start(), *STRIPE_GREY_RANGE.end());
         Color32::from_gray(grey)
+    }
+
+    /// Row Shading's Reset To Default: back to the default shade only, leaving
+    /// the other preferences as they are.
+    pub(crate) fn reset_shading(&mut self) {
+        self.stripe_grey = Self::default().stripe_grey;
     }
 
     /// The saved preferences, or the defaults if there are none or they
@@ -188,9 +198,12 @@ fn global_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
             }
         });
     ui.add_space(6.0);
+    ui.checkbox(&mut prefs.hover_menus, "Open Menus On Hover")
+        .on_hover_text("Open File, Edit, View and the other top menus when the pointer rests on them, without clicking");
+    ui.add_space(6.0);
     ui.horizontal(|ui| {
-        if ui.button("Reset to default").clicked() {
-            *prefs = Prefs::default();
+        if ui.button("Reset To Default").clicked() {
+            prefs.reset_shading();
         }
         ui.label(
             RichText::new("Saved automatically.")
@@ -246,6 +259,7 @@ mod tests {
         let prefs = Prefs {
             stripe_grey: 190,
             show_tutorial: false,
+            hover_menus: true,
         };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
@@ -288,6 +302,34 @@ mod tests {
         save_to(&path, &off).unwrap();
         assert!(!load_from(&path).show_tutorial);
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn hover_menus_are_off_by_default() {
+        assert!(!Prefs::default().hover_menus);
+        let path = temp_file("hover");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        // A file saved before the setting existed keeps click-to-open menus.
+        fs::write(&path, "{\"stripe_grey\": 190, \"show_tutorial\": false}").unwrap();
+        let loaded = load_from(&path);
+        assert!(!loaded.hover_menus);
+        assert!(!loaded.show_tutorial);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    // Regression: Reset To Default replaced every preference, so it also
+    // turned the tutorial back on.
+    #[test]
+    fn reset_shading_leaves_other_preferences_alone() {
+        let mut prefs = Prefs {
+            stripe_grey: 170,
+            show_tutorial: false,
+            hover_menus: true,
+        };
+        prefs.reset_shading();
+        assert_eq!(prefs.stripe_grey, Prefs::default().stripe_grey);
+        assert!(!prefs.show_tutorial);
+        assert!(prefs.hover_menus);
     }
 
     #[test]
