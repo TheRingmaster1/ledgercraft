@@ -10,6 +10,7 @@ repository.workspace = true
 
 [dependencies]
 ledgercraft-engine.workspace = true
+ledgercraft-file.workspace = true
 ledgercraft-ui-egui.workspace = true
 eframe.workspace = true
 

@@ -27,6 +27,14 @@ fixes to a release. See docs/releasing.md.
   and Open Menus On Hover); it no longer turns the tutorial back on.
 
 ### Added
+- Password protection and encryption: every new company file is encrypted
+  with a password chosen in Create a Company (Argon2id key derivation and
+  XChaCha20-Poly1305 authenticated encryption, file format version 2). The
+  file is never written unencrypted, including temporary files during a save.
+  Opening a protected file asks for its password; File > Password… sets,
+  changes or removes it for the open company. A wrong password or a tampered
+  file is detected. Plain (version 1) files still open. The CLI reads the
+  password from LEDGERCRAFT_PASSWORD.
 - Amounts are shown with a currency symbol everywhere in the app ($1,234.56),
   and Excel exports format them the same way. Help > Preferences has a new
   Currency section (US, Canadian, Australian, New Zealand and Mexican dollars,

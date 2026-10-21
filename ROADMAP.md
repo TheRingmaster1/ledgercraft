@@ -55,7 +55,7 @@ Platform focus: **Windows 10/11 x64 only** until this list is done.
 * IIF import/export, CSV list import, QuickBooks Online CSV export import
 * Multi-currency
 * Agent interfaces: JSON control channel and MCP server over the command catalog
-* Encryption at rest, multi-user via a local server
+* ~~Encryption at rest~~ (done in 0.1: password-protected, encrypted company files); next: lock after inactivity, multi-user via a local server
 * Performance: copy-on-write company state, cached balances
 
 ## Out of scope for now

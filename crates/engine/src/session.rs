@@ -2,7 +2,7 @@ use std::fmt;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
-use ledgercraft_file::FileError;
+use ledgercraft_file::{FileError, Protection};
 use ledgercraft_ledger::{Company, LedgerError};
 
 use crate::Command;
@@ -59,18 +59,52 @@ pub struct Session {
     undo: Vec<(String, Company)>,
     redo: Vec<(String, Company)>,
     dirty: bool,
+    /// The file's encryption key, when it is password protected.
+    protection: Option<Protection>,
 }
 
 impl Session {
     pub fn new(company: Company) -> Self {
-        Self { company, path: None, undo: Vec::new(), redo: Vec::new(), dirty: false }
+        Self { company, path: None, undo: Vec::new(), redo: Vec::new(), dirty: false, protection: None }
     }
 
+    /// Opens a plain company file. A protected one fails with
+    /// `FileError::PasswordRequired`; open it with [`Session::open_with_password`].
     pub fn open(path: &Path) -> Result<Self, EngineError> {
-        let company = ledgercraft_file::load(path)?;
+        Self::load(path, None)
+    }
+
+    pub fn open_with_password(path: &Path, password: &str) -> Result<Self, EngineError> {
+        Self::load(path, Some(password))
+    }
+
+    fn load(path: &Path, password: Option<&str>) -> Result<Self, EngineError> {
+        let (company, protection) = ledgercraft_file::load(path, password)?;
         let mut s = Self::new(company);
         s.path = Some(path.to_path_buf());
+        s.protection = protection;
         Ok(s)
+    }
+
+    /// True when the company file is password protected.
+    pub fn is_protected(&self) -> bool {
+        self.protection.is_some()
+    }
+
+    /// Sets a new password (or removes it with `None`) and saves the file
+    /// straight away if it has a location, so the change takes effect on disk
+    /// immediately rather than at the next save.
+    pub fn set_password(&mut self, password: Option<&str>) -> Result<(), EngineError> {
+        self.protection = match password {
+            Some(p) => Some(Protection::new(p)?),
+            None => None,
+        };
+        if self.path.is_some() {
+            self.save()
+        } else {
+            self.dirty = true;
+            Ok(())
+        }
     }
 
     pub fn company(&self) -> &Company {
@@ -159,14 +193,14 @@ impl Session {
 
     pub fn save(&mut self) -> Result<(), EngineError> {
         let path = self.path.clone().ok_or(EngineError::NoPath)?;
-        ledgercraft_file::save(&path, &self.company)?;
+        ledgercraft_file::save(&path, &self.company, self.protection.as_ref())?;
         self.dirty = false;
         Ok(())
     }
 
     pub fn save_as(&mut self, path: &Path) -> Result<(), EngineError> {
         let path = ledgercraft_file::with_extension(path);
-        ledgercraft_file::save(&path, &self.company)?;
+        ledgercraft_file::save(&path, &self.company, self.protection.as_ref())?;
         self.path = Some(path);
         self.dirty = false;
         Ok(())
@@ -176,6 +210,27 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn protected_sessions_save_encrypted_and_reopen_with_the_password() {
+        let dir = std::env::temp_dir().join(format!("lc-session-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("locked.lcbooks");
+        let mut s = Session::new(Company::with_default_accounts("Locked Co"));
+        s.set_password(Some("open sesame please")).unwrap();
+        s.save_as(&path).unwrap();
+        assert!(ledgercraft_file::is_protected(&path));
+        assert!(matches!(Session::open(&path), Err(EngineError::File(FileError::PasswordRequired))));
+        assert!(Session::open_with_password(&path, "nope nope nope").is_err());
+        let mut reopened = Session::open_with_password(&path, "open sesame please").unwrap();
+        assert!(reopened.is_protected());
+        assert_eq!(reopened.company().info.name, "Locked Co");
+        // Removing the password writes a plain file at once.
+        reopened.set_password(None).unwrap();
+        assert!(!ledgercraft_file::is_protected(&path));
+        assert!(Session::open(&path).is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn failed_commands_change_nothing_and_undo_works() {

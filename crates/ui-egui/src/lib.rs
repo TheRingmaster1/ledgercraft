@@ -11,6 +11,7 @@ mod hints;
 mod licenses;
 mod pages;
 mod prefs;
+mod security;
 mod start;
 mod theme;
 mod tutorial;

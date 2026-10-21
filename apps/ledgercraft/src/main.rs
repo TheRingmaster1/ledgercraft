@@ -12,7 +12,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use eframe::egui;
-use ledgercraft_engine::{sample_company, Session};
+use ledgercraft_engine::{sample_company, EngineError, Session};
+use ledgercraft_file::FileError;
 use ledgercraft_ui_egui::LedgerApp;
 
 /// The app icon, 256 x 256. Original artwork; see ATTRIBUTION.md.
@@ -36,9 +37,15 @@ fn main() -> ExitCode {
         }
     }
 
+    // A password-protected file opens in the app, which asks for the password.
+    let mut unlock = None;
     let session = if let Some(p) = &path {
         match Session::open(p) {
             Ok(s) => Some(s),
+            Err(EngineError::File(FileError::PasswordRequired)) => {
+                unlock = Some(p.clone());
+                None
+            }
             Err(e) => {
                 eprintln!("ledgercraft: could not open {}: {e}", p.display());
                 return ExitCode::FAILURE;
@@ -79,7 +86,7 @@ fn main() -> ExitCode {
     let result = eframe::run_native(
         "LedgerCraft",
         options,
-        Box::new(move |cc| Ok(Box::new(LedgerApp::new(cc, session)))),
+        Box::new(move |cc| Ok(Box::new(LedgerApp::new(cc, session, unlock)))),
     );
     match result {
         Ok(()) => ExitCode::SUCCESS,

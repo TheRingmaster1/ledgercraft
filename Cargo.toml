@@ -42,6 +42,15 @@ todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
 
+# Key derivation is deliberately expensive; unoptimised it takes seconds, so
+# build the crypto crates optimised even in debug builds and tests.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.chacha20]
+opt-level = 3
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

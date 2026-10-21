@@ -71,7 +71,12 @@ fn run(args: &[String]) -> Result<(), String> {
                 let name = flag_value(rest, "--name").unwrap_or_else(|| "My Company".into());
                 new_company(&name)
             };
-            ledgercraft_file::save(&path, &company).map_err(|e| e.to_string())?;
+            // A new file is protected when LEDGERCRAFT_PASSWORD is set.
+            let protection = match password_from_env() {
+                Some(p) => Some(ledgercraft_file::Protection::new(&p).map_err(|e| e.to_string())?),
+                None => None,
+            };
+            ledgercraft_file::save(&path, &company, protection.as_ref()).map_err(|e| e.to_string())?;
             println!("created {}", path.display());
             Ok(())
         }
@@ -142,7 +147,24 @@ fn run(args: &[String]) -> Result<(), String> {
     }
 }
 
+/// Password-protected files are opened with the password in the
+/// LEDGERCRAFT_PASSWORD environment variable (never a command-line argument,
+/// which other users and shell history can see).
 fn open(file: &str) -> Result<Session, String> {
     let path = PathBuf::from(file);
-    Session::open(&path).map_err(|e| format!("{}: {e}", path.display()))
+    let opened = match password_from_env() {
+        Some(p) => Session::open_with_password(&path, &p),
+        None => Session::open(&path),
+    };
+    opened.map_err(|e| match e {
+        ledgercraft_engine::EngineError::File(ledgercraft_file::FileError::PasswordRequired) => format!(
+            "{}: this company file is password protected; set LEDGERCRAFT_PASSWORD",
+            path.display()
+        ),
+        e => format!("{}: {e}", path.display()),
+    })
+}
+
+fn password_from_env() -> Option<String> {
+    std::env::var("LEDGERCRAFT_PASSWORD").ok().filter(|p| !p.is_empty())
 }

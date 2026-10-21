@@ -7,6 +7,7 @@ use eframe::egui::{self, RichText};
 use ledgercraft_file::import::{self, ImportSummary, ListKind};
 use ledgercraft_ledger::{Address, Company};
 
+use crate::security::{self, Secret};
 use crate::theme;
 
 const ICON_PNG: &[u8] = include_bytes!("../../../assets/app-icon/ledgercraft-256.png");
@@ -158,6 +159,10 @@ pub(crate) struct NewCompanyForm {
     region: String,
     postal_code: String,
     imports: Vec<ImportFile>,
+    password: Secret,
+    confirm: Secret,
+    /// "I understand a forgotten password cannot be recovered."
+    understood: bool,
     /// The list the next CSV file holds.
     csv_kind: ListKind,
     error: Option<String>,
@@ -177,6 +182,9 @@ impl Default for NewCompanyForm {
             region: String::new(),
             postal_code: String::new(),
             imports: Vec::new(),
+            password: Secret::default(),
+            confirm: Secret::default(),
+            understood: false,
             csv_kind: ListKind::Customers,
             error: None,
         }
@@ -253,8 +261,9 @@ fn read_import(path: &std::path::Path) -> Result<String, String> {
 
 /// What happened in the Create a Company window this frame.
 pub(crate) enum CreateOutcome {
-    /// The new company, and what was imported into it (if anything).
-    Create(Company, Option<ImportSummary>),
+    /// The new company, what was imported into it (if anything), and the
+    /// password to protect it with.
+    Create(Box<Company>, Option<ImportSummary>, Secret),
     Cancel,
 }
 
@@ -321,6 +330,8 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
             );
             ui.radio_value(&mut form.starter_accounts, false, "Start with no accounts; I will add my own");
             ui.add_space(8.0);
+            password_section(ui, form);
+            ui.add_space(8.0);
             import_section(ui, form);
             if let Some(error) = &form.error {
                 ui.add_space(6.0);
@@ -329,8 +340,18 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
             ui.add_space(10.0);
             ui.horizontal(|ui| {
                 if ui.button(RichText::new("Create Company").strong()).clicked() {
-                    match form.build_with_imports() {
-                        Ok((company, summary)) => outcome = Some(CreateOutcome::Create(company, summary)),
+                    let password = security::check_new(&form.password.0, &form.confirm.0).and_then(|()| {
+                        if form.understood {
+                            Ok(())
+                        } else {
+                            Err("Tick the box to confirm you will keep the password safe.".to_string())
+                        }
+                    });
+                    match password.and_then(|()| form.build_with_imports()) {
+                        Ok((company, summary)) => {
+                            let secret = Secret(std::mem::take(&mut form.password.0));
+                            outcome = Some(CreateOutcome::Create(Box::new(company), summary, secret));
+                        }
                         Err(e) => form.error = Some(e),
                     }
                 }
@@ -348,6 +369,29 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
         outcome = Some(CreateOutcome::Cancel);
     }
     outcome
+}
+
+/// The company file's password. Every new company is encrypted with one.
+fn password_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
+    ui.label(RichText::new("Password").strong());
+    ui.label(
+        "The company file is encrypted with this password, on disk and in every backup \
+         copy. You will need it each time you open the company.",
+    );
+    egui::Grid::new("new_company_password").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
+        ui.label("Password");
+        security::password_field(
+            ui,
+            &mut form.password.0,
+            &format!("at least {} characters", ledgercraft_file::MIN_PASSWORD_CHARS),
+        );
+        ui.end_row();
+        ui.label("Confirm");
+        security::password_field(ui, &mut form.confirm.0, "type it again");
+        ui.end_row();
+    });
+    security::forgotten_password_note(ui);
+    ui.checkbox(&mut form.understood, "I understand, and I will keep the password safe");
 }
 
 /// "Bring in existing data": choose IIF and CSV files to import.

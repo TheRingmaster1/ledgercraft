@@ -1,12 +1,14 @@
 use std::path::PathBuf;
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText};
-use ledgercraft_engine::{sample_company, Session};
+use ledgercraft_engine::{sample_company, EngineError, Session};
+use ledgercraft_file::FileError;
 
 use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
+use crate::security::{self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome};
 use crate::start::{self, NewCompanyForm, StartChoice, StartPage};
 use crate::{forms, theme, tutorial, Action, FormKind, Page, Reset};
 
@@ -25,6 +27,10 @@ pub struct LedgerApp {
     session: Option<Session>,
     /// The Create a Company window, while it is open.
     create: Option<NewCompanyForm>,
+    /// Asking for a protected file's password, while open.
+    unlock: Option<UnlockForm>,
+    /// File > Password…, while open.
+    password: Option<PasswordForm>,
     /// What the last import brought in, shown until closed.
     import_report: Option<ledgercraft_file::import::ImportSummary>,
     start: StartPage,
@@ -63,14 +69,20 @@ const CHECK: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::W
 const SIDE_BAR: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::B);
 
 impl LedgerApp {
-    /// `None` starts with no company open, on the start page.
-    pub fn new(cc: &eframe::CreationContext<'_>, session: Option<Session>) -> Self {
+    /// `None` starts with no company open, on the start page. `unlock` is a
+    /// password-protected file to ask the password for straight away.
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        session: Option<Session>,
+        unlock: Option<PathBuf>,
+    ) -> Self {
         theme::apply(&cc.egui_ctx);
         let prefs = Prefs::load();
         Self {
             show_tutorial: prefs.show_tutorial,
             prefs,
             saved_prefs: prefs,
+            unlock: unlock.map(UnlockForm::new),
             ..Self::blank(session)
         }
     }
@@ -85,6 +97,8 @@ impl LedgerApp {
             session,
             create: None,
             import_report: None,
+            unlock: None,
+            password: None,
             start: StartPage::default(),
             page: Page::Home,
             forms: Forms::default(),
@@ -218,6 +232,7 @@ impl LedgerApp {
                 self.replace_session(s);
                 self.info(format!("Opened {}", path.display()));
             }
+            Err(EngineError::File(FileError::PasswordRequired)) => self.unlock = Some(UnlockForm::new(path)),
             Err(e) => self.error(format!("Could not open {}: {e}", path.display())),
         }
     }
@@ -461,6 +476,13 @@ impl LedgerApp {
                         ui.close_menu();
                         self.save_as();
                     }
+                    let password = ui
+                        .add_enabled(has_company, egui::Button::new("Password…"))
+                        .on_hover_text("Set, change or remove the password that encrypts this company file.");
+                    if password.clicked() {
+                        ui.close_menu();
+                        self.password = Some(PasswordForm::default());
+                    }
                     let close = ui
                         .add_enabled(has_company, egui::Button::new("Close Company"))
                         .on_hover_text("Close the books and go back to the start page.");
@@ -651,13 +673,64 @@ impl LedgerApp {
                                 .map(|p| p.display().to_string())
                                 .unwrap_or_else(|| "Not saved yet".into());
                             let dirty = if session.is_dirty() { "  • unsaved changes" } else { "" };
-                            format!("{file}{dirty}")
+                            let lock = if session.is_protected() {
+                                "  • password protected"
+                            } else {
+                                "  • not password protected"
+                            };
+                            format!("{file}{lock}{dirty}")
                         }
                     };
                     ui.label(RichText::new(text).color(theme::MUTED));
                 });
             });
         });
+    }
+
+    /// The unlock prompt and File > Password….
+    fn security_windows(&mut self, ctx: &egui::Context) {
+        let unlocked = match self.unlock.as_mut() {
+            Some(form) => security::unlock_window(ctx, form),
+            None => None,
+        };
+        match unlocked {
+            Some(UnlockOutcome::Opened(session)) => {
+                let shown = self.unlock.take().map(|f| f.path.display().to_string()).unwrap_or_default();
+                self.replace_session(*session);
+                self.info(format!("Opened {shown}"));
+            }
+            Some(UnlockOutcome::Failed(e)) => {
+                self.unlock = None;
+                self.error(format!("Could not open the company: {e}"));
+            }
+            Some(UnlockOutcome::Cancel) => self.unlock = None,
+            None => {}
+        }
+
+        let changed = match (self.password.as_mut(), self.session.as_ref()) {
+            (Some(form), Some(session)) => security::password_window(ctx, form, session),
+            (Some(_), None) => Some(PasswordOutcome::Cancel),
+            (None, _) => None,
+        };
+        match changed {
+            Some(PasswordOutcome::Apply(new)) => {
+                self.password = None;
+                let protect = new.is_some();
+                let result = self.session.as_mut().map(|s| s.set_password(new.as_deref()));
+                let mut new = new;
+                if let Some(p) = new.as_mut() {
+                    zeroize::Zeroize::zeroize(p);
+                }
+                match result {
+                    Some(Ok(())) if protect => self.info("Password saved. The company file is encrypted."),
+                    Some(Ok(())) => self.info("Password removed. The company file is no longer encrypted."),
+                    Some(Err(e)) => self.error(format!("Could not change the password: {e}")),
+                    None => {}
+                }
+            }
+            Some(PasswordOutcome::Cancel) => self.password = None,
+            None => {}
+        }
     }
 
     fn dialogs(&mut self, ctx: &egui::Context) {
@@ -702,9 +775,17 @@ impl LedgerApp {
             None => None,
         };
         match created {
-            Some(start::CreateOutcome::Create(company, summary)) => {
+            Some(start::CreateOutcome::Create(company, summary, password)) => {
                 let name = company.info.name.clone();
-                self.replace_session(Session::new(company));
+                let mut session = Session::new(*company);
+                // No location yet, so this only sets the key; the file is
+                // written encrypted when it is saved just below.
+                if let Err(e) = session.set_password(Some(&password.0)) {
+                    self.error(format!("Could not protect the company: {e}"));
+                    return;
+                }
+                drop(password);
+                self.replace_session(session);
                 match &summary {
                     Some(s) => self.info(format!("Created {name}. {s}.")),
                     None => self.info(format!("Created {name}.")),
@@ -721,6 +802,7 @@ impl LedgerApp {
             None => {}
         }
         start::import_report_window(ctx, &mut self.import_report);
+        self.security_windows(ctx);
         let mut open = self.show_about;
         let mut view_licenses = false;
         egui::Window::new("About LedgerCraft").open(&mut open).collapsible(false).show(ctx, |ui| {

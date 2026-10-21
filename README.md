@@ -89,6 +89,16 @@ The honest picture, and what comes next, is in [ROADMAP.md](ROADMAP.md).
 Release history is in [CHANGELOG.md](CHANGELOG.md); releases are numbered
 0.1, 0.2, 0.3 … and made as described in [docs/releasing.md](docs/releasing.md).
 
+## Security
+
+Company files hold sensitive financial data, so every new company is
+protected by a password and **encrypted on disk** with Argon2id and
+XChaCha20-Poly1305 (details in [docs/file-format.md](docs/file-format.md)).
+Copies and backups stay encrypted; a wrong password or a modified file is
+detected. While a company is open its books are decrypted in the app's memory
+only. There is no password recovery, so keep the password in a password
+manager.
+
 ## Architecture
 
 LedgerCraft is an engine-first Cargo workspace with enforced layering

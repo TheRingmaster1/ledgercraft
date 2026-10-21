@@ -117,7 +117,10 @@ const LESSONS: &[Lesson] = &[
                  choose a standard chart of accounts or an empty one. You can also bring in \
                  your lists (accounts, customers, vendors, items) from IIF or CSV files \
                  exported by other software. LedgerCraft then asks where to save the file.",
-                "File > Open Company opens a .lcbooks file you saved earlier.",
+                "File > Open Company opens a .lcbooks file you saved earlier. A \
+                 password-protected file asks for its password first.",
+                "File > Password sets, changes or removes the password of the open \
+                 company. New companies always get one.",
                 "File > Open Sample Company loads Pine Ridge Woodworks to practise on.",
                 "File > Close Company puts the books away and returns to the start page. \
                  If there are unsaved changes, it asks first.",
@@ -128,6 +131,14 @@ const LESSONS: &[Lesson] = &[
                  \"Unsaved\" and the status bar says \"unsaved changes\". If you close the \
                  window or open another company with changes pending, LedgerCraft asks \
                  whether to save first.",
+            ),
+            Heading("Passwords and encryption"),
+            Text(
+                "Every new company is protected by a password you choose when you create \
+                 it. The file is encrypted with it, so a copy on a lost laptop, a USB drive \
+                 or in cloud storage cannot be read without the password. Keep the \
+                 password in a password manager: if it is forgotten, the books cannot be \
+                 recovered by anyone.",
             ),
             Heading("Backups"),
             Text(

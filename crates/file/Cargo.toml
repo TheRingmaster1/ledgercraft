@@ -12,6 +12,12 @@ repository.workspace = true
 ledgercraft-ledger.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# Password protection: RustCrypto crates, MIT OR Apache-2.0.
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+base64 = "0.22"
+getrandom = "0.2"
+zeroize = "1"
 
 [lints]
 workspace = true
