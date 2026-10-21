@@ -14,7 +14,7 @@ use ledgercraft_ledger::{
 };
 
 use crate::widgets::{self, field, money_label};
-use crate::{theme, Action, FormKind, Reset};
+use crate::{currency, theme, Action, FormKind, Reset};
 
 fn today() -> String {
     Date::today().to_string()
@@ -208,7 +208,7 @@ fn finish(out: &mut Vec<Action>, kind: FormKind, built: Result<Command, String>)
 fn total_row(ui: &mut Ui, label: &str, total: Money) {
     ui.horizontal(|ui| {
         ui.label(RichText::new(label).strong());
-        ui.label(RichText::new(total.to_string()).strong().size(16.0));
+        ui.label(RichText::new(currency::format(total)).strong().size(16.0));
     });
 }
 
@@ -735,7 +735,7 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
         let waiting = c.account_balance(uf.id, None);
         if waiting.is_positive() {
             ui.horizontal(|ui| {
-                ui.label(format!("{waiting} is waiting in Undeposited Funds."));
+                ui.label(format!("{} is waiting in Undeposited Funds.", currency::format(waiting)));
                 if ui.button("Add it to this deposit").clicked() {
                     f.lines.retain(|l| l.account.is_some() || !l.amount.trim().is_empty());
                     f.lines.push(AccountLineInput {
@@ -820,7 +820,8 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
         field(ui, &mut f.memo, 360.0, "");
     });
     ui.horizontal(|ui| {
-        ui.label(RichText::new(format!("Debits {debits}   Credits {credits}")).strong());
+        let totals = format!("Debits {}   Credits {}", currency::format(debits), currency::format(credits));
+        ui.label(RichText::new(totals).strong());
         let diff = debits.saturating_sub(credits);
                 if debits.is_zero() && credits.is_zero() {
             // Nothing entered yet: say nothing rather than "Balanced".
@@ -828,7 +829,8 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
             ui.label(RichText::new("Balanced").color(theme::POSITIVE));
 
         } else {
-            ui.label(RichText::new(format!("Out of balance by {}", diff.abs())).color(theme::NEGATIVE));
+            let off = format!("Out of balance by {}", currency::format(diff.abs()));
+            ui.label(RichText::new(off).color(theme::NEGATIVE));
         }
     });
     let (save, clear) = footer(ui);

@@ -135,6 +135,7 @@ impl LedgerApp {
     /// Row Shading applies to every striped list in the app: egui's striped
     /// grids take their colour from `faint_bg_color` (and nothing else does).
     fn apply_prefs(&self, ctx: &egui::Context) {
+        crate::currency::set(self.prefs.currency);
         let stripe = self.prefs.stripe();
         if ctx.style().visuals.faint_bg_color != stripe {
             ctx.style_mut(|s| s.visuals.faint_bg_color = stripe);

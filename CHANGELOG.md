@@ -27,6 +27,12 @@ fixes to a release. See docs/releasing.md.
   and Open Menus On Hover); it no longer turns the tutorial back on.
 
 ### Added
+- Amounts are shown with a currency symbol everywhere in the app ($1,234.56),
+  and Excel exports format them the same way. Help > Preferences has a new
+  Currency section (US, Canadian, Australian, New Zealand and Mexican dollars,
+  euro, pound, Swiss franc, rand, krona) with a preview. It changes display
+  only; nothing is converted. Amount fields also accept a typed symbol or
+  code, such as €12.50 or CHF 12.
 - Start page: with no company open, LedgerCraft shows its icon and three
   choices (Create a New Company, Open a Company File, Explore the Sample
   Company) plus a link to the tutorial. The app now starts here instead of

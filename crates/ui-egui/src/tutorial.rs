@@ -409,6 +409,8 @@ const LESSONS: &[Lesson] = &[
                 "Row Shading: how strongly alternate rows in lists and reports are shaded.",
                 "Open Menus On Hover: open the top menus by resting the mouse on them.",
                 "Reset To Default puts those settings back.",
+                "Currency: the symbol shown with every amount ($, €, £ and others), in the \
+                 app and in Excel exports. It changes how amounts look, not their value.",
             ]),
             Heading("Seeing this again"),
             Text(

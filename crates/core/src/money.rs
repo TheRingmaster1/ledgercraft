@@ -89,7 +89,9 @@ impl Money {
             .map(Self)
     }
 
-    /// Parses `1234.5`, `1,234.50`, `$1,234.50`, `-$12`, `$-12` or `(12.00)`.
+    /// Parses `1234.5`, `1,234.50`, `$1,234.50`, `-$12`, `$-12`, `(12.00)`,
+    /// and the same with another currency symbol (`€`, `£`, `¥`) or a
+    /// currency code in front (`CHF 12.00`, `R 12`).
     pub fn parse(input: &str) -> CoreResult<Self> {
         let mut s = input.trim();
         let mut negative = false;
@@ -97,7 +99,7 @@ impl Money {
             negative = true;
             s = inner.trim();
         }
-        let cleaned = s.replacen('$', "", 1);
+        let cleaned = strip_currency(s);
         let cents = parse_scaled(&cleaned, 2).map_err(|e| match e {
             ScaleError::Invalid => CoreError::InvalidMoney(input.to_string()),
             ScaleError::Overflow => CoreError::Overflow,
@@ -117,12 +119,47 @@ impl Money {
         }
     }
 
+    /// `-$1,234.56`: the amount with a currency symbol (or code) in front,
+    /// after the minus sign. An empty symbol gives the plain [`Display`] form.
+    ///
+    /// [`Display`]: fmt::Display
+    pub fn format_with(self, symbol: &str) -> String {
+        let plain = self.to_string();
+        match plain.strip_prefix('-') {
+            Some(abs) => format!("-{symbol}{abs}"),
+            None => format!("{symbol}{plain}"),
+        }
+    }
+
     /// `-1234.56`: no separators, for CSV and editable fields.
     pub fn to_plain_string(self) -> String {
         let sign = if self.0 < 0 { "-" } else { "" };
         let abs = self.0.unsigned_abs();
         format!("{sign}{}.{:02}", abs / 100, abs % 100)
     }
+}
+
+/// Removes one currency symbol (`$`, `€`, `£`, `¥`), and a leading currency
+/// code such as `CHF` or `R`, wherever the sign puts them: `-$5`, `$-5`,
+/// `CHF -5`.
+fn strip_currency(s: &str) -> String {
+    let (sign, rest) = match s.strip_prefix('-') {
+        Some(r) => ("-", r.trim_start()),
+        None => ("", s),
+    };
+    let code_len = rest.chars().take_while(char::is_ascii_alphabetic).count();
+    let rest = if code_len > 0 && code_len <= 3 { rest[code_len..].trim_start() } else { rest };
+    let mut out = String::with_capacity(s.len());
+    out.push_str(sign);
+    let mut removed = false;
+    for c in rest.chars() {
+        if !removed && matches!(c, '$' | '€' | '£' | '¥') {
+            removed = true;
+            continue;
+        }
+        out.push(c);
+    }
+    out
 }
 
 /// `-1,234.56`
@@ -155,9 +192,29 @@ mod tests {
         assert_eq!(Money::parse("$-12").unwrap().cents(), -1200);
         assert_eq!(Money::parse("(12.00)").unwrap().cents(), -1200);
         assert!(Money::parse("12.345").is_err());
+        assert_eq!(Money::parse("€1.234").unwrap_err(), CoreError::InvalidMoney("€1.234".into()));
+        assert_eq!(Money::parse("€1,234.50").unwrap().cents(), 123_450);
+        assert_eq!(Money::parse("-£7").unwrap().cents(), -700);
+        assert_eq!(Money::parse("CHF 12.00").unwrap().cents(), 1200);
+        assert_eq!(Money::parse("CHF -12").unwrap().cents(), -1200);
+        assert_eq!(Money::parse("R 5").unwrap().cents(), 500);
+        assert!(Money::parse("abcd").is_err());
         assert!(Money::parse("abc").is_err());
         assert!(Money::parse("").is_err());
         assert_eq!(Money::parse_or_zero("  ").unwrap(), Money::ZERO);
+    }
+
+    #[test]
+    fn with_a_currency_symbol() {
+        assert_eq!(Money::from_cents(123_456).format_with("$"), "$1,234.56");
+        assert_eq!(Money::from_cents(-8_910).format_with("€"), "-€89.10");
+        assert_eq!(Money::from_cents(500).format_with("CHF "), "CHF 5.00");
+        assert_eq!(Money::from_cents(-1).format_with(""), "-0.01");
+        // Whatever is shown can be typed back in.
+        for (cents, sym) in [(123_456, "$"), (-8_910, "€"), (500, "CHF "), (-42, "£")] {
+            let m = Money::from_cents(cents);
+            assert_eq!(Money::parse(&m.format_with(sym)), Ok(m));
+        }
     }
 
     #[test]

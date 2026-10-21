@@ -5,6 +5,7 @@
 //! frame is drawn. Nothing below this crate knows egui exists.
 
 mod app;
+mod currency;
 mod forms;
 mod hints;
 mod licenses;

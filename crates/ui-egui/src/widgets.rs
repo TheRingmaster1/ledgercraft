@@ -31,7 +31,7 @@ pub(crate) fn balances(c: &Company) -> HashMap<AccountId, Money> {
 }
 
 pub(crate) fn money_label(ui: &mut Ui, m: Money, strong: bool) {
-    let mut text = RichText::new(m.to_string());
+    let mut text = RichText::new(crate::currency::format(m));
     if strong {
         text = text.strong();
     }

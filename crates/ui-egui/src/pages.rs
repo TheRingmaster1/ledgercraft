@@ -624,7 +624,7 @@ pub(crate) fn reports(ui: &mut Ui, c: &Company, s: &mut ReportState, out: &mut V
             "A formatted Excel workbook (.xlsx): money formats, bold totals and sized columns.",
         );
         if excel.clicked() {
-            out.push(Action::ExportXlsx { name: format!("{}.xlsx", s.kind.cli_id()), data: report.to_xlsx() });
+            out.push(Action::ExportXlsx { name: format!("{}.xlsx", s.kind.cli_id()), data: report.to_xlsx(crate::currency::current().symbol()) });
         }
         let csv = ui.button("Export CSV…").on_hover_text("Plain values only, for importing into other programs.");
         if csv.clicked() {

@@ -8,20 +8,30 @@ use rust_xlsxwriter::{Color, Format, FormatAlign, FormatBorder, Workbook, Worksh
 
 use crate::{Cell, Report, RowKind};
 
-const MONEY: &str = "#,##0.00;[Red]-#,##0.00";
+/// Excel number format for money, with an optional currency symbol shown in
+/// front: `"$"#,##0.00;[Red]-"$"#,##0.00`.
+fn money_format(symbol: &str) -> String {
+    if symbol.is_empty() {
+        "#,##0.00;[Red]-#,##0.00".to_string()
+    } else {
+        let quoted = format!("\"{}\"", symbol.replace('"', ""));
+        format!("{quoted}#,##0.00;[Red]-{quoted}#,##0.00")
+    }
+}
 const MUTED: u32 = 0x6B7280;
 const ACCENT: u32 = 0x1F6F8B;
 /// Rows above the column headers: company, title, period, blank.
 const HEADER_ROW: u32 = 4;
 
 impl Report {
-    /// The report as the bytes of an .xlsx file.
-    pub fn to_xlsx(&self) -> Result<Vec<u8>, String> {
-        build(self).map_err(|e| format!("could not build the Excel file: {e}"))
+    /// The report as the bytes of an .xlsx file. Amounts are numbers Excel can
+    /// add up, shown with `currency` (such as `"$"`, or `""` for none) in front.
+    pub fn to_xlsx(&self, currency: &str) -> Result<Vec<u8>, String> {
+        build(self, &money_format(currency)).map_err(|e| format!("could not build the Excel file: {e}"))
     }
 }
 
-fn build(r: &Report) -> Result<Vec<u8>, XlsxError> {
+fn build(r: &Report, money_fmt: &str) -> Result<Vec<u8>, XlsxError> {
     let mut workbook = Workbook::new();
     let ws = workbook.add_worksheet();
     ws.set_name(sheet_name(&r.title))?;
@@ -43,7 +53,7 @@ fn build(r: &Report) -> Result<Vec<u8>, XlsxError> {
     // Body.
     let mut row = HEADER_ROW + 1;
     for line in &r.rows {
-        write_row(ws, row, line, r.columns.len())?;
+        write_row(ws, row, line, r.columns.len(), money_fmt)?;
         row = row.saturating_add(1);
     }
 
@@ -74,7 +84,13 @@ fn build(r: &Report) -> Result<Vec<u8>, XlsxError> {
     workbook.save_to_buffer()
 }
 
-fn write_row(ws: &mut Worksheet, row: u32, line: &crate::Row, columns: usize) -> Result<(), XlsxError> {
+fn write_row(
+    ws: &mut Worksheet,
+    row: u32,
+    line: &crate::Row,
+    columns: usize,
+    money_fmt: &str,
+) -> Result<(), XlsxError> {
     let strong = matches!(line.kind, RowKind::Section | RowKind::Subtotal | RowKind::Total);
     let mut label = Format::new().set_indent(line.indent);
     if strong {
@@ -85,7 +101,7 @@ fn write_row(ws: &mut Worksheet, row: u32, line: &crate::Row, columns: usize) ->
     if line.kind == RowKind::Section {
         return Ok(());
     }
-    let mut money = Format::new().set_num_format(MONEY);
+    let mut money = Format::new().set_num_format(money_fmt);
     match line.kind {
         RowKind::Subtotal => money = money.set_bold().set_border_top(FormatBorder::Thin),
         RowKind::Total => {
@@ -162,7 +178,9 @@ mod tests {
         r.section("Income", 0);
         r.money(RowKind::Detail, "Sales", 1, &[ledgercraft_core::Money::from_cents(12_345)], None);
         r.money(RowKind::Total, "Net Income", 0, &[ledgercraft_core::Money::from_cents(12_345)], None);
-        let bytes = r.to_xlsx().unwrap();
+        let bytes = r.to_xlsx("$").unwrap();
+        assert_eq!(money_format("$"), "\"$\"#,##0.00;[Red]-\"$\"#,##0.00");
+        assert_eq!(money_format(""), "#,##0.00;[Red]-#,##0.00");
         // An .xlsx file is a zip archive.
         assert_eq!(bytes.get(0..2), Some(&b"PK"[..]));
     }

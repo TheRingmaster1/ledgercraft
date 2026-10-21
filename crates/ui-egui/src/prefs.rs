@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use eframe::egui::{self, Color32, RichText};
 use serde::{Deserialize, Serialize};
 
+use crate::currency::Currency;
 use crate::theme;
 
 const FILE_NAME: &str = "preferences.json";
@@ -34,6 +35,8 @@ pub(crate) struct Prefs {
     /// Open the top menus (File, Edit, …) when the pointer rests on them,
     /// instead of on a click.
     pub(crate) hover_menus: bool,
+    /// How amounts are shown ($, €, £, …). Display only; nothing is converted.
+    pub(crate) currency: Currency,
 }
 
 impl Default for Prefs {
@@ -42,6 +45,7 @@ impl Default for Prefs {
             stripe_grey: DEFAULT_STRIPE_GREY,
             show_tutorial: true,
             hover_menus: false,
+            currency: Currency::Usd,
         }
     }
 }
@@ -159,7 +163,56 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
                 ui.add_space(4.0);
                 global_section(ui, prefs);
             }
+            ui.add_space(6.0);
+            if section_header(ui, "prefs_currency_selected", "Currency") {
+                ui.add_space(4.0);
+                currency_section(ui, prefs);
+            }
         });
+}
+
+/// A section heading styled like the Global one: selected shows the section,
+/// clicking again hides it. Starts open.
+fn section_header(ui: &mut egui::Ui, key: &str, label: &str) -> bool {
+    let id = egui::Id::new(key);
+    let mut open = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(true);
+    ui.scope(|ui| {
+        ui.visuals_mut().selection.bg_fill = theme::ACCENT;
+        let text = RichText::new(label).size(15.0);
+        let text = if open { text.color(Color32::WHITE) } else { text };
+        if ui.selectable_label(open, text).clicked() {
+            open = !open;
+            ui.data_mut(|d| d.insert_temp(id, open));
+        }
+    });
+    open
+}
+
+/// The currency amounts are shown in, with a preview.
+fn currency_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
+    ui.horizontal(|ui| {
+        ui.label("Show amounts in");
+        egui::ComboBox::from_id_salt("prefs_currency")
+            .selected_text(prefs.currency.label())
+            .width(230.0)
+            .show_ui(ui, |ui| {
+                for c in Currency::ALL {
+                    ui.selectable_value(&mut prefs.currency, c, c.label());
+                }
+            });
+    });
+    let symbol = prefs.currency.symbol();
+    let sample = |cents: i64| ledgercraft_core::Money::from_cents(cents).format_with(symbol);
+    ui.label(format!("Example: {}   and a negative amount: {}", sample(123_456), sample(-8_910)));
+    ui.label(
+        RichText::new(
+            "This changes how amounts are shown, in the app and in Excel exports. It does \
+             not convert amounts between currencies: choose the currency your books are \
+             kept in.",
+        )
+        .small()
+        .color(theme::MUTED),
+    );
 }
 
 /// Global preferences: the row shading used by every list, with a preview.
@@ -262,6 +315,7 @@ mod tests {
             stripe_grey: 190,
             show_tutorial: false,
             hover_menus: true,
+            currency: Currency::Eur,
         };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
@@ -277,6 +331,15 @@ mod tests {
         assert_eq!(load_from(&path), Prefs::default());
         fs::write(&path, "{\"stripe_grey\": 999}").unwrap();
         assert_eq!(load_from(&path), Prefs::default());
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn currency_defaults_to_dollars_for_older_files() {
+        let path = temp_file("currency");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "{\"stripe_grey\": 190}").unwrap();
+        assert_eq!(load_from(&path).currency, Currency::Usd);
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 
@@ -327,8 +390,11 @@ mod tests {
             stripe_grey: 170,
             show_tutorial: false,
             hover_menus: true,
+            currency: Currency::Gbp,
         };
         prefs.reset_global();
+        // The currency is not a Global setting, so Reset leaves it.
+        assert_eq!(prefs.currency, Currency::Gbp);
         assert_eq!(prefs.stripe_grey, Prefs::default().stripe_grey);
         assert!(!prefs.hover_menus);
         assert!(!prefs.show_tutorial);
