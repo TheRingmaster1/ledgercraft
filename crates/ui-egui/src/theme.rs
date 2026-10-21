@@ -194,7 +194,9 @@ impl Font {
             Self::InterLight => Some(Arc::new(egui::FontData::from_static(INTER_LIGHT))),
             _ => {
                 let bytes = read_font(&self.installed_file()?)?;
-                Some(Arc::new(egui::FontData::from_owned(bytes)))
+                Some(Arc::new(egui::FontData::from_owned(
+                    without_image_glyphs(bytes),
+                )))
             }
         }
     }
@@ -235,21 +237,89 @@ fn read_font(path: &std::path::Path) -> Option<Vec<u8>> {
     usable(&bytes).then_some(bytes)
 }
 
-/// Tables holding embedded bitmap or colour glyphs. egui 0.37 draws those
-/// glyphs as images in their own colour, not the text colour, so a font that
-/// has them (such as Windows' regular Calibri) shows letters that are white
-/// or missing. Such fonts are not offered until egui handles them.
-const IMAGE_GLYPH_TABLES: [&[u8; 4]; 4] = [b"EBDT", b"CBDT", b"sbix", b"COLR"];
-
-/// Whether egui's font reader (skrifa) accepts these bytes and draws every
-/// glyph as an outline in the text colour.
+/// Whether egui's font reader (skrifa) accepts these bytes.
 fn usable(bytes: &[u8]) -> bool {
-    let Ok(font) = skrifa::FontRef::new(bytes) else {
-        return false;
+    skrifa::FontRef::new(bytes).is_ok()
+}
+
+/// Tables holding embedded bitmap or colour glyphs. egui 0.37 draws such
+/// glyphs as images in their own colour rather than the text colour, so
+/// fonts that have them (Windows' Calibri, for one) showed white or missing
+/// letters. Every glyph in these fonts also has an outline, which egui draws
+/// properly, so the tables are removed before the font is handed to egui.
+const IMAGE_GLYPH_TABLES: [[u8; 4]; 9] = [
+    *b"EBDT", *b"EBLC", *b"EBSC", *b"CBDT", *b"CBLC", *b"sbix", *b"COLR", *b"bdat", *b"bloc",
+];
+
+/// The font with its image-glyph tables removed, or unchanged if it has none
+/// (or is not a plain TrueType/OpenType file, such as a collection).
+fn without_image_glyphs(font: Vec<u8>) -> Vec<u8> {
+    match strip_tables(&font, &IMAGE_GLYPH_TABLES) {
+        Some(stripped) if usable(&stripped) => stripped,
+        _ => font,
+    }
+}
+
+/// Rewrites an sfnt font without the `drop` tables: a new table directory,
+/// then the kept tables, each padded to 4 bytes. `None` if nothing is dropped
+/// or the font is not laid out as expected. Checksums are copied as they are;
+/// egui's font reader does not check them.
+fn strip_tables(font: &[u8], drop: &[[u8; 4]]) -> Option<Vec<u8>> {
+    let u16_at = |at: usize| -> Option<u16> {
+        Some(u16::from_be_bytes(font.get(at..at.checked_add(2)?)?.try_into().ok()?))
     };
-    IMAGE_GLYPH_TABLES
-        .iter()
-        .all(|tag| font.table_data(skrifa::raw::types::Tag::new(tag)).is_none())
+    let u32_at = |at: usize| -> Option<u32> {
+        Some(u32::from_be_bytes(font.get(at..at.checked_add(4)?)?.try_into().ok()?))
+    };
+    let version = font.get(0..4)?;
+    if version == b"ttcf" {
+        return None;
+    }
+    let count = usize::from(u16_at(4)?);
+    let mut kept: Vec<([u8; 4], u32, &[u8])> = Vec::with_capacity(count);
+    let mut dropped = false;
+    for i in 0..count {
+        let record = 12usize.checked_add(i.checked_mul(16)?)?;
+        let tag: [u8; 4] = font.get(record..record + 4)?.try_into().ok()?;
+        let checksum = u32_at(record + 4)?;
+        let offset = usize::try_from(u32_at(record + 8)?).ok()?;
+        let length = usize::try_from(u32_at(record + 12)?).ok()?;
+        let data = font.get(offset..offset.checked_add(length)?)?;
+        if drop.contains(&tag) {
+            dropped = true;
+        } else {
+            kept.push((tag, checksum, data));
+        }
+    }
+    if !dropped || kept.is_empty() {
+        return None;
+    }
+    let tables = u16::try_from(kept.len()).ok()?;
+    let mut entry_selector = 0u16;
+    while (2u32 << entry_selector) <= u32::from(tables) {
+        entry_selector += 1;
+    }
+    let search_range = (1u16 << entry_selector).checked_mul(16)?;
+    let range_shift = tables.checked_mul(16)?.checked_sub(search_range)?;
+
+    let mut out = Vec::with_capacity(font.len());
+    out.extend_from_slice(version);
+    for field in [tables, search_range, entry_selector, range_shift] {
+        out.extend_from_slice(&field.to_be_bytes());
+    }
+    let mut offset = 12usize.checked_add(kept.len().checked_mul(16)?)?;
+    for (tag, checksum, data) in &kept {
+        out.extend_from_slice(tag);
+        out.extend_from_slice(&checksum.to_be_bytes());
+        out.extend_from_slice(&u32::try_from(offset).ok()?.to_be_bytes());
+        out.extend_from_slice(&u32::try_from(data.len()).ok()?.to_be_bytes());
+        offset = offset.checked_add(data.len().next_multiple_of(4))?;
+    }
+    for (_, _, data) in &kept {
+        out.extend_from_slice(data);
+        out.resize(out.len().next_multiple_of(4), 0);
+    }
+    Some(out)
 }
 
 /// Text darkness, as a grey level for ordinary text: 0 is black (as in
@@ -431,8 +501,34 @@ mod tests {
     }
 
     #[test]
+    fn image_glyph_tables_are_stripped_and_the_font_still_reads() {
+        // Inter has no image glyphs: nothing to strip, the font is unchanged.
+        assert!(strip_tables(INTER, &IMAGE_GLYPH_TABLES).is_none());
+        assert_eq!(without_image_glyphs(INTER.to_vec()), INTER.to_vec());
+        // Stripping a table Inter does have leaves a font that still reads,
+        // without that table and with every other one intact.
+        let gpos = *b"GPOS";
+        let stripped = strip_tables(INTER, &[gpos]).unwrap();
+        let before = skrifa::FontRef::new(INTER).unwrap();
+        let after = skrifa::FontRef::new(&stripped).unwrap();
+        let tag = |t: &[u8; 4]| skrifa::raw::types::Tag::new(t);
+        assert!(before.table_data(tag(&gpos)).is_some());
+        assert!(after.table_data(tag(&gpos)).is_none());
+        for t in [b"glyf", b"loca", b"cmap", b"head", b"hmtx", b"name"] {
+            assert_eq!(
+                before.table_data(tag(t)).map(|d| d.as_bytes().to_vec()),
+                after.table_data(tag(t)).map(|d| d.as_bytes().to_vec()),
+                "{}",
+                String::from_utf8_lossy(t)
+            );
+        }
+        // Damaged input is left alone rather than crashing.
+        assert!(strip_tables(b"not a font", &IMAGE_GLYPH_TABLES).is_none());
+        assert!(strip_tables(&INTER[..40], &[gpos]).is_none());
+    }
+
+    #[test]
     fn only_real_fonts_are_used() {
-        // Inter is outlines only, so it passes the image-glyph check too.
         assert!(usable(INTER));
         assert!(usable(INTER_LIGHT));
         assert!(!usable(b"not a font at all"));
