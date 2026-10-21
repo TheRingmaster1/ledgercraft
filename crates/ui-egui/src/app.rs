@@ -47,6 +47,9 @@ pub struct LedgerApp {
     reports: ReportState,
     status: String,
     status_is_error: bool,
+    /// When the status message appeared (egui time, seconds); `None` until
+    /// the next frame notes it.
+    status_since: Option<f64>,
     pending: Option<Pending>,
     allow_close: bool,
     show_about: bool,
@@ -73,6 +76,12 @@ pub struct LedgerApp {
 
 /// Smallest window the layout still works in, in ui points.
 const MIN_WINDOW: egui::Vec2 = egui::vec2(900.0, 560.0);
+
+/// How long a status message stays before the status bar goes back to
+/// "Ready": long enough to read, short enough not to linger. Errors stay
+/// longer.
+const STATUS_SECONDS: f64 = 8.0;
+const ERROR_SECONDS: f64 = 20.0;
 
 const SAVE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::S);
 const OPEN: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::O);
@@ -146,6 +155,7 @@ impl LedgerApp {
             reports: ReportState::default(),
             status: "Ready".into(),
             status_is_error: false,
+            status_since: None,
             pending: None,
             allow_close: false,
             show_about: false,
@@ -288,11 +298,34 @@ impl LedgerApp {
     fn info(&mut self, msg: impl Into<String>) {
         self.status = msg.into();
         self.status_is_error = false;
+        self.status_since = None;
     }
 
     fn error(&mut self, msg: impl Into<String>) {
         self.status = msg.into();
         self.status_is_error = true;
+        self.status_since = None;
+    }
+
+    /// Clears the status message once it has been shown long enough.
+    /// Returns the seconds it has left, so the app can wake up to clear it.
+    fn expire_status(&mut self, now: f64) -> Option<f64> {
+        let since = *self.status_since.get_or_insert(now);
+        if self.status == "Ready" {
+            return None;
+        }
+        let lasts = if self.status_is_error {
+            ERROR_SECONDS
+        } else {
+            STATUS_SECONDS
+        };
+        let left = since + lasts - now;
+        if left > 0.0 {
+            Some(left)
+        } else {
+            self.info("Ready");
+            None
+        }
     }
 
     // ----- files -----------------------------------------------------------
@@ -348,7 +381,7 @@ impl LedgerApp {
                 let protected = s.is_protected();
                 self.replace_session(s);
                 self.remember(&path);
-                self.info(format!("Opened {}", path.display()));
+                self.info(format!("Opened {}", file_name(&path)));
                 // A file from before encryption (or with its password removed):
                 // offer to upgrade it.
                 self.offer_protection = !protected;
@@ -424,7 +457,7 @@ impl LedgerApp {
         match result {
             Ok(()) => {
                 self.remember(&path);
-                self.info(format!("Saved to {}", path.display()));
+                self.info(format!("Saved {}", file_name(&path)));
                 true
             }
             Err(e) => {
@@ -900,39 +933,67 @@ impl LedgerApp {
             });
     }
 
+    /// The status message on the left, the company file on the right. The
+    /// file side gets at most half the bar; both shorten with "…" rather than
+    /// overlap when the window is narrow, and hovering shows them in full.
     fn status_bar(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                let color = if self.status_is_error {
-                    theme::NEGATIVE
-                } else {
-                    theme::MUTED
+            ui.horizontal(|ui| self.status_row(ui));
+        });
+    }
+
+    fn status_row(&self, ui: &mut egui::Ui) {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let (text, full_path) = match &self.session {
+                    None => ("No company open".to_string(), None),
+                    Some(session) => {
+                        let file = session
+                            .path()
+                            .map(file_name)
+                            .unwrap_or_else(|| "Not saved yet".into());
+                        let dirty = if session.is_dirty() {
+                            "  • unsaved changes"
+                        } else {
+                            ""
+                        };
+                        let lock = if session.is_protected() {
+                            "  • password protected"
+                        } else {
+                            "  • not password protected"
+                        };
+                        let full = session.path().map(|p| p.display().to_string());
+                        (format!("{file}{lock}{dirty}"), full)
+                    }
                 };
-                ui.label(RichText::new(self.status.as_str()).color(color));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let text = match &self.session {
-                        None => "No company open".to_string(),
-                        Some(session) => {
-                            let file = session
-                                .path()
-                                .map(|p| p.display().to_string())
-                                .unwrap_or_else(|| "Not saved yet".into());
-                            let dirty = if session.is_dirty() {
-                                "  • unsaved changes"
-                            } else {
-                                ""
-                            };
-                            let lock = if session.is_protected() {
-                                "  • password protected"
-                            } else {
-                                "  • not password protected"
-                            };
-                            format!("{file}{lock}{dirty}")
+                let height = ui.available_height();
+                let right_width = (ui.available_width() * 0.5).max(0.0);
+                ui.allocate_ui_with_layout(
+                    egui::vec2(right_width, height),
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| {
+                        let label = ui.add(
+                            egui::Label::new(RichText::new(text).color(theme::MUTED))
+                                .wrap_mode(egui::TextWrapMode::Truncate),
+                        );
+                        if let Some(full) = full_path {
+                            label.on_hover_text(full);
                         }
+                    },
+                );
+                ui.add_space(12.0);
+                // The message takes whatever is left, from the left edge.
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    let color = if self.status_is_error {
+                        theme::NEGATIVE
+                    } else {
+                        theme::MUTED
                     };
-                    ui.label(RichText::new(text).color(theme::MUTED));
+                    ui.add(
+                        egui::Label::new(RichText::new(self.status.as_str()).color(color))
+                            .wrap_mode(egui::TextWrapMode::Truncate),
+                    )
+                    .on_hover_text(self.status.as_str());
                 });
-            });
         });
     }
 
@@ -948,7 +1009,7 @@ impl LedgerApp {
                 self.replace_session(*session);
                 if let Some(path) = path {
                     self.remember(&path);
-                    self.info(format!("Opened {}", path.display()));
+                    self.info(format!("Opened {}", file_name(&path)));
                 }
             }
             Some(UnlockOutcome::Failed(e)) => {
@@ -1130,6 +1191,13 @@ impl LedgerApp {
     }
 }
 
+/// "Pine Ridge Woodworks.lcbooks" from a full path, for the status bar.
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string())
+}
+
 /// Help > Preferences > Open Menus On Hover. egui opens a top-level menu on a
 /// click, or on hover only once another menu is open; this opens the hovered
 /// one straight away (where a click would) and closes the open menu when the
@@ -1188,6 +1256,10 @@ impl eframe::App for LedgerApp {
             self.title = title;
         }
         self.fit_window(ctx);
+        let now = ctx.input(|i| i.time);
+        if let Some(left) = self.expire_status(now) {
+            ctx.request_repaint_after(std::time::Duration::from_secs_f64(left));
+        }
         self.apply_prefs(ctx);
         self.save_prefs(ctx);
 
@@ -1296,6 +1368,30 @@ mod tests {
         app.apply(Action::ClearStatus);
         assert_eq!(app.status, "Ready");
         assert!(!app.status_is_error);
+    }
+
+    #[test]
+    fn status_messages_clear_themselves() {
+        let mut app = LedgerApp::blank(None);
+        app.info("Saved Pine Ridge.lcbooks");
+        assert_eq!(app.expire_status(100.0), Some(STATUS_SECONDS));
+        assert!(app.expire_status(100.0 + STATUS_SECONDS - 1.0).is_some());
+        assert_eq!(app.expire_status(100.0 + STATUS_SECONDS), None);
+        assert_eq!(app.status, "Ready");
+        // Errors stay longer.
+        app.error("Could not save");
+        app.expire_status(200.0);
+        assert!(app.expire_status(200.0 + STATUS_SECONDS + 1.0).is_some());
+        assert!(app.status_is_error);
+        app.expire_status(200.0 + ERROR_SECONDS);
+        assert_eq!(app.status, "Ready");
+        assert!(!app.status_is_error);
+    }
+
+    #[test]
+    fn the_status_bar_shows_the_file_name_not_the_whole_path() {
+        let path = std::env::temp_dir().join("Pine Ridge Woodworks.lcbooks");
+        assert_eq!(file_name(&path), "Pine Ridge Woodworks.lcbooks");
     }
 
     #[test]
