@@ -269,7 +269,8 @@ const LESSONS: &[Lesson] = &[
                 "Check the income account on each line, then click Save & New.",
             ]),
             Bullets(&[
-                "+ Add line adds a line; the x button removes one.",
+                "A new empty line appears as soon as you type in the last one, so there is \
+                 always room for the next; the x button removes a line.",
                 "Dates can be typed as 2026-03-31 or 3/31/2026.",
                 "Clear empties the form without saving anything.",
             ]),

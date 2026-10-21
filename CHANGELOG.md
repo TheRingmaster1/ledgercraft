@@ -64,6 +64,10 @@ fixes to a release. See docs/releasing.md.
 - Entry boxes are easy to see: white with a thin grey outline (the accent
   outline when focused), instead of near-white boxes with no edge that all
   but vanished on unshaded rows. Buttons and drop-downs get the same outline.
+- Form lines grow as you type: Create Invoice, Enter Bill, Write Check,
+  Make Deposit and Journal Entry start with one empty line (two for a journal
+  entry) and add the next as soon as you type in the last, always keeping one
+  empty line ready. The "+ Add line" buttons are gone.
 - Create Invoice: each line's Amount (Qty x Rate) shows from the start
   ($0.00 on a blank line) instead of staying empty until a rate was typed,
   which made the column look missing. Text that is not a number shows
