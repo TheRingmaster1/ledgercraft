@@ -13,5 +13,9 @@ ledgercraft-engine.workspace = true
 ledgercraft-ui-egui.workspace = true
 eframe.workspace = true
 
+[build-dependencies]
+# Embeds the icon and version details in ledgercraft.exe. MIT licensed.
+winresource = "0.1"
+
 [lints]
 workspace = true

@@ -1,7 +1,7 @@
 # LedgerCraft roadmap
 
 Stage: **pre-alpha 0.1** (version 0.1.0; releases go 0.1 → 0.2 → 0.3 …, see docs/releasing.md) — the double-entry core, the everyday customer,
-vendor and banking forms, and the core reports. Last updated 2026-10-19.
+vendor and banking forms, and the core reports. Last updated 2026-10-21.
 
 Estimates are for what a typical small business uses QuickBooks Desktop for
 day to day; weighted by depth, LedgerCraft 0.1 covers roughly 20% of it.
@@ -22,10 +22,14 @@ day to day; weighted by depth, LedgerCraft 0.1 covers roughly 20% of it.
 
 Platform focus: **Windows 10/11 x64 only** until this list is done.
 
-1. M1.5.1 Debug and release builds start cleanly on Windows (wgpu/DX12 renderer) — in progress
+1. ~~M1.5.1 Debug and release builds start cleanly on Windows (wgpu/DX12 renderer)~~ (done)
 2. M1.5.2 Walk every page and form with the sample company; fix crashes and layout problems
 3. M1.5.3 `cargo xtask ci` green on the Windows GitHub runner
-4. M1.5.4 Windows niceties: app icon, file association for `.lcbooks`, remembered window size, high-DPI check
+4. M1.5.4 Windows niceties
+   - ~~App icon~~ (done: open-ledger icon in the title bar, taskbar and .exe)
+   - ~~High-DPI check~~ (done: window fits and resizes on mixed-DPI monitors)
+   - File association for `.lcbooks`
+   - Remembered window size, side bar and last company
 5. M1.5.5 Windows installer (MSI) and portable zip; code signing later
 
 ## Next (M2 — usable for a real sole proprietor)

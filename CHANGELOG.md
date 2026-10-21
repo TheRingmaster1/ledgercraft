@@ -7,6 +7,10 @@ fixes to a release. See docs/releasing.md.
 
 ## [Unreleased]
 
+### Changed
+- Building LedgerCraft now needs Rust 1.88 or newer (was 1.82). README lists
+  the Windows requirements.
+
 ### Fixed
 - Tutorial: the window no longer runs off the bottom of the screen and hides
   its Back and Next buttons. It is now 70% of the app window's width and 75%
@@ -23,6 +27,8 @@ fixes to a release. See docs/releasing.md.
   and Open Menus On Hover); it no longer turns the tutorial back on.
 
 ### Added
+- App icon: an open ledger book on navy, shown in the title bar and taskbar,
+  and embedded in ledgercraft.exe for Explorer, the Start menu and shortcuts.
 - Tutorial: thirteen lessons covering the whole app as it stands (getting
   around, company files, the chart of accounts, customers, vendors and items,
   invoicing, payments and deposits, bills, checks and card purchases, journal

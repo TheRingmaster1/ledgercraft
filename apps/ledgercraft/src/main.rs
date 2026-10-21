@@ -15,6 +15,9 @@ use eframe::egui;
 use ledgercraft_engine::{new_company, sample_company, Session};
 use ledgercraft_ui_egui::LedgerApp;
 
+/// The app icon, 256 x 256. Original artwork; see ATTRIBUTION.md.
+const APP_ICON: &[u8] = include_bytes!("../../../assets/app-icon/ledgercraft-256.png");
+
 fn main() -> ExitCode {
     let mut path: Option<PathBuf> = None;
     let mut sample = false;
@@ -53,15 +56,23 @@ fn main() -> ExitCode {
         Session::new(new_company("My Company"))
     };
 
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_title("LedgerCraft")
+        // The minimum size is set by `LedgerApp` once the window's
+        // monitor scale is known (see `LedgerApp::fit_window`).
+        .with_inner_size([1280.0, 800.0]);
+    // Title bar and taskbar icon. The .exe's own icon (Explorer, Start menu)
+    // is embedded by build.rs from assets/app-icon/ledgercraft.ico.
+    match eframe::icon_data::from_png_bytes(APP_ICON) {
+        Ok(icon) => viewport = viewport.with_icon(icon),
+        Err(e) => eprintln!("ledgercraft: could not load the app icon: {e}"),
+    }
+
     let options = eframe::NativeOptions {
         // wgpu (DirectX 12 / Vulkan / Metal), not OpenGL: glutin's Windows
         // OpenGL path panics in debug builds (see Cargo.toml).
         renderer: eframe::Renderer::Wgpu,
-        viewport: egui::ViewportBuilder::default()
-            .with_title("LedgerCraft")
-            // The minimum size is set by `LedgerApp` once the window's
-            // monitor scale is known (see `LedgerApp::fit_window`).
-            .with_inner_size([1280.0, 800.0]),
+        viewport,
         ..Default::default()
     };
     let result = eframe::run_native(

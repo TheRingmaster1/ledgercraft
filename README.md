@@ -35,17 +35,33 @@ own. No subscription, no licence server, no telemetry.
 
 ## Quick start
 
-On Windows you need [Rust](https://rustup.rs) 1.82 or newer and the Microsoft
-C++ Build Tools ("Desktop development with C++"). If the window is blank or
-slow, try `$env:WGPU_BACKEND="vulkan"` before running.
+### Requirements (Windows 10/11, x64)
 
-```sh
-git clone https://github.com/OWNER/ledgercraft
+| Requirement | Version | Notes |
+|---|---|---|
+| [Rust](https://rustup.rs) (stable, MSVC toolchain) | **1.88 or newer** | `rustup update stable` to upgrade; `rustc --version` to check |
+| Microsoft C++ Build Tools | 2019 or newer | The "Desktop development with C++" workload; provides the linker and the resource compiler that embeds the app icon |
+| Graphics | DirectX 12 (or Vulkan) | Drawn with wgpu. If the window is blank or slow, run `$env:WGPU_BACKEND="vulkan"` first |
+
+Rust 1.88 is the minimum because of the Excel export library
+(`rust_xlsxwriter`) and the clippy lints the project builds with; it is set as
+`rust-version` in `Cargo.toml`, so an older compiler reports the problem
+clearly. The first build downloads and compiles the dependencies and takes a
+few minutes; later builds take seconds.
+
+### Build and run
+
+```powershell
+git clone https://github.com/TheRingmaster1/ledgercraft
 cd ledgercraft
 cargo run --release -p ledgercraft -- --sample          # the desktop app with the sample company
 cargo run --release -p ledgercraft -- books.lcbooks     # open a company file
+cargo test --workspace                                  # the test suite
 cargo xtask ci                                          # fmt, clippy, tests, layering, assets
 ```
+
+Keep the source folder outside OneDrive and other synced folders: syncing the
+`target` build folder slows builds and can lock files.
 
 Command line:
 

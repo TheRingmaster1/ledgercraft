@@ -9,8 +9,8 @@ edition = "2021"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
 authors = ["Jeffrey Parke and the LedgerCraft contributors"]
-repository = "https://github.com/OWNER/ledgercraft"
-homepage = "https://github.com/OWNER/ledgercraft"
+repository = "https://github.com/TheRingmaster1/ledgercraft"
+homepage = "https://github.com/TheRingmaster1/ledgercraft"
 keywords = ["accounting", "bookkeeping", "ledger", "invoicing", "small-business"]
 categories = ["finance"]
 

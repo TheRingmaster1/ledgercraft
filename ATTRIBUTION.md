@@ -6,7 +6,9 @@ has no row. Adding an asset without a row is a bug.
 
 | Path | Author | Source | Licence |
 |------|--------|--------|---------|
-| _(none yet)_ | | | |
+| assets/app-icon/ledgercraft-1024.png | LedgerCraft contributors | Original artwork made for LedgerCraft (drafted with an AI image tool, then edited) | MIT OR Apache-2.0 |
+| assets/app-icon/ledgercraft-256.png | LedgerCraft contributors | Resized from ledgercraft-1024.png | MIT OR Apache-2.0 |
+| assets/app-icon/ledgercraft.ico | LedgerCraft contributors | Windows icon (16-256 px) built from ledgercraft-1024.png | MIT OR Apache-2.0 |
 
 Notes
 
