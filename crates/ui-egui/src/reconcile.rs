@@ -241,6 +241,8 @@ fn body(
         });
     ui.add_space(6.0);
     let balances = matches!(&ending, Some(Ok(e)) if *e == cleared_balance);
+    guidance(ui, ending.as_ref(), balances);
+    ui.add_space(6.0);
     ui.horizontal(|ui| {
         let now = ui
             .add_enabled(balances, egui::Button::new(RichText::new("Reconcile Now").strong()))
@@ -284,6 +286,40 @@ fn body(
     });
 
     history(ui, c, account, s, out);
+}
+
+/// What to do next, in plain words, under the summary.
+fn guidance(ui: &mut Ui, ending: Option<&Result<Money, ledgercraft_core::CoreError>>, balances: bool) {
+    let (lead, text, colour) = match ending {
+        None => (
+            "Next: ",
+            "find the ending balance printed on your bank or card statement and type it into \
+             the Ending balance box at the top of this page.",
+            theme::MUTED,
+        ),
+        Some(Err(_)) => (
+            "Check the ending balance: ",
+            "it should be a number, such as 1234.56.",
+            theme::NEGATIVE,
+        ),
+        Some(Ok(_)) if balances => (
+            "Done checking: ",
+            "the books match your statement. Click Reconcile Now to record it.",
+            theme::POSITIVE,
+        ),
+        Some(Ok(_)) => (
+            "Next: ",
+            "tick each item in the two lists that also appears on your statement. The \
+             Difference should reach $0.00. If it will not, look for an amount entered \
+             wrongly, an item entered twice, or a bank fee or interest not recorded yet.",
+            theme::MUTED,
+        ),
+    };
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        ui.label(RichText::new(lead).strong().color(colour));
+        ui.label(RichText::new(text).color(colour));
+    });
 }
 
 /// One of the two lists of items to tick.
@@ -421,6 +457,20 @@ mod tests {
         assert!(out.is_empty());
         assert_eq!(s.known, Some((checking, 0)));
         assert!(!s.statement_date.is_empty(), "the statement date defaults to today");
+    }
+
+    #[test]
+    fn guidance_draws_for_every_step() {
+        let ctx = egui::Context::default();
+        crate::theme::apply(&ctx);
+        let bad = Money::parse("abc");
+        let good = Money::parse("12.00");
+        crate::theme::test_frame(&ctx, |ui| {
+            guidance(ui, None, false);
+            guidance(ui, Some(&bad), false);
+            guidance(ui, Some(&good), false);
+            guidance(ui, Some(&good), true);
+        });
     }
 
     #[test]
