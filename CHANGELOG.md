@@ -8,6 +8,9 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Fixed
+- Tutorial: the window no longer runs off the bottom of the screen and hides
+  its Back and Next buttons. It is now 70% of the app window's width and 75%
+  of its height (within sensible limits) and follows the window when resized.
 - The register's "back to Chart of Accounts" link showed an empty box instead
   of an arrow (egui's font has no arrow glyph).
 - Clear on the Create Invoice form no longer closes the app.

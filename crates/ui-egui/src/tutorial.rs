@@ -425,6 +425,26 @@ pub(crate) struct Tutorial {
 /// Draws the Tutorial window. The "Never show again" box edits `prefs` (the
 /// app saves them). Returns where a "Try it" button asks to go, if one was
 /// clicked.
+/// Share of the app window the tutorial takes, and its size limits in points.
+const WIDTH_SHARE: f32 = 0.70;
+const HEIGHT_SHARE: f32 = 0.75;
+const MIN_SIZE: egui::Vec2 = egui::vec2(560.0, 340.0);
+const MAX_SIZE: egui::Vec2 = egui::vec2(960.0, 680.0);
+/// Height of the bottom row (checkbox, Back, Next) and the line above it.
+const FOOTER_HEIGHT: f32 = 40.0;
+const LIST_WIDTH: f32 = 190.0;
+
+/// The tutorial's size: a share of the app window, within limits, and never
+/// bigger than the window itself, so it always fits with its buttons showing.
+fn window_size(screen: egui::Vec2) -> egui::Vec2 {
+    let wanted = egui::vec2(screen.x * WIDTH_SHARE, screen.y * HEIGHT_SHARE).clamp(MIN_SIZE, MAX_SIZE);
+    // Leave room for the title bar and a margin on every side.
+    wanted.min(screen - egui::vec2(40.0, 80.0)).max(egui::vec2(200.0, 160.0))
+}
+
+/// Draws the Tutorial window. The "Never show again" box edits `prefs` (the
+/// app saves them). Returns where a "Try it" button asks to go, if one was
+/// clicked.
 pub(crate) fn window(
     ctx: &egui::Context,
     open: &mut bool,
@@ -434,21 +454,27 @@ pub(crate) fn window(
     let mut go = None;
     let last = LESSONS.len().saturating_sub(1);
     state.lesson = state.lesson.min(last);
+    let screen = ctx.screen_rect();
+    let size = window_size(screen.size());
+    let body_height = (size.y - FOOTER_HEIGHT).max(80.0);
     egui::Window::new("Tutorial")
         .open(open)
         .collapsible(false)
-        .resizable(true)
-        .default_size([780.0, 500.0])
+        // A fixed size that follows the app window: everything inside is laid
+        // out to it, so nothing can push the window past the screen.
+        .fixed_size(size)
         .pivot(egui::Align2::CENTER_CENTER)
-        .default_pos(ctx.screen_rect().center())
+        .default_pos(screen.center())
+        .constrain(true)
         .show(ctx, |ui| {
             ui.horizontal_top(|ui| {
-                lesson_list(ui, state);
+                ui.set_height(body_height);
+                lesson_list(ui, state, body_height);
                 ui.separator();
                 ui.vertical(|ui| {
                     egui::ScrollArea::vertical()
                         .id_salt("tutorial_lesson")
-                        .max_height(400.0)
+                        .max_height(body_height)
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
                             if let Some(lesson) = LESSONS.get(state.lesson) {
@@ -477,17 +503,21 @@ pub(crate) fn window(
     go
 }
 
-fn lesson_list(ui: &mut egui::Ui, state: &mut Tutorial) {
+fn lesson_list(ui: &mut egui::Ui, state: &mut Tutorial, height: f32) {
     ui.vertical(|ui| {
-        ui.set_width(200.0);
-        egui::ScrollArea::vertical().id_salt("tutorial_list").max_height(400.0).show(ui, |ui| {
-            for (i, lesson) in LESSONS.iter().enumerate() {
-                let label = format!("{}. {}", i + 1, lesson.title);
-                if ui.selectable_label(state.lesson == i, label).clicked() {
-                    state.lesson = i;
+        ui.set_width(LIST_WIDTH);
+        egui::ScrollArea::vertical()
+            .id_salt("tutorial_list")
+            .max_height(height)
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for (i, lesson) in LESSONS.iter().enumerate() {
+                    let label = format!("{}. {}", i + 1, lesson.title);
+                    if ui.selectable_label(state.lesson == i, label).clicked() {
+                        state.lesson = i;
+                    }
                 }
-            }
-        });
+            });
     });
 }
 
@@ -501,7 +531,7 @@ fn lesson_body(ui: &mut egui::Ui, lesson: &Lesson) -> Option<Target> {
             }
             Heading(h) => {
                 ui.add_space(4.0);
-                ui.label(RichText::new(*h).strong());
+                ui.label(RichText::new(*h).strong().size(15.0).color(theme::ACCENT));
             }
             Steps(steps) => {
                 for (i, step) in steps.iter().enumerate() {
@@ -558,6 +588,24 @@ mod tests {
             assert!(!lesson.title.is_empty());
             assert!(!lesson.blocks.is_empty(), "{} is empty", lesson.title);
         }
+    }
+
+    #[test]
+    fn the_window_always_fits() {
+        let screens = [
+            egui::vec2(1280.0, 800.0),
+            egui::vec2(900.0, 560.0),
+            egui::vec2(3840.0, 2160.0),
+            egui::vec2(400.0, 300.0),
+        ];
+        for screen in screens {
+            let size = window_size(screen);
+            assert!(size.x <= screen.x && size.y <= screen.y, "{size:?} does not fit {screen:?}");
+            assert!(size.x <= MAX_SIZE.x && size.y <= MAX_SIZE.y);
+        }
+        // A typical laptop window gets 70% by 75%.
+        let laptop = window_size(egui::vec2(1280.0, 800.0));
+        assert!((laptop.x - 896.0).abs() < 0.5 && (laptop.y - 600.0).abs() < 0.5, "{laptop:?}");
     }
 
     /// Adding a form without teaching it fails here, as a reminder.
