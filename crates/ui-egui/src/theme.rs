@@ -194,9 +194,9 @@ impl Font {
             Self::InterLight => Some(Arc::new(egui::FontData::from_static(INTER_LIGHT))),
             _ => {
                 let bytes = read_font(&self.installed_file()?)?;
-                Some(Arc::new(egui::FontData::from_owned(
-                    without_image_glyphs(bytes),
-                )))
+                Some(Arc::new(egui::FontData::from_owned(without_image_glyphs(
+                    bytes,
+                ))))
             }
         }
     }
@@ -266,10 +266,14 @@ fn without_image_glyphs(font: Vec<u8>) -> Vec<u8> {
 /// egui's font reader does not check them.
 fn strip_tables(font: &[u8], drop: &[[u8; 4]]) -> Option<Vec<u8>> {
     let u16_at = |at: usize| -> Option<u16> {
-        Some(u16::from_be_bytes(font.get(at..at.checked_add(2)?)?.try_into().ok()?))
+        Some(u16::from_be_bytes(
+            font.get(at..at.checked_add(2)?)?.try_into().ok()?,
+        ))
     };
     let u32_at = |at: usize| -> Option<u32> {
-        Some(u32::from_be_bytes(font.get(at..at.checked_add(4)?)?.try_into().ok()?))
+        Some(u32::from_be_bytes(
+            font.get(at..at.checked_add(4)?)?.try_into().ok()?,
+        ))
     };
     let version = font.get(0..4)?;
     if version == b"ttcf" {
