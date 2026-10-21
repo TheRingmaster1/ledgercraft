@@ -167,6 +167,17 @@ impl Font {
         self.system_files().into_iter().find(|p| p.is_file())
     }
 
+    /// The name its data is registered under in egui.
+    fn key(self) -> String {
+        format!("ledgercraft-{self:?}")
+    }
+
+    /// The egui family that draws text in just this font (with egui's fonts
+    /// behind it), registered by [`set_text`].
+    pub(crate) fn family(self) -> egui::FontFamily {
+        egui::FontFamily::Name(self.key().into())
+    }
+
     /// Whether this font can be used on this computer.
     pub(crate) fn is_available(self) -> bool {
         Self::BUNDLED.contains(&self) || installed().contains(&self)
@@ -262,16 +273,38 @@ impl TextSize {
 /// behind a chosen font for any character it lacks, and for monospace. A
 /// font that cannot be found or read falls back to Classic. Rebuilds the
 /// font atlas, so call it only when the choice changes.
+///
+/// Every font on offer also gets its own named family ([`Font::family`]), so
+/// the font list in Preferences can show each name in its own font. egui
+/// stops the app if text asks for a family that is not registered, so the
+/// families are always registered (one that cannot be read is backed by
+/// Classic), and [`apply`] registers them before the first frame.
 pub(crate) fn set_text(ctx: &egui::Context, font: Font, size: TextSize) {
     let mut fonts = egui::FontDefinitions::default();
-    if let Some(data) = font.data() {
-        let name = "LedgerCraft text".to_owned();
-        fonts.font_data.insert(name.clone(), data);
+    let fallback: Vec<String> = fonts
+        .families
+        .get(&egui::FontFamily::Proportional)
+        .cloned()
+        .unwrap_or_default();
+    let mut chosen = None;
+    for offered in Font::BUNDLED.iter().chain(installed()).copied() {
+        let mut family = fallback.clone();
+        if let Some(data) = offered.data() {
+            let key = offered.key();
+            fonts.font_data.insert(key.clone(), data);
+            family.insert(0, key.clone());
+            if offered == font {
+                chosen = Some(key);
+            }
+        }
+        fonts.families.insert(offered.family(), family);
+    }
+    if let Some(key) = chosen {
         fonts
             .families
             .entry(egui::FontFamily::Proportional)
             .or_default()
-            .insert(0, name);
+            .insert(0, key);
     }
     ctx.set_fonts(fonts);
     let body = size.body();
@@ -305,6 +338,8 @@ pub(crate) fn apply(ctx: &egui::Context) {
     style.spacing.item_spacing = egui::vec2(8.0, 6.0);
     style.spacing.button_padding = egui::vec2(10.0, 4.0);
     ctx.set_style(style);
+    // The default text, and every font's own family, before the first frame.
+    set_text(ctx, Font::default(), TextSize::default());
 }
 
 #[cfg(test)]
@@ -337,6 +372,19 @@ mod tests {
                 assert_eq!(body.map(|f| f.size), Some(size.body()), "{font:?} {size:?}");
             }
         }
+    }
+
+    #[test]
+    fn every_offered_font_has_a_family_to_show_its_name_in() {
+        let ctx = egui::Context::default();
+        apply(&ctx);
+        let _ = ctx.run(egui::RawInput::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                for font in Font::BUNDLED.iter().chain(installed()) {
+                    ui.label(egui::RichText::new(font.label()).family(font.family()));
+                }
+            });
+        });
     }
 
     #[test]

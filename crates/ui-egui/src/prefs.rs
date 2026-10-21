@@ -286,21 +286,32 @@ fn text_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
                 // Chosen on another computer: Classic is used here instead.
                 format!("{} (not on this computer)", prefs.font.label())
             };
+            // Each font's name is shown in that font. Only fonts on offer here
+            // have a family registered; egui stops on an unregistered one.
+            let in_font = |font: Font, text: String| {
+                if font.is_available() {
+                    RichText::new(text).family(font.family())
+                } else {
+                    RichText::new(text)
+                }
+            };
             egui::ComboBox::from_id_salt("prefs_font")
-                .selected_text(shown)
+                .selected_text(in_font(prefs.font, shown))
                 .width(220.0)
                 .height(360.0)
                 .show_ui(ui, |ui| {
                     ui.label(RichText::new("Included with LedgerCraft").small().color(theme::MUTED));
                     for font in Font::BUNDLED {
-                        ui.selectable_value(&mut prefs.font, font, font.label());
+                        let name = in_font(font, font.label().to_string());
+                        ui.selectable_value(&mut prefs.font, font, name);
                     }
                     let installed = theme::installed();
                     if !installed.is_empty() {
                         ui.separator();
                         ui.label(RichText::new("On this computer").small().color(theme::MUTED));
                         for font in installed {
-                            ui.selectable_value(&mut prefs.font, *font, font.label());
+                            let name = in_font(*font, font.label().to_string());
+                            ui.selectable_value(&mut prefs.font, *font, name);
                         }
                     }
                 });
@@ -586,6 +597,8 @@ mod tests {
         assert_eq!(labels.len(), PrefsPage::ALL.len());
         for page in PrefsPage::ALL {
             let ctx = egui::Context::default();
+            // As the app does at start: fonts (and each font's family) first.
+            theme::apply(&ctx);
             ctx.data_mut(|d| d.insert_temp(egui::Id::new(PAGE_ID), page));
             let mut open = true;
             let mut prefs = Prefs::default();
