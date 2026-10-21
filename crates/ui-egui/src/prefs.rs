@@ -179,7 +179,11 @@ fn section_header(ui: &mut egui::Ui, key: &str, label: &str) -> bool {
     ui.scope(|ui| {
         ui.visuals_mut().selection.bg_fill = theme::ACCENT;
         let text = RichText::new(label).size(15.0);
-        let text = if open { text.color(Color32::WHITE) } else { text };
+        let text = if open {
+            text.color(Color32::WHITE)
+        } else {
+            text
+        };
         if ui.selectable_label(open, text).clicked() {
             open = !open;
             ui.data_mut(|d| d.insert_temp(id, open));
@@ -203,7 +207,11 @@ fn currency_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     });
     let symbol = prefs.currency.symbol();
     let sample = |cents: i64| ledgercraft_core::Money::from_cents(cents).format_with(symbol);
-    ui.label(format!("Example: {}   and a negative amount: {}", sample(123_456), sample(-8_910)));
+    ui.label(format!(
+        "Example: {}   and a negative amount: {}",
+        sample(123_456),
+        sample(-8_910)
+    ));
     ui.label(
         RichText::new(
             "This changes how amounts are shown, in the app and in Excel exports. It does \

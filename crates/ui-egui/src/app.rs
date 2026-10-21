@@ -8,7 +8,9 @@ use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
-use crate::security::{self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice};
+use crate::security::{
+    self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice,
+};
 use crate::start::{self, NewCompanyForm, StartChoice, StartPage};
 use crate::{forms, theme, tutorial, Action, FormKind, Page, Reset};
 
@@ -239,7 +241,9 @@ impl LedgerApp {
                 // offer to upgrade it.
                 self.offer_protection = !protected;
             }
-            Err(EngineError::File(FileError::PasswordRequired)) => self.unlock = Some(UnlockForm::new(path)),
+            Err(EngineError::File(FileError::PasswordRequired)) => {
+                self.unlock = Some(UnlockForm::new(path))
+            }
             Err(e) => self.error(format!("Could not open {}: {e}", path.display())),
         }
     }
@@ -289,7 +293,11 @@ impl LedgerApp {
         let Some(session) = self.session.as_ref() else {
             return false;
         };
-        let name = format!("{}.{}", session.company().info.name, ledgercraft_file::EXTENSION);
+        let name = format!(
+            "{}.{}",
+            session.company().info.name,
+            ledgercraft_file::EXTENSION
+        );
         let Some(path) = rfd::FileDialog::new()
             .add_filter("LedgerCraft company", &[ledgercraft_file::EXTENSION])
             .set_file_name(name)
@@ -314,7 +322,10 @@ impl LedgerApp {
     }
 
     fn export_csv(&mut self, name: &str, csv: &str) {
-        let Some(path) = rfd::FileDialog::new().add_filter("CSV", &["csv"]).set_file_name(name).save_file()
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("CSV", &["csv"])
+            .set_file_name(name)
+            .save_file()
         else {
             return;
         };
@@ -388,7 +399,10 @@ impl LedgerApp {
                     .as_ref()
                     .and_then(|s| s.company().customer(id))
                     .map(|c| c.contact.terms_days);
-                if let (Some(t), Ok(d)) = (terms, ledgercraft_core::Date::parse(&self.forms.invoice.date)) {
+                if let (Some(t), Ok(d)) = (
+                    terms,
+                    ledgercraft_core::Date::parse(&self.forms.invoice.date),
+                ) {
                     self.forms.invoice.due = d.add_days(i64::from(t)).to_string();
                 }
                 self.page = Page::Form(FormKind::Invoice);
@@ -417,8 +431,7 @@ impl LedgerApp {
             Action::ExportXlsx { name, data } => match data {
                 Ok(bytes) => self.export_xlsx(&name, &bytes),
                 Err(e) => self.error(e),
-            }
-
+            },
         }
     }
 
@@ -460,161 +473,227 @@ impl LedgerApp {
             egui::menu::bar(ui, |ui| {
                 let mut tops = Vec::new();
                 let has_company = self.session.is_some();
-                if has_company && !self.show_nav && ui.button(">").on_hover_text("Show side bar (Ctrl+B)").clicked() {
+                if has_company
+                    && !self.show_nav
+                    && ui
+                        .button(">")
+                        .on_hover_text("Show side bar (Ctrl+B)")
+                        .clicked()
+                {
                     self.show_nav = true;
                 }
-                tops.push(ui.menu_button("File", |ui| {
-                    if ui.button("New Company…").clicked() {
-                        ui.close_menu();
-                        self.request(Pending::New, ctx);
-                    }
-                    if ui.button("Open Company…").clicked() {
-                        ui.close_menu();
-                        self.request(Pending::Open, ctx);
-                    }
-                    if ui.button("Open Sample Company").clicked() {
-                        ui.close_menu();
-                        self.request(Pending::Sample, ctx);
-                    }
-                    ui.separator();
-                    if ui.add_enabled(has_company, egui::Button::new("Save")).clicked() {
-                        ui.close_menu();
-                        self.save();
-                    }
-                    if ui.add_enabled(has_company, egui::Button::new("Save As…")).clicked() {
-                        ui.close_menu();
-                        self.save_as();
-                    }
-                    let password = ui
-                        .add_enabled(has_company, egui::Button::new("Password…"))
-                        .on_hover_text("Set, change or remove the password that encrypts this company file.");
-                    if password.clicked() {
-                        ui.close_menu();
-                        self.password = Some(PasswordForm::default());
-                    }
-                    let close = ui
-                        .add_enabled(has_company, egui::Button::new("Close Company"))
-                        .on_hover_text("Close the books and go back to the start page.");
-                    if close.clicked() {
-                        ui.close_menu();
-                        self.request(Pending::Close, ctx);
-                    }
-                    ui.separator();
-                    if ui.button("Exit").clicked() {
-                        ui.close_menu();
-                        self.request(Pending::Quit, ctx);
-                    }
-                }).response);
-                tops.push(ui.menu_button("Edit", |ui| {
-                    let undo = self.session.as_ref().and_then(Session::undo_label).map(|l| format!("Undo {l}"));
-                    if ui.add_enabled(undo.is_some(), egui::Button::new(undo.unwrap_or_else(|| "Undo".into()))).clicked() {
-                        ui.close_menu();
-                        self.undo();
-                    }
-                    let redo = self.session.as_ref().and_then(Session::redo_label).map(|l| format!("Redo {l}"));
-                    if ui.add_enabled(redo.is_some(), egui::Button::new(redo.unwrap_or_else(|| "Redo".into()))).clicked() {
-                        ui.close_menu();
-                        self.redo();
-                    }
-                }).response);
-                tops.push(ui.menu_button("View", |ui| {
-                    let side_bar = egui::Checkbox::new(&mut self.show_nav, "Side Bar    Ctrl+B");
-                    if ui.add_enabled(has_company, side_bar).clicked() {
-                        ui.close_menu();
-                    }
-                }).response);
+                tops.push(
+                    ui.menu_button("File", |ui| {
+                        if ui.button("New Company…").clicked() {
+                            ui.close_menu();
+                            self.request(Pending::New, ctx);
+                        }
+                        if ui.button("Open Company…").clicked() {
+                            ui.close_menu();
+                            self.request(Pending::Open, ctx);
+                        }
+                        if ui.button("Open Sample Company").clicked() {
+                            ui.close_menu();
+                            self.request(Pending::Sample, ctx);
+                        }
+                        ui.separator();
+                        if ui
+                            .add_enabled(has_company, egui::Button::new("Save"))
+                            .clicked()
+                        {
+                            ui.close_menu();
+                            self.save();
+                        }
+                        if ui
+                            .add_enabled(has_company, egui::Button::new("Save As…"))
+                            .clicked()
+                        {
+                            ui.close_menu();
+                            self.save_as();
+                        }
+                        let password = ui
+                            .add_enabled(has_company, egui::Button::new("Password…"))
+                            .on_hover_text(
+                            "Set, change or remove the password that encrypts this company file.",
+                        );
+                        if password.clicked() {
+                            ui.close_menu();
+                            self.password = Some(PasswordForm::default());
+                        }
+                        let close = ui
+                            .add_enabled(has_company, egui::Button::new("Close Company"))
+                            .on_hover_text("Close the books and go back to the start page.");
+                        if close.clicked() {
+                            ui.close_menu();
+                            self.request(Pending::Close, ctx);
+                        }
+                        ui.separator();
+                        if ui.button("Exit").clicked() {
+                            ui.close_menu();
+                            self.request(Pending::Quit, ctx);
+                        }
+                    })
+                    .response,
+                );
+                tops.push(
+                    ui.menu_button("Edit", |ui| {
+                        let undo = self
+                            .session
+                            .as_ref()
+                            .and_then(Session::undo_label)
+                            .map(|l| format!("Undo {l}"));
+                        if ui
+                            .add_enabled(
+                                undo.is_some(),
+                                egui::Button::new(undo.unwrap_or_else(|| "Undo".into())),
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                            self.undo();
+                        }
+                        let redo = self
+                            .session
+                            .as_ref()
+                            .and_then(Session::redo_label)
+                            .map(|l| format!("Redo {l}"));
+                        if ui
+                            .add_enabled(
+                                redo.is_some(),
+                                egui::Button::new(redo.unwrap_or_else(|| "Redo".into())),
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                            self.redo();
+                        }
+                    })
+                    .response,
+                );
+                tops.push(
+                    ui.menu_button("View", |ui| {
+                        let side_bar =
+                            egui::Checkbox::new(&mut self.show_nav, "Side Bar    Ctrl+B");
+                        if ui.add_enabled(has_company, side_bar).clicked() {
+                            ui.close_menu();
+                        }
+                    })
+                    .response,
+                );
                 // Lists, Customers, Vendors, Banking and Reports work on a
                 // company, so their items are greyed out until one is open.
                 // (Disabled inside each menu rather than around the bar, so
                 // the menus stay part of the same bar for Open Menus On Hover.)
-                tops.push(ui.menu_button("Lists", |ui| {
-                    if !has_company {
-                        ui.disable();
-                    }
-                    for (label, page) in [
-                        ("Chart of Accounts", Page::Accounts),
-                        ("Customers", Page::Customers),
-                        ("Vendors", Page::Vendors),
-                        ("Products and Services", Page::Items),
-                    ] {
-                        if ui.button(label).clicked() {
-                            ui.close_menu();
-                            self.page = page;
+                tops.push(
+                    ui.menu_button("Lists", |ui| {
+                        if !has_company {
+                            ui.disable();
                         }
-                    }
-                }).response);
-                tops.push(ui.menu_button("Customers", |ui| {
-                    if !has_company {
-                        ui.disable();
-                    }
-                    for kind in [FormKind::Invoice, FormKind::ReceivePayment, FormKind::Deposit] {
-                        if ui.button(kind.title()).clicked() {
-                            ui.close_menu();
-                            self.page = Page::Form(kind);
+                        for (label, page) in [
+                            ("Chart of Accounts", Page::Accounts),
+                            ("Customers", Page::Customers),
+                            ("Vendors", Page::Vendors),
+                            ("Products and Services", Page::Items),
+                        ] {
+                            if ui.button(label).clicked() {
+                                ui.close_menu();
+                                self.page = page;
+                            }
                         }
-                    }
-                }).response);
-                tops.push(ui.menu_button("Vendors", |ui| {
-                    if !has_company {
-                        ui.disable();
-                    }
-                    for kind in [FormKind::Bill, FormKind::PayBills] {
-                        if ui.button(kind.title()).clicked() {
-                            ui.close_menu();
-                            self.page = Page::Form(kind);
+                    })
+                    .response,
+                );
+                tops.push(
+                    ui.menu_button("Customers", |ui| {
+                        if !has_company {
+                            ui.disable();
                         }
-                    }
-                }).response);
-                tops.push(ui.menu_button("Banking", |ui| {
-                    if !has_company {
-                        ui.disable();
-                    }
-                    for kind in [FormKind::Check, FormKind::Deposit, FormKind::Journal] {
-                        if ui.button(kind.title()).clicked() {
-                            ui.close_menu();
-                            self.page = Page::Form(kind);
+                        for kind in [
+                            FormKind::Invoice,
+                            FormKind::ReceivePayment,
+                            FormKind::Deposit,
+                        ] {
+                            if ui.button(kind.title()).clicked() {
+                                ui.close_menu();
+                                self.page = Page::Form(kind);
+                            }
                         }
-                    }
-                }).response);
+                    })
+                    .response,
+                );
+                tops.push(
+                    ui.menu_button("Vendors", |ui| {
+                        if !has_company {
+                            ui.disable();
+                        }
+                        for kind in [FormKind::Bill, FormKind::PayBills] {
+                            if ui.button(kind.title()).clicked() {
+                                ui.close_menu();
+                                self.page = Page::Form(kind);
+                            }
+                        }
+                    })
+                    .response,
+                );
+                tops.push(
+                    ui.menu_button("Banking", |ui| {
+                        if !has_company {
+                            ui.disable();
+                        }
+                        for kind in [FormKind::Check, FormKind::Deposit, FormKind::Journal] {
+                            if ui.button(kind.title()).clicked() {
+                                ui.close_menu();
+                                self.page = Page::Form(kind);
+                            }
+                        }
+                    })
+                    .response,
+                );
                 // A real menu: each report opens directly, rather than
                 // duplicating the side bar's "Reports" link.
-                tops.push(ui.menu_button("Reports", |ui| {
-                    if !has_company {
-                        ui.disable();
-                    }
-                    for kind in ledgercraft_reports::ReportKind::ALL {
-                        if ui.button(kind.label()).clicked() {
-                            ui.close_menu();
-                            self.reports.kind = kind;
-                            self.page = Page::Reports;
+                tops.push(
+                    ui.menu_button("Reports", |ui| {
+                        if !has_company {
+                            ui.disable();
                         }
-                    }
-                }).response);
-                tops.push(ui.menu_button("Help", |ui| {
-                    if ui.button("Preferences…").clicked() {
-                        ui.close_menu();
-                        self.show_prefs = true;
-                    }
-                    ui.menu_button("Tutorial", |ui| {
-                        if ui.button("Show Tutorial").clicked() {
-                            ui.close_menu();
-                            self.show_tutorial = true;
+                        for kind in ledgercraft_reports::ReportKind::ALL {
+                            if ui.button(kind.label()).clicked() {
+                                ui.close_menu();
+                                self.reports.kind = kind;
+                                self.page = Page::Reports;
+                            }
                         }
-                        if ui.button("Show at Next Launch").clicked() {
+                    })
+                    .response,
+                );
+                tops.push(
+                    ui.menu_button("Help", |ui| {
+                        if ui.button("Preferences…").clicked() {
                             ui.close_menu();
-                            self.tutorial_at_next_launch();
+                            self.show_prefs = true;
                         }
-                    });
-                    if ui.button("Licenses").clicked() {
-                        ui.close_menu();
-                        self.licenses.show_tab(LicenseTab::Summary);
-                    }
-                    ui.separator();
-                    if ui.button("About LedgerCraft").clicked() {
-                        ui.close_menu();
-                        self.show_about = true;
-                    }
-                }).response);
+                        ui.menu_button("Tutorial", |ui| {
+                            if ui.button("Show Tutorial").clicked() {
+                                ui.close_menu();
+                                self.show_tutorial = true;
+                            }
+                            if ui.button("Show at Next Launch").clicked() {
+                                ui.close_menu();
+                                self.tutorial_at_next_launch();
+                            }
+                        });
+                        if ui.button("Licenses").clicked() {
+                            ui.close_menu();
+                            self.licenses.show_tab(LicenseTab::Summary);
+                        }
+                        ui.separator();
+                        if ui.button("About LedgerCraft").clicked() {
+                            ui.close_menu();
+                            self.show_about = true;
+                        }
+                    })
+                    .response,
+                );
                 if self.prefs.hover_menus {
                     open_menus_on_hover(ui, &tops);
                 }
@@ -630,10 +709,20 @@ impl LedgerApp {
             .show_animated(ctx, self.show_nav && self.session.is_some(), |ui| {
                 theme::nav_visuals(ui);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("LedgerCraft").size(20.0).strong().color(theme::NAV_TEXT));
+                    ui.label(
+                        RichText::new("LedgerCraft")
+                            .size(20.0)
+                            .strong()
+                            .color(theme::NAV_TEXT),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let hide = egui::Button::new(RichText::new("<").color(theme::NAV_TEXT)).frame(false);
-                        if ui.add(hide).on_hover_text("Hide side bar (Ctrl+B)").clicked() {
+                        let hide = egui::Button::new(RichText::new("<").color(theme::NAV_TEXT))
+                            .frame(false);
+                        if ui
+                            .add(hide)
+                            .on_hover_text("Hide side bar (Ctrl+B)")
+                            .clicked()
+                        {
                             self.show_nav = false;
                         }
                     });
@@ -652,16 +741,31 @@ impl LedgerApp {
                 for (label, page) in items {
                     let selected = self.page == page;
                     let text = RichText::new(label).size(15.0).color(theme::NAV_TEXT);
-                    if ui.selectable_label(selected, text).on_hover_text(page.hint()).clicked() {
+                    if ui
+                        .selectable_label(selected, text)
+                        .on_hover_text(page.hint())
+                        .clicked()
+                    {
                         self.page = page;
                     }
                 }
                 ui.add_space(16.0);
                 ui.label(RichText::new("Create").color(theme::NAV_TEXT).small());
-                for kind in [FormKind::Invoice, FormKind::ReceivePayment, FormKind::Bill, FormKind::PayBills, FormKind::Check, FormKind::Deposit] {
+                for kind in [
+                    FormKind::Invoice,
+                    FormKind::ReceivePayment,
+                    FormKind::Bill,
+                    FormKind::PayBills,
+                    FormKind::Check,
+                    FormKind::Deposit,
+                ] {
                     let selected = self.page == Page::Form(kind);
                     let text = RichText::new(kind.title()).color(theme::NAV_TEXT);
-                    if ui.selectable_label(selected, text).on_hover_text(kind.hint()).clicked() {
+                    if ui
+                        .selectable_label(selected, text)
+                        .on_hover_text(kind.hint())
+                        .clicked()
+                    {
                         self.page = Page::Form(kind);
                     }
                 }
@@ -671,7 +775,11 @@ impl LedgerApp {
     fn status_bar(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                let color = if self.status_is_error { theme::NEGATIVE } else { theme::MUTED };
+                let color = if self.status_is_error {
+                    theme::NEGATIVE
+                } else {
+                    theme::MUTED
+                };
                 ui.label(RichText::new(self.status.as_str()).color(color));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let text = match &self.session {
@@ -681,7 +789,11 @@ impl LedgerApp {
                                 .path()
                                 .map(|p| p.display().to_string())
                                 .unwrap_or_else(|| "Not saved yet".into());
-                            let dirty = if session.is_dirty() { "  • unsaved changes" } else { "" };
+                            let dirty = if session.is_dirty() {
+                                "  • unsaved changes"
+                            } else {
+                                ""
+                            };
                             let lock = if session.is_protected() {
                                 "  • password protected"
                             } else {
@@ -704,7 +816,11 @@ impl LedgerApp {
         };
         match unlocked {
             Some(UnlockOutcome::Opened(session)) => {
-                let shown = self.unlock.take().map(|f| f.path.display().to_string()).unwrap_or_default();
+                let shown = self
+                    .unlock
+                    .take()
+                    .map(|f| f.path.display().to_string())
+                    .unwrap_or_default();
                 self.replace_session(*session);
                 self.info(format!("Opened {shown}"));
             }
@@ -746,14 +862,21 @@ impl LedgerApp {
             Some(PasswordOutcome::Apply(new)) => {
                 self.password = None;
                 let protect = new.is_some();
-                let result = self.session.as_mut().map(|s| s.set_password(new.as_deref()));
+                let result = self
+                    .session
+                    .as_mut()
+                    .map(|s| s.set_password(new.as_deref()));
                 let mut new = new;
                 if let Some(p) = new.as_mut() {
                     zeroize::Zeroize::zeroize(p);
                 }
                 match result {
-                    Some(Ok(())) if protect => self.info("Password saved. The company file is encrypted."),
-                    Some(Ok(())) => self.info("Password removed. The company file is no longer encrypted."),
+                    Some(Ok(())) if protect => {
+                        self.info("Password saved. The company file is encrypted.")
+                    }
+                    Some(Ok(())) => {
+                        self.info("Password removed. The company file is no longer encrypted.")
+                    }
                     Some(Err(e)) => self.error(format!("Could not change the password: {e}")),
                     None => {}
                 }
@@ -835,15 +958,20 @@ impl LedgerApp {
         self.security_windows(ctx);
         let mut open = self.show_about;
         let mut view_licenses = false;
-        egui::Window::new("About LedgerCraft").open(&mut open).collapsible(false).show(ctx, |ui| {
-            ui.label(RichText::new(format!("LedgerCraft {}", env!("CARGO_PKG_VERSION"))).strong());
-            ui.label("Open-source, double-entry small-business accounting in pure Rust.");
-            ui.horizontal(|ui| {
-                ui.label("Dual-licensed under MIT or Apache-2.0.");
-                view_licenses = ui.link("View licenses").clicked();
-            });
-            ui.add_space(6.0);
-            ui.label(
+        egui::Window::new("About LedgerCraft")
+            .open(&mut open)
+            .collapsible(false)
+            .show(ctx, |ui| {
+                ui.label(
+                    RichText::new(format!("LedgerCraft {}", env!("CARGO_PKG_VERSION"))).strong(),
+                );
+                ui.label("Open-source, double-entry small-business accounting in pure Rust.");
+                ui.horizontal(|ui| {
+                    ui.label("Dual-licensed under MIT or Apache-2.0.");
+                    view_licenses = ui.link("View licenses").clicked();
+                });
+                ui.add_space(6.0);
+                ui.label(
                 RichText::new(
                     "LedgerCraft is an independent project, not affiliated with or endorsed by \
                      Intuit Inc. QuickBooks is a trademark of Intuit Inc.",
@@ -851,14 +979,19 @@ impl LedgerApp {
                 .small()
                 .color(theme::MUTED),
             );
-        });
+            });
         self.show_about = open;
         if view_licenses {
             self.licenses.show_tab(LicenseTab::Summary);
         }
         self.licenses.ui(ctx);
         prefs::window(ctx, &mut self.show_prefs, &mut self.prefs);
-        let target = tutorial::window(ctx, &mut self.show_tutorial, &mut self.prefs, &mut self.tutorial);
+        let target = tutorial::window(
+            ctx,
+            &mut self.show_tutorial,
+            &mut self.prefs,
+            &mut self.tutorial,
+        );
         match target {
             Some(tutorial::Target::Page(page)) if self.session.is_some() => self.page = page,
             Some(tutorial::Target::Page(_)) => {
@@ -951,32 +1084,40 @@ impl eframe::App for LedgerApp {
                 _ => {
                     let stripe = self.prefs.stripe();
                     let salt = ("page", format!("{page:?}"));
-                    egui::ScrollArea::vertical().id_salt(salt).show(ui, |ui| match page {
-                        Page::Home => pages::home(ui, company, stripe, &mut actions),
-                        Page::Items => pages::items(ui, company, &mut self.lists, &mut actions),
-                        Page::Form(FormKind::Invoice) => {
-                            forms::invoice(ui, company, &mut self.forms.invoice, &mut actions)
-                        }
-                        Page::Form(FormKind::ReceivePayment) => {
-                            forms::receive_payment(ui, company, &mut self.forms.receive, &mut actions)
-                        }
-                        Page::Form(FormKind::Bill) => {
-                            forms::bill(ui, company, &mut self.forms.bill, &mut actions)
-                        }
-                        Page::Form(FormKind::PayBills) => {
-                            forms::pay_bills(ui, company, &mut self.forms.pay_bills, &mut actions)
-                        }
-                        Page::Form(FormKind::Check) => {
-                            forms::check(ui, company, &mut self.forms.check, &mut actions)
-                        }
-                        Page::Form(FormKind::Deposit) => {
-                            forms::deposit(ui, company, &mut self.forms.deposit, &mut actions)
-                        }
-                        Page::Form(FormKind::Journal) => {
-                            forms::journal(ui, company, &mut self.forms.journal, &mut actions)
-                        }
-                        _ => {}
-                    });
+                    egui::ScrollArea::vertical()
+                        .id_salt(salt)
+                        .show(ui, |ui| match page {
+                            Page::Home => pages::home(ui, company, stripe, &mut actions),
+                            Page::Items => pages::items(ui, company, &mut self.lists, &mut actions),
+                            Page::Form(FormKind::Invoice) => {
+                                forms::invoice(ui, company, &mut self.forms.invoice, &mut actions)
+                            }
+                            Page::Form(FormKind::ReceivePayment) => forms::receive_payment(
+                                ui,
+                                company,
+                                &mut self.forms.receive,
+                                &mut actions,
+                            ),
+                            Page::Form(FormKind::Bill) => {
+                                forms::bill(ui, company, &mut self.forms.bill, &mut actions)
+                            }
+                            Page::Form(FormKind::PayBills) => forms::pay_bills(
+                                ui,
+                                company,
+                                &mut self.forms.pay_bills,
+                                &mut actions,
+                            ),
+                            Page::Form(FormKind::Check) => {
+                                forms::check(ui, company, &mut self.forms.check, &mut actions)
+                            }
+                            Page::Form(FormKind::Deposit) => {
+                                forms::deposit(ui, company, &mut self.forms.deposit, &mut actions)
+                            }
+                            Page::Form(FormKind::Journal) => {
+                                forms::journal(ui, company, &mut self.forms.journal, &mut actions)
+                            }
+                            _ => {}
+                        });
                 }
             }
         });
@@ -1034,10 +1175,12 @@ mod tests {
     fn closing_with_unsaved_changes_asks_first() {
         let ctx = egui::Context::default();
         let mut app = LedgerApp::with_session(Session::new(new_company("Dirty Co")));
-        let renamed = app
-            .session
-            .as_mut()
-            .map(|s| s.execute(Command::CompanyRename { name: "Dirty Co 2".into() }).is_ok());
+        let renamed = app.session.as_mut().map(|s| {
+            s.execute(Command::CompanyRename {
+                name: "Dirty Co 2".into(),
+            })
+            .is_ok()
+        });
         assert_eq!(renamed, Some(true));
         app.request(Pending::Close, &ctx);
         assert!(app.session.is_some(), "closed without asking");
@@ -1069,7 +1212,10 @@ mod tests {
         ledgercraft_file::save(&locked, &new_company("Locked Co"), Some(&protection)).unwrap();
         let mut app = LedgerApp::blank(None);
         app.open_path(locked);
-        assert!(app.session.is_none(), "a protected file waits for its password");
+        assert!(
+            app.session.is_none(),
+            "a protected file waits for its password"
+        );
         assert!(app.unlock.is_some());
         assert!(!app.offer_protection);
         let _ = std::fs::remove_dir_all(&dir);
@@ -1079,7 +1225,9 @@ mod tests {
     fn with_no_company_the_books_cannot_change() {
         let mut app = LedgerApp::blank(None);
         app.apply(Action::Run {
-            cmd: Command::CompanyRename { name: "Nobody".into() },
+            cmd: Command::CompanyRename {
+                name: "Nobody".into(),
+            },
             reset: Reset::Nothing,
         });
         assert!(app.status_is_error);

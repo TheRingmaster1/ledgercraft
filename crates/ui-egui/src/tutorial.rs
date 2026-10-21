@@ -466,9 +466,12 @@ const LIST_WIDTH: f32 = 190.0;
 /// The tutorial's size: a share of the app window, within limits, and never
 /// bigger than the window itself, so it always fits with its buttons showing.
 fn window_size(screen: egui::Vec2) -> egui::Vec2 {
-    let wanted = egui::vec2(screen.x * WIDTH_SHARE, screen.y * HEIGHT_SHARE).clamp(MIN_SIZE, MAX_SIZE);
+    let wanted =
+        egui::vec2(screen.x * WIDTH_SHARE, screen.y * HEIGHT_SHARE).clamp(MIN_SIZE, MAX_SIZE);
     // Leave room for the title bar and a margin on every side.
-    wanted.min(screen - egui::vec2(40.0, 80.0)).max(egui::vec2(200.0, 160.0))
+    wanted
+        .min(screen - egui::vec2(40.0, 80.0))
+        .max(egui::vec2(200.0, 160.0))
 }
 
 /// Draws the Tutorial window. The "Never show again" box edits `prefs` (the
@@ -519,11 +522,17 @@ pub(crate) fn window(
                     prefs.show_tutorial = !never;
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.add_enabled(state.lesson < last, egui::Button::new("Next")).clicked() {
+                    if ui
+                        .add_enabled(state.lesson < last, egui::Button::new("Next"))
+                        .clicked()
+                    {
                         state.lesson += 1;
                     }
                     ui.label(format!("{} of {}", state.lesson + 1, LESSONS.len()));
-                    if ui.add_enabled(state.lesson > 0, egui::Button::new("Back")).clicked() {
+                    if ui
+                        .add_enabled(state.lesson > 0, egui::Button::new("Back"))
+                        .clicked()
+                    {
                         state.lesson -= 1;
                     }
                 });
@@ -629,12 +638,18 @@ mod tests {
         ];
         for screen in screens {
             let size = window_size(screen);
-            assert!(size.x <= screen.x && size.y <= screen.y, "{size:?} does not fit {screen:?}");
+            assert!(
+                size.x <= screen.x && size.y <= screen.y,
+                "{size:?} does not fit {screen:?}"
+            );
             assert!(size.x <= MAX_SIZE.x && size.y <= MAX_SIZE.y);
         }
         // A typical laptop window gets 70% by 75%.
         let laptop = window_size(egui::vec2(1280.0, 800.0));
-        assert!((laptop.x - 896.0).abs() < 0.5 && (laptop.y - 600.0).abs() < 0.5, "{laptop:?}");
+        assert!(
+            (laptop.x - 896.0).abs() < 0.5 && (laptop.y - 600.0).abs() < 0.5,
+            "{laptop:?}"
+        );
     }
 
     /// Adding a form without teaching it fails here, as a reminder.

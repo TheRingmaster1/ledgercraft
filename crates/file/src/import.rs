@@ -14,9 +14,7 @@
 
 use std::fmt;
 
-use ledgercraft_ledger::{
-    AccountType, Address, Company, Contact, ItemKind, ItemSpec, Money,
-};
+use ledgercraft_ledger::{AccountType, Address, Company, Contact, ItemKind, ItemSpec, Money};
 
 /// Which list a CSV file holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -109,13 +107,20 @@ pub fn import_iif(company: &mut Company, text: &str) -> ImportSummary {
         let Some(tag) = fields.first() else { continue };
         if let Some(kind) = tag.strip_prefix('!') {
             headers.retain(|(k, _)| k != kind);
-            headers.push((kind.to_string(), fields.iter().skip(1).map(|h| h.to_uppercase()).collect()));
+            headers.push((
+                kind.to_string(),
+                fields.iter().skip(1).map(|h| h.to_uppercase()).collect(),
+            ));
             continue;
         }
         let Some((_, cols)) = headers.iter().find(|(k, _)| k == tag) else {
             continue;
         };
-        let record = Record { line: line_no, cols: cols.clone(), values: fields.iter().skip(1).cloned().collect() };
+        let record = Record {
+            line: line_no,
+            cols: cols.clone(),
+            values: fields.iter().skip(1).cloned().collect(),
+        };
         match tag.as_str() {
             "ACCNT" => add_account(company, &record, &mut summary),
             "CUST" => add_party(company, &record, true, &mut summary),
@@ -185,22 +190,32 @@ fn account_type(text: &str) -> Option<AccountType> {
         "EXEXP" => Some(AccountType::OtherExpense),
         _ => None,
     };
-    by_code.or_else(|| AccountType::ALL.into_iter().find(|k| k.label().eq_ignore_ascii_case(text.trim())))
+    by_code.or_else(|| {
+        AccountType::ALL
+            .into_iter()
+            .find(|k| k.label().eq_ignore_ascii_case(text.trim()))
+    })
 }
 
 fn add_account(company: &mut Company, r: &Record, summary: &mut ImportSummary) {
     let name = r.get(&["NAME", "ACCOUNT", "ACCOUNT NAME"]);
     let type_text = r.get(&["ACCNTTYPE", "TYPE", "ACCOUNT TYPE"]);
     if name.is_empty() {
-        summary.skipped.push(format!("Line {}: account with no name", r.line));
+        summary
+            .skipped
+            .push(format!("Line {}: account with no name", r.line));
         return;
     }
     if type_text.eq_ignore_ascii_case("NONPOSTING") {
-        summary.skipped.push(format!("{name}: non-posting accounts (such as purchase orders) are not used"));
+        summary.skipped.push(format!(
+            "{name}: non-posting accounts (such as purchase orders) are not used"
+        ));
         return;
     }
     let Some(kind) = account_type(type_text) else {
-        summary.skipped.push(format!("{name}: unknown account type {type_text:?}"));
+        summary
+            .skipped
+            .push(format!("{name}: unknown account type {type_text:?}"));
         return;
     };
     let number = r.get(&["ACCNUM", "NUMBER", "ACCOUNT NUMBER", "NUM"]);
@@ -214,26 +229,47 @@ fn add_account(company: &mut Company, r: &Record, summary: &mut ImportSummary) {
 /// Payment terms such as "Net 30" or "30" become days; anything else 0.
 fn terms_days(text: &str) -> u32 {
     let digits: String = text.chars().filter(char::is_ascii_digit).collect();
-    digits.parse::<u32>().ok().filter(|d| *d <= 3650).unwrap_or(0)
+    digits
+        .parse::<u32>()
+        .ok()
+        .filter(|d| *d <= 3650)
+        .unwrap_or(0)
 }
 
 fn add_party(company: &mut Company, r: &Record, customer: bool, summary: &mut ImportSummary) {
     let name = r.get(&["NAME", "CUSTOMER", "VENDOR", "DISPLAY NAME", "FULL NAME"]);
     if name.is_empty() {
-        summary.skipped.push(format!("Line {}: name is missing", r.line));
+        summary
+            .skipped
+            .push(format!("Line {}: name is missing", r.line));
         return;
     }
     let contact = Contact {
         name: name.to_string(),
-        company: r.get(&["COMPANYNAME", "COMPANY", "COMPANY NAME"]).to_string(),
+        company: r
+            .get(&["COMPANYNAME", "COMPANY", "COMPANY NAME"])
+            .to_string(),
         email: r.get(&["EMAIL", "E-MAIL"]).to_string(),
         phone: r.get(&["PHONE1", "PHONE", "MAIN PHONE"]).to_string(),
         address: Address {
-            line1: r.get(&["BADDR1", "ADDR1", "STREET", "ADDRESS", "BILLING ADDRESS", "ADDRESS 1"]).to_string(),
+            line1: r
+                .get(&[
+                    "BADDR1",
+                    "ADDR1",
+                    "STREET",
+                    "ADDRESS",
+                    "BILLING ADDRESS",
+                    "ADDRESS 1",
+                ])
+                .to_string(),
             line2: r.get(&["BADDR2", "ADDR2", "ADDRESS 2"]).to_string(),
             city: r.get(&["CITY", "BILLING CITY"]).to_string(),
-            region: r.get(&["STATE", "REGION", "PROVINCE", "BILLING STATE"]).to_string(),
-            postal_code: r.get(&["ZIP", "POSTAL CODE", "ZIP CODE", "BILLING ZIP"]).to_string(),
+            region: r
+                .get(&["STATE", "REGION", "PROVINCE", "BILLING STATE"])
+                .to_string(),
+            postal_code: r
+                .get(&["ZIP", "POSTAL CODE", "ZIP CODE", "BILLING ZIP"])
+                .to_string(),
             country: r.get(&["COUNTRY"]).to_string(),
         },
         terms_days: terms_days(r.get(&["TERMS", "PAYMENT TERMS"])),
@@ -254,10 +290,16 @@ fn add_party(company: &mut Company, r: &Record, customer: bool, summary: &mut Im
 fn add_item(company: &mut Company, r: &Record, summary: &mut ImportSummary) {
     let name = r.get(&["NAME", "ITEM", "PRODUCT/SERVICE NAME", "PRODUCT/SERVICE"]);
     if name.is_empty() {
-        summary.skipped.push(format!("Line {}: item with no name", r.line));
+        summary
+            .skipped
+            .push(format!("Line {}: item with no name", r.line));
         return;
     }
-    let kind = match r.get(&["INVITEMTYPE", "TYPE", "ITEM TYPE"]).to_uppercase().as_str() {
+    let kind = match r
+        .get(&["INVITEMTYPE", "TYPE", "ITEM TYPE"])
+        .to_uppercase()
+        .as_str()
+    {
         "SERV" | "SERVICE" => ItemKind::Service,
         "OTHC" | "OTHER CHARGE" => ItemKind::OtherCharge,
         _ => ItemKind::NonInventory,
@@ -266,7 +308,9 @@ fn add_item(company: &mut Company, r: &Record, summary: &mut ImportSummary) {
     let rate = match Money::parse_or_zero(rate_text) {
         Ok(m) => m,
         Err(_) => {
-            summary.skipped.push(format!("{name}: price {rate_text:?} is not an amount"));
+            summary
+                .skipped
+                .push(format!("{name}: price {rate_text:?} is not an amount"));
             return;
         }
     };
@@ -277,12 +321,16 @@ fn add_item(company: &mut Company, r: &Record, summary: &mut ImportSummary) {
         .map(|a| a.id)
         .or_else(|| company.first_account_of(AccountType::Income));
     let Some(income_account) = account else {
-        summary.skipped.push(format!("{name}: no income account to record its sales in"));
+        summary
+            .skipped
+            .push(format!("{name}: no income account to record its sales in"));
         return;
     };
     let spec = ItemSpec {
         name: name.to_string(),
-        description: r.get(&["DESC", "DESCRIPTION", "SALES DESCRIPTION"]).to_string(),
+        description: r
+            .get(&["DESC", "DESCRIPTION", "SALES DESCRIPTION"])
+            .to_string(),
         kind,
         rate,
         income_account,
@@ -296,7 +344,11 @@ fn add_item(company: &mut Company, r: &Record, summary: &mut ImportSummary) {
 // ----- CSV --------------------------------------------------------------------
 
 /// Reads one list from a CSV file with a header row into `company`.
-pub fn import_csv(company: &mut Company, kind: ListKind, text: &str) -> Result<ImportSummary, String> {
+pub fn import_csv(
+    company: &mut Company,
+    kind: ListKind,
+    text: &str,
+) -> Result<ImportSummary, String> {
     let rows = parse_csv(text);
     let mut rows = rows.into_iter();
     let Some(header) = rows.next() else {
@@ -308,7 +360,11 @@ pub fn import_csv(company: &mut Company, kind: ListKind, text: &str) -> Result<I
         if values.iter().all(|v| v.trim().is_empty()) {
             continue;
         }
-        let record = Record { line: i + 2, cols: cols.clone(), values };
+        let record = Record {
+            line: i + 2,
+            cols: cols.clone(),
+            values,
+        };
         match kind {
             ListKind::Accounts => add_account(company, &record, &mut summary),
             ListKind::Customers => add_party(company, &record, true, &mut summary),
@@ -383,7 +439,11 @@ INVITEM\tDelivery\tSERV\tLocal delivery\t40\tNo Such Account\n";
     fn iif_lists_come_in() {
         let mut c = Company::new("Import Co");
         let s = import_iif(&mut c, IIF);
-        assert_eq!((s.accounts, s.customers, s.vendors, s.items), (3, 1, 1, 2), "{s:?}");
+        assert_eq!(
+            (s.accounts, s.customers, s.vendors, s.items),
+            (3, 1, 1, 2),
+            "{s:?}"
+        );
         assert_eq!(s.skipped.len(), 1); // the non-posting account
         let jane = c.customers.first().unwrap();
         assert_eq!(jane.contact.name, "Smith, Jane");
@@ -391,7 +451,10 @@ INVITEM\tDelivery\tSERV\tLocal delivery\t40\tNo Such Account\n";
         assert_eq!(c.vendors.first().unwrap().contact.terms_days, 0);
         let shelf = c.items.iter().find(|i| i.spec.name == "Bookshelf").unwrap();
         assert_eq!(shelf.spec.rate, Money::from_dollars(450));
-        assert_eq!(c.account_name(shelf.spec.income_account), "4050 · Furniture Sales");
+        assert_eq!(
+            c.account_name(shelf.spec.income_account),
+            "4050 · Furniture Sales"
+        );
     }
 
     #[test]

@@ -96,7 +96,10 @@ impl AccountType {
     }
 
     pub fn is_balance_sheet(self) -> bool {
-        matches!(self.class(), Class::Asset | Class::Liability | Class::Equity)
+        matches!(
+            self.class(),
+            Class::Asset | Class::Liability | Class::Equity
+        )
     }
 
     /// AR and AP track who owes what, so every posting to them needs a name.
@@ -106,7 +109,10 @@ impl AccountType {
 
     /// Accounts money can be paid from or deposited to.
     pub fn is_cash_like(self) -> bool {
-        matches!(self, Self::Bank | Self::OtherCurrentAsset | Self::CreditCard)
+        matches!(
+            self,
+            Self::Bank | Self::OtherCurrentAsset | Self::CreditCard
+        )
     }
 }
 

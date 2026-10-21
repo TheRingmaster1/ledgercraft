@@ -27,7 +27,8 @@ impl Report {
     /// The report as the bytes of an .xlsx file. Amounts are numbers Excel can
     /// add up, shown with `currency` (such as `"$"`, or `""` for none) in front.
     pub fn to_xlsx(&self, currency: &str) -> Result<Vec<u8>, String> {
-        build(self, &money_format(currency)).map_err(|e| format!("could not build the Excel file: {e}"))
+        build(self, &money_format(currency))
+            .map_err(|e| format!("could not build the Excel file: {e}"))
     }
 }
 
@@ -37,16 +38,35 @@ fn build(r: &Report, money_fmt: &str) -> Result<Vec<u8>, XlsxError> {
     ws.set_name(sheet_name(&r.title))?;
 
     // Title block.
-    ws.write_string_with_format(0, 0, &r.company, &Format::new().set_bold().set_font_size(14))?;
-    let title = Format::new().set_bold().set_font_size(12).set_font_color(Color::RGB(ACCENT));
+    ws.write_string_with_format(
+        0,
+        0,
+        &r.company,
+        &Format::new().set_bold().set_font_size(14),
+    )?;
+    let title = Format::new()
+        .set_bold()
+        .set_font_size(12)
+        .set_font_color(Color::RGB(ACCENT));
     ws.write_string_with_format(1, 0, &r.title, &title)?;
-    ws.write_string_with_format(2, 0, &r.period, &Format::new().set_font_color(Color::RGB(MUTED)))?;
+    ws.write_string_with_format(
+        2,
+        0,
+        &r.period,
+        &Format::new().set_font_color(Color::RGB(MUTED)),
+    )?;
 
     // Column headers. Money columns are right-aligned to sit over their numbers.
-    let header = Format::new().set_bold().set_border_bottom(FormatBorder::Thin);
+    let header = Format::new()
+        .set_bold()
+        .set_border_bottom(FormatBorder::Thin);
     ws.write_string_with_format(HEADER_ROW, 0, &r.label_header, &header)?;
     for (i, name) in r.columns.iter().enumerate() {
-        let fmt = if is_money_column(r, i) { header.clone().set_align(FormatAlign::Right) } else { header.clone() };
+        let fmt = if is_money_column(r, i) {
+            header.clone().set_align(FormatAlign::Right)
+        } else {
+            header.clone()
+        };
         ws.write_string_with_format(HEADER_ROW, col(i + 1), name, &fmt)?;
     }
 
@@ -91,7 +111,10 @@ fn write_row(
     columns: usize,
     money_fmt: &str,
 ) -> Result<(), XlsxError> {
-    let strong = matches!(line.kind, RowKind::Section | RowKind::Subtotal | RowKind::Total);
+    let strong = matches!(
+        line.kind,
+        RowKind::Section | RowKind::Subtotal | RowKind::Total
+    );
     let mut label = Format::new().set_indent(line.indent);
     if strong {
         label = label.set_bold();
@@ -135,14 +158,22 @@ fn write_row(
 
 /// True when a column holds money in any row.
 fn is_money_column(r: &Report, i: usize) -> bool {
-    r.rows.iter().any(|l| matches!(l.cells.get(i), Some(Cell::Money(_))))
+    r.rows
+        .iter()
+        .any(|l| matches!(l.cells.get(i), Some(Cell::Money(_))))
 }
 
 /// Excel sheet names: at most 31 characters, none of `[]:*?/\`.
 fn sheet_name(title: &str) -> String {
     let cleaned: String = title
         .chars()
-        .map(|c| if matches!(c, '[' | ']' | ':' | '*' | '?' | '/' | '\\') { '-' } else { c })
+        .map(|c| {
+            if matches!(c, '[' | ']' | ':' | '*' | '?' | '/' | '\\') {
+                '-'
+            } else {
+                c
+            }
+        })
         .take(31)
         .collect();
     let trimmed = cleaned.trim().trim_matches('\'').to_string();
@@ -167,7 +198,10 @@ mod tests {
 
     #[test]
     fn sheet_names_are_valid() {
-        assert_eq!(sheet_name("Register: 1000 · Checking"), "Register- 1000 · Checking");
+        assert_eq!(
+            sheet_name("Register: 1000 · Checking"),
+            "Register- 1000 · Checking"
+        );
         assert_eq!(sheet_name(""), "Report");
         assert!(sheet_name(&"x".repeat(50)).chars().count() <= 31);
     }
@@ -176,8 +210,20 @@ mod tests {
     fn builds_a_workbook() {
         let mut r = Report::new("Profit & Loss", "Test Co", "2026".into(), &["Amount"]);
         r.section("Income", 0);
-        r.money(RowKind::Detail, "Sales", 1, &[ledgercraft_core::Money::from_cents(12_345)], None);
-        r.money(RowKind::Total, "Net Income", 0, &[ledgercraft_core::Money::from_cents(12_345)], None);
+        r.money(
+            RowKind::Detail,
+            "Sales",
+            1,
+            &[ledgercraft_core::Money::from_cents(12_345)],
+            None,
+        );
+        r.money(
+            RowKind::Total,
+            "Net Income",
+            0,
+            &[ledgercraft_core::Money::from_cents(12_345)],
+            None,
+        );
         let bytes = r.to_xlsx("$").unwrap();
         assert_eq!(money_format("$"), "\"$\"#,##0.00;[Red]-\"$\"#,##0.00");
         assert_eq!(money_format(""), "#,##0.00;[Red]-#,##0.00");

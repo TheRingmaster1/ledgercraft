@@ -14,8 +14,14 @@ fn main() {
     let mut res = winresource::WindowsResource::new();
     res.set_icon("../../assets/app-icon/ledgercraft.ico");
     res.set("ProductName", "LedgerCraft");
-    res.set("FileDescription", "LedgerCraft - open-source small-business accounting");
-    res.set("LegalCopyright", "Copyright (c) 2026 the LedgerCraft contributors. MIT OR Apache-2.0.");
+    res.set(
+        "FileDescription",
+        "LedgerCraft - open-source small-business accounting",
+    );
+    res.set(
+        "LegalCopyright",
+        "Copyright (c) 2026 the LedgerCraft contributors. MIT OR Apache-2.0.",
+    );
     if let Err(e) = res.compile() {
         println!("cargo:warning=could not embed the app icon in the .exe: {e}");
     }

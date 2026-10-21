@@ -182,7 +182,12 @@ fn neg(m: Money) -> LedgerResult<Money> {
 }
 
 fn post(account: AccountId, amount: Money, party: Option<Party>, memo: &str) -> Posting {
-    Posting { account, amount, party, memo: memo.to_string() }
+    Posting {
+        account,
+        amount,
+        party,
+        memo: memo.to_string(),
+    }
 }
 
 impl TxnBody {

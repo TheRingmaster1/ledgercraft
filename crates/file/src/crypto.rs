@@ -38,7 +38,11 @@ pub struct KdfParams {
 
 impl Default for KdfParams {
     fn default() -> Self {
-        Self { memory_kib: 19 * 1024, iterations: 2, parallelism: 1 }
+        Self {
+            memory_kib: 19 * 1024,
+            iterations: 2,
+            parallelism: 1,
+        }
     }
 }
 
@@ -52,7 +56,9 @@ impl KdfParams {
         if ok {
             Ok(())
         } else {
-            Err(FileError::Damaged("its encryption settings are out of range".into()))
+            Err(FileError::Damaged(
+                "its encryption settings are out of range".into(),
+            ))
         }
     }
 }
@@ -108,14 +114,24 @@ impl Protection {
         let cipher = XChaCha20Poly1305::new(Key::from_slice(&self.key[..]));
         let aad = aad(&header);
         let sealed = cipher
-            .encrypt(XNonce::from_slice(&nonce), Payload { msg: plain, aad: aad.as_bytes() })
+            .encrypt(
+                XNonce::from_slice(&nonce),
+                Payload {
+                    msg: plain,
+                    aad: aad.as_bytes(),
+                },
+            )
             .map_err(|_| FileError::Crypto("encryption failed".into()))?;
         Ok((header, B64.encode(sealed)))
     }
 
     /// Decrypts a protected file's contents with `password`. Returns the
     /// plain text and the protection to save it with again.
-    pub(crate) fn open(header: &Header, ciphertext: &str, password: &str) -> Result<(Zeroizing<Vec<u8>>, Self), FileError> {
+    pub(crate) fn open(
+        header: &Header,
+        ciphertext: &str,
+        password: &str,
+    ) -> Result<(Zeroizing<Vec<u8>>, Self), FileError> {
         if header.cipher != CIPHER || header.kdf != KDF {
             return Err(FileError::Damaged(format!(
                 "it uses an encryption method this version does not know ({} / {})",
@@ -132,9 +148,22 @@ impl Protection {
         let cipher = XChaCha20Poly1305::new(Key::from_slice(&key[..]));
         let aad = aad(header);
         let plain = cipher
-            .decrypt(XNonce::from_slice(&nonce), Payload { msg: &sealed, aad: aad.as_bytes() })
+            .decrypt(
+                XNonce::from_slice(&nonce),
+                Payload {
+                    msg: &sealed,
+                    aad: aad.as_bytes(),
+                },
+            )
             .map_err(|_| FileError::WrongPassword)?;
-        Ok((Zeroizing::new(plain), Self { salt, params: header.params, key }))
+        Ok((
+            Zeroizing::new(plain),
+            Self {
+                salt,
+                params: header.params,
+                key,
+            },
+        ))
     }
 }
 

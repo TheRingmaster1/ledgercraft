@@ -132,7 +132,12 @@ pub(crate) fn party_combo(ui: &mut Ui, salt: impl Hash, c: &Company, value: &mut
 }
 
 /// Returns true when the choice changed.
-pub(crate) fn item_combo(ui: &mut Ui, salt: impl Hash, c: &Company, value: &mut Option<ItemId>) -> bool {
+pub(crate) fn item_combo(
+    ui: &mut Ui,
+    salt: impl Hash,
+    c: &Company,
+    value: &mut Option<ItemId>,
+) -> bool {
     let before = *value;
     let text = (*value)
         .and_then(|id| c.item(id))
@@ -157,7 +162,10 @@ pub(crate) fn item_combo(ui: &mut Ui, salt: impl Hash, c: &Company, value: &mut 
 /// narrow would stay narrow forever.
 pub(crate) fn field(ui: &mut Ui, text: &mut String, width: f32, hint: &str) -> egui::Response {
     let height = ui.spacing().interact_size.y;
-    ui.add_sized([width, height], egui::TextEdit::singleline(text).hint_text(hint))
+    ui.add_sized(
+        [width, height],
+        egui::TextEdit::singleline(text).hint_text(hint),
+    )
 }
 
 /// The small "remove this line" button. Plain ASCII, so it renders with any font.
@@ -187,51 +195,57 @@ pub(crate) fn report_view(ui: &mut Ui, r: &Report, out: &mut Vec<Action>) {
         ui.label(RichText::new(r.period.as_str()).color(theme::MUTED));
     });
     ui.add_space(8.0);
-    egui::ScrollArea::both().id_salt("report_scroll").show(ui, |ui| {
-        egui::Grid::new("report_grid")
-            .striped(true)
-            .min_col_width(90.0)
-            .spacing([18.0, 4.0])
-            .show(ui, |ui| {
-                ui.label(RichText::new(r.label_header.as_str()).strong());
-                for col in &r.columns {
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new(col.as_str()).strong());
-                    });
-                }
-                ui.end_row();
-                for row in &r.rows {
-                    let strong = matches!(row.kind, RowKind::Section | RowKind::Subtotal | RowKind::Total);
-                    let label = format!("{}{}", "    ".repeat(usize::from(row.indent)), row.label);
-                    let mut text = RichText::new(label);
-                    if strong {
-                        text = text.strong();
-                    }
-                    match row.account {
-                        Some(acct) => {
-                            if ui.link(text).clicked() {
-                                out.push(Action::Go(Page::Register(acct)));
-                            }
-                        }
-                        None => {
-                            ui.label(text);
-                        }
-                    }
-                    for i in 0..r.columns.len() {
-                        match row.cells.get(i) {
-                            Some(Cell::Money(m)) => money_label(ui, *m, strong),
-                            Some(Cell::Text(t)) => {
-                                ui.label(t.as_str());
-                            }
-                            _ => {
-                                ui.label("");
-                            }
-                        }
+    egui::ScrollArea::both()
+        .id_salt("report_scroll")
+        .show(ui, |ui| {
+            egui::Grid::new("report_grid")
+                .striped(true)
+                .min_col_width(90.0)
+                .spacing([18.0, 4.0])
+                .show(ui, |ui| {
+                    ui.label(RichText::new(r.label_header.as_str()).strong());
+                    for col in &r.columns {
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.label(RichText::new(col.as_str()).strong());
+                        });
                     }
                     ui.end_row();
-                }
-            });
-    });
+                    for row in &r.rows {
+                        let strong = matches!(
+                            row.kind,
+                            RowKind::Section | RowKind::Subtotal | RowKind::Total
+                        );
+                        let label =
+                            format!("{}{}", "    ".repeat(usize::from(row.indent)), row.label);
+                        let mut text = RichText::new(label);
+                        if strong {
+                            text = text.strong();
+                        }
+                        match row.account {
+                            Some(acct) => {
+                                if ui.link(text).clicked() {
+                                    out.push(Action::Go(Page::Register(acct)));
+                                }
+                            }
+                            None => {
+                                ui.label(text);
+                            }
+                        }
+                        for i in 0..r.columns.len() {
+                            match row.cells.get(i) {
+                                Some(Cell::Money(m)) => money_label(ui, *m, strong),
+                                Some(Cell::Text(t)) => {
+                                    ui.label(t.as_str());
+                                }
+                                _ => {
+                                    ui.label("");
+                                }
+                            }
+                        }
+                        ui.end_row();
+                    }
+                });
+        });
 }
 
 /// A label with hover help when `hints::field` has some for its text.

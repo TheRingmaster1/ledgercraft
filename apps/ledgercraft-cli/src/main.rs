@@ -36,7 +36,10 @@ fn main() -> ExitCode {
 }
 
 fn flag_value(args: &[String], flag: &str) -> Option<String> {
-    args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1)).cloned()
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .cloned()
 }
 
 fn run(args: &[String]) -> Result<(), String> {
@@ -64,7 +67,10 @@ fn run(args: &[String]) -> Result<(), String> {
             let file = rest.first().ok_or("new: which file?")?;
             let path = ledgercraft_file::with_extension(Path::new(file));
             if path.exists() {
-                return Err(format!("{} already exists; refusing to overwrite it", path.display()));
+                return Err(format!(
+                    "{} already exists; refusing to overwrite it",
+                    path.display()
+                ));
             }
             let company = if rest.iter().any(|a| a == "--sample") {
                 sample_company().map_err(|e| e.to_string())?
@@ -77,7 +83,8 @@ fn run(args: &[String]) -> Result<(), String> {
                 Some(p) => Some(ledgercraft_file::Protection::new(&p).map_err(|e| e.to_string())?),
                 None => None,
             };
-            ledgercraft_file::save(&path, &company, protection.as_ref()).map_err(|e| e.to_string())?;
+            ledgercraft_file::save(&path, &company, protection.as_ref())
+                .map_err(|e| e.to_string())?;
             println!("created {}", path.display());
             Ok(())
         }
@@ -138,7 +145,9 @@ fn run(args: &[String]) -> Result<(), String> {
                 .filter(|p| !p.is_empty())
                 .ok_or("protect: set LEDGERCRAFT_NEW_PASSWORD to the new password")?;
             let mut session = open(file)?;
-            session.set_password(Some(&new)).map_err(|e| e.to_string())?;
+            session
+                .set_password(Some(&new))
+                .map_err(|e| e.to_string())?;
             println!("{file}: protected and encrypted");
             Ok(())
         }
@@ -172,14 +181,18 @@ fn open(file: &str) -> Result<Session, String> {
         None => Session::open(&path),
     };
     opened.map_err(|e| match e {
-        ledgercraft_engine::EngineError::File(ledgercraft_file::FileError::PasswordRequired) => format!(
-            "{}: this company file is password protected; set LEDGERCRAFT_PASSWORD",
-            path.display()
-        ),
+        ledgercraft_engine::EngineError::File(ledgercraft_file::FileError::PasswordRequired) => {
+            format!(
+                "{}: this company file is password protected; set LEDGERCRAFT_PASSWORD",
+                path.display()
+            )
+        }
         e => format!("{}: {e}", path.display()),
     })
 }
 
 fn password_from_env() -> Option<String> {
-    std::env::var("LEDGERCRAFT_PASSWORD").ok().filter(|p| !p.is_empty())
+    std::env::var("LEDGERCRAFT_PASSWORD")
+        .ok()
+        .filter(|p| !p.is_empty())
 }

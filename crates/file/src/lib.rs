@@ -95,7 +95,11 @@ struct EnvelopeIn {
 }
 
 pub fn to_json(company: &Company) -> Result<String, FileError> {
-    let env = EnvelopeOut { format: FORMAT, version: VERSION, company };
+    let env = EnvelopeOut {
+        format: FORMAT,
+        version: VERSION,
+        company,
+    };
     Ok(serde_json::to_string_pretty(&env)?)
 }
 
@@ -107,7 +111,9 @@ pub fn from_json(text: &str) -> Result<Company, FileError> {
     }
     let version = head.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
     if version > u64::from(VERSION) {
-        return Err(FileError::TooNew(u32::try_from(version).unwrap_or(u32::MAX)));
+        return Err(FileError::TooNew(
+            u32::try_from(version).unwrap_or(u32::MAX),
+        ));
     }
     let env: EnvelopeIn = serde_json::from_value(head)?;
     if env.format != FORMAT || env.version > VERSION {
@@ -133,7 +139,10 @@ struct ProtectedIn {
 }
 
 /// The file's text as it is saved: plain JSON, or encrypted with `protection`.
-pub fn to_file_text(company: &Company, protection: Option<&Protection>) -> Result<String, FileError> {
+pub fn to_file_text(
+    company: &Company,
+    protection: Option<&Protection>,
+) -> Result<String, FileError> {
     let json = zeroize::Zeroizing::new(to_json(company)?);
     let Some(protection) = protection else {
         return Ok(json.to_string());
@@ -150,7 +159,10 @@ pub fn to_file_text(company: &Company, protection: Option<&Protection>) -> Resul
 
 /// Reads a file's text. A protected file needs `password`; the protection to
 /// save it with again comes back with the company.
-pub fn from_file_text(text: &str, password: Option<&str>) -> Result<(Company, Option<Protection>), FileError> {
+pub fn from_file_text(
+    text: &str,
+    password: Option<&str>,
+) -> Result<(Company, Option<Protection>), FileError> {
     let head: serde_json::Value = serde_json::from_str(text)?;
     if head.get("format").and_then(|v| v.as_str()) != Some(FORMAT) {
         return Err(FileError::NotLedgerCraft);
@@ -164,7 +176,8 @@ pub fn from_file_text(text: &str, password: Option<&str>) -> Result<(Company, Op
     };
     let env: ProtectedIn = serde_json::from_value(head)?;
     let (plain, protection) = Protection::open(&env.encryption, &env.ciphertext, password)?;
-    let plain = std::str::from_utf8(&plain).map_err(|_| FileError::Damaged("its contents are not text".into()))?;
+    let plain = std::str::from_utf8(&plain)
+        .map_err(|_| FileError::Damaged("its contents are not text".into()))?;
     let company = from_json(plain)?;
     Ok((company, Some(protection)))
 }
@@ -175,7 +188,10 @@ pub fn is_protected(path: &Path) -> bool {
 }
 
 /// Opens a company file; a protected one needs `password`.
-pub fn load(path: &Path, password: Option<&str>) -> Result<(Company, Option<Protection>), FileError> {
+pub fn load(
+    path: &Path,
+    password: Option<&str>,
+) -> Result<(Company, Option<Protection>), FileError> {
     let len = fs::metadata(path)?.len();
     if len > MAX_FILE_BYTES {
         return Err(FileError::TooLarge(len));
@@ -188,7 +204,11 @@ pub fn load(path: &Path, password: Option<&str>) -> Result<(Company, Option<Prot
 /// to disk, then renames it over the target, so a crash or power cut never
 /// leaves half a company file. With `protection` only encrypted bytes are
 /// ever written, including to the temporary file.
-pub fn save(path: &Path, company: &Company, protection: Option<&Protection>) -> Result<(), FileError> {
+pub fn save(
+    path: &Path,
+    company: &Company,
+    protection: Option<&Protection>,
+) -> Result<(), FileError> {
     let json = to_file_text(company, protection)?;
     let tmp = temp_path(path);
     {
@@ -196,7 +216,7 @@ pub fn save(path: &Path, company: &Company, protection: Option<&Protection>) -> 
         f.write_all(json.as_bytes())?;
         f.sync_all()?;
     }
-        if let Err(e) = replace_with_retry(&tmp, path) {
+    if let Err(e) = replace_with_retry(&tmp, path) {
         let _ = fs::remove_file(&tmp);
         return Err(e.into());
     }
@@ -224,12 +244,15 @@ fn replace_with_retry(tmp: &Path, path: &Path) -> std::io::Result<()> {
 
 fn is_transient_lock(e: &std::io::Error) -> bool {
     // ERROR_ACCESS_DENIED (5), ERROR_SHARING_VIOLATION (32), ERROR_LOCK_VIOLATION (33)
-    e.kind() == std::io::ErrorKind::PermissionDenied || matches!(e.raw_os_error(), Some(5 | 32 | 33))
+    e.kind() == std::io::ErrorKind::PermissionDenied
+        || matches!(e.raw_os_error(), Some(5 | 32 | 33))
 }
 
-
 fn temp_path(path: &Path) -> PathBuf {
-    let mut name = path.file_name().map(|n| n.to_os_string()).unwrap_or_default();
+    let mut name = path
+        .file_name()
+        .map(|n| n.to_os_string())
+        .unwrap_or_default();
     name.push(".tmp");
     path.with_file_name(name)
 }
@@ -257,8 +280,14 @@ mod tests {
         assert!(!text.contains("Checking"));
         assert!(text.contains("\"version\": 2"));
 
-        assert!(matches!(from_file_text(&text, None), Err(FileError::PasswordRequired)));
-        assert!(matches!(from_file_text(&text, Some("wrong password")), Err(FileError::WrongPassword)));
+        assert!(matches!(
+            from_file_text(&text, None),
+            Err(FileError::PasswordRequired)
+        ));
+        assert!(matches!(
+            from_file_text(&text, Some("wrong password")),
+            Err(FileError::WrongPassword)
+        ));
         let (opened, again) = from_file_text(&text, Some("correct horse battery")).unwrap();
         assert_eq!(opened, company);
 
@@ -278,16 +307,28 @@ mod tests {
         // Weaken the stored settings: the header is authenticated, so this fails.
         let tampered = text.replace("\"iterations\": 2", "\"iterations\": 1");
         assert_ne!(tampered, text);
-        assert!(matches!(from_file_text(&tampered, Some("a long passphrase")), Err(FileError::WrongPassword)));
+        assert!(matches!(
+            from_file_text(&tampered, Some("a long passphrase")),
+            Err(FileError::WrongPassword)
+        ));
         // Absurd settings are refused before any work is done.
         let huge = text.replace("\"memory_kib\": 19456", "\"memory_kib\": 4000000000");
-        assert!(matches!(from_file_text(&huge, Some("a long passphrase")), Err(FileError::Damaged(_))));
+        assert!(matches!(
+            from_file_text(&huge, Some("a long passphrase")),
+            Err(FileError::Damaged(_))
+        ));
     }
 
     #[test]
     fn weak_passwords_are_refused() {
-        assert!(matches!(Protection::new("short"), Err(FileError::WeakPassword(_))));
-        assert!(matches!(Protection::new("        "), Err(FileError::WeakPassword(_))));
+        assert!(matches!(
+            Protection::new("short"),
+            Err(FileError::WeakPassword(_))
+        ));
+        assert!(matches!(
+            Protection::new("        "),
+            Err(FileError::WeakPassword(_))
+        ));
         assert!(check_new_password("long enough").is_ok());
     }
 
@@ -304,7 +345,10 @@ mod tests {
 
     #[test]
     fn rejects_foreign_and_future_files() {
-        assert!(matches!(from_json("{\"format\":\"other\"}"), Err(FileError::NotLedgerCraft)));
+        assert!(matches!(
+            from_json("{\"format\":\"other\"}"),
+            Err(FileError::NotLedgerCraft)
+        ));
         assert!(matches!(
             from_json("{\"format\":\"ledgercraft\",\"version\":99,\"company\":{}}"),
             Err(FileError::TooNew(99))

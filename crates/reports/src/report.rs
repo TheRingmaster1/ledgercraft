@@ -77,11 +77,31 @@ impl Report {
         });
     }
 
-    pub(crate) fn line(&mut self, kind: RowKind, label: &str, indent: u8, cells: Vec<Cell>, account: Option<AccountId>) {
-        self.rows.push(Row { kind, label: label.to_string(), indent, cells, account });
+    pub(crate) fn line(
+        &mut self,
+        kind: RowKind,
+        label: &str,
+        indent: u8,
+        cells: Vec<Cell>,
+        account: Option<AccountId>,
+    ) {
+        self.rows.push(Row {
+            kind,
+            label: label.to_string(),
+            indent,
+            cells,
+            account,
+        });
     }
 
-    pub(crate) fn money(&mut self, kind: RowKind, label: &str, indent: u8, values: &[Money], account: Option<AccountId>) {
+    pub(crate) fn money(
+        &mut self,
+        kind: RowKind,
+        label: &str,
+        indent: u8,
+        values: &[Money],
+        account: Option<AccountId>,
+    ) {
         let cells = values.iter().map(|m| Cell::Money(*m)).collect();
         self.line(kind, label, indent, cells, account);
     }
@@ -97,7 +117,9 @@ impl Report {
             let label = format!("{}{}", "  ".repeat(usize::from(row.indent)), row.label);
             let mut fields = vec![csv_field(&label)];
             for i in 0..self.columns.len() {
-                fields.push(csv_field(&row.cells.get(i).map(Cell::csv).unwrap_or_default()));
+                fields.push(csv_field(
+                    &row.cells.get(i).map(Cell::csv).unwrap_or_default(),
+                ));
             }
             out.push_str(&fields.join(","));
             out.push_str("\r\n");
@@ -146,7 +168,11 @@ impl Report {
 fn csv_field(s: &str) -> String {
     // A leading =, + or @ would be read as a formula by spreadsheet apps.
     // (A leading - is left alone: it is how negative amounts are written.)
-    let s = if s.starts_with(['=', '+', '@']) { format!("'{s}") } else { s.to_string() };
+    let s = if s.starts_with(['=', '+', '@']) {
+        format!("'{s}")
+    } else {
+        s.to_string()
+    };
     if s.contains([',', '"', '\n', '\r']) {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {

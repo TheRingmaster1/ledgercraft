@@ -65,7 +65,14 @@ pub struct Session {
 
 impl Session {
     pub fn new(company: Company) -> Self {
-        Self { company, path: None, undo: Vec::new(), redo: Vec::new(), dirty: false, protection: None }
+        Self {
+            company,
+            path: None,
+            undo: Vec::new(),
+            redo: Vec::new(),
+            dirty: false,
+            protection: None,
+        }
     }
 
     /// Opens a plain company file. A protected one fails with
@@ -146,7 +153,10 @@ impl Session {
                 }
                 self.redo.clear();
                 self.dirty = true;
-                Ok(Outcome { command: id, created })
+                Ok(Outcome {
+                    command: id,
+                    created,
+                })
             }
             Ok(Err(e)) => {
                 self.company = before;
@@ -221,7 +231,9 @@ mod tests {
         let company = crate::sample_company().unwrap();
         // Exactly what LedgerCraft wrote before this change: plain version 1 JSON.
         std::fs::write(&path, ledgercraft_file::to_json(&company).unwrap()).unwrap();
-        assert!(std::fs::read_to_string(&path).unwrap().contains("\"version\": 1"));
+        assert!(std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("\"version\": 1"));
 
         let mut s = Session::open(&path).unwrap();
         assert!(!s.is_protected());
@@ -245,7 +257,10 @@ mod tests {
         s.set_password(Some("open sesame please")).unwrap();
         s.save_as(&path).unwrap();
         assert!(ledgercraft_file::is_protected(&path));
-        assert!(matches!(Session::open(&path), Err(EngineError::File(FileError::PasswordRequired))));
+        assert!(matches!(
+            Session::open(&path),
+            Err(EngineError::File(FileError::PasswordRequired))
+        ));
         assert!(Session::open_with_password(&path, "nope nope nope").is_err());
         let mut reopened = Session::open_with_password(&path, "open sesame please").unwrap();
         assert!(reopened.is_protected());
@@ -267,7 +282,9 @@ mod tests {
         assert!(!s.is_dirty());
 
         let ok = s
-            .execute_json(r#"{"command":"account.create","number":"6700","name":"Postage","kind":"expense"}"#)
+            .execute_json(
+                r#"{"command":"account.create","number":"6700","name":"Postage","kind":"expense"}"#,
+            )
             .unwrap();
         assert!(ok.created.is_some());
         assert!(s.company().account_by_name("Postage").is_some());
@@ -282,7 +299,11 @@ mod tests {
         for info in crate::CATALOG {
             let mut s = Session::new(Company::with_default_accounts("Fuzz"));
             let json = format!(r#"{{"command":"{}"}}"#, info.id);
-            assert!(s.execute_json(&json).is_err(), "{} accepted empty params", info.id);
+            assert!(
+                s.execute_json(&json).is_err(),
+                "{} accepted empty params",
+                info.id
+            );
         }
     }
 

@@ -51,13 +51,24 @@ fn account_rows(
         }
         let value = natural(a.kind, raw);
         total = total.saturating_add(value);
-        report.money(RowKind::Detail, &a.display_name(), indent, &[value], Some(a.id));
+        report.money(
+            RowKind::Detail,
+            &a.display_name(),
+            indent,
+            &[value],
+            Some(a.id),
+        );
     }
     total
 }
 
 pub fn trial_balance(company: &Company, as_of: Date) -> Report {
-    let mut r = Report::new("Trial Balance", &company.info.name, format!("As of {as_of}"), &["Debit", "Credit"]);
+    let mut r = Report::new(
+        "Trial Balance",
+        &company.info.name,
+        format!("As of {as_of}"),
+        &["Debit", "Credit"],
+    );
     r.label_header = "Account".into();
     let amounts = activity(company, None, Some(as_of));
     let mut debits = Money::ZERO;
@@ -75,14 +86,25 @@ pub fn trial_balance(company: &Company, as_of: Date) -> Report {
             credits = credits.saturating_add(c);
             (Cell::Empty, Cell::Money(c))
         };
-        r.line(RowKind::Detail, &a.display_name(), 0, vec![dr, cr], Some(a.id));
+        r.line(
+            RowKind::Detail,
+            &a.display_name(),
+            0,
+            vec![dr, cr],
+            Some(a.id),
+        );
     }
     r.money(RowKind::Total, "Total", 0, &[debits, credits], None);
     r
 }
 
 pub fn profit_and_loss(company: &Company, from: Date, to: Date) -> Report {
-    let mut r = Report::new("Profit & Loss", &company.info.name, format!("{from} through {to}"), &["Amount"]);
+    let mut r = Report::new(
+        "Profit & Loss",
+        &company.info.name,
+        format!("{from} through {to}"),
+        &["Amount"],
+    );
     let amounts = activity(company, Some(from), Some(to));
 
     r.section("Income", 0);
@@ -90,7 +112,13 @@ pub fn profit_and_loss(company: &Company, from: Date, to: Date) -> Report {
     r.money(RowKind::Subtotal, "Total Income", 0, &[income], None);
 
     r.section("Cost of Goods Sold", 0);
-    let cogs = account_rows(&mut r, company, &amounts, &[AccountType::CostOfGoodsSold], 1);
+    let cogs = account_rows(
+        &mut r,
+        company,
+        &amounts,
+        &[AccountType::CostOfGoodsSold],
+        1,
+    );
     r.money(RowKind::Subtotal, "Total COGS", 0, &[cogs], None);
     let gross = income.saturating_sub(cogs);
     r.money(RowKind::Subtotal, "Gross Profit", 0, &[gross], None);
@@ -99,7 +127,13 @@ pub fn profit_and_loss(company: &Company, from: Date, to: Date) -> Report {
     let expenses = account_rows(&mut r, company, &amounts, &[AccountType::Expense], 1);
     r.money(RowKind::Subtotal, "Total Expenses", 0, &[expenses], None);
     let operating = gross.saturating_sub(expenses);
-    r.money(RowKind::Subtotal, "Net Operating Income", 0, &[operating], None);
+    r.money(
+        RowKind::Subtotal,
+        "Net Operating Income",
+        0,
+        &[operating],
+        None,
+    );
 
     r.section("Other Income and Expense", 0);
     let other_income = account_rows(&mut r, company, &amounts, &[AccountType::OtherIncome], 1);
@@ -107,7 +141,13 @@ pub fn profit_and_loss(company: &Company, from: Date, to: Date) -> Report {
     let net_other = other_income.saturating_sub(other_expense);
     r.money(RowKind::Subtotal, "Net Other Income", 0, &[net_other], None);
 
-    r.money(RowKind::Total, "Net Income", 0, &[operating.saturating_add(net_other)], None);
+    r.money(
+        RowKind::Total,
+        "Net Income",
+        0,
+        &[operating.saturating_add(net_other)],
+        None,
+    );
     r
 }
 
@@ -124,7 +164,12 @@ fn net_income(company: &Company, amounts: &BTreeMap<AccountId, Money>) -> Money 
 }
 
 pub fn balance_sheet(company: &Company, as_of: Date) -> Report {
-    let mut r = Report::new("Balance Sheet", &company.info.name, format!("As of {as_of}"), &["Amount"]);
+    let mut r = Report::new(
+        "Balance Sheet",
+        &company.info.name,
+        format!("As of {as_of}"),
+        &["Amount"],
+    );
     let amounts = activity(company, None, Some(as_of));
     let fy_start = as_of.fiscal_year_start(company.info.fiscal_year_start_month);
     let prior = activity(company, None, Some(fy_start.add_days(-1)));
@@ -135,8 +180,20 @@ pub fn balance_sheet(company: &Company, as_of: Date) -> Report {
     use AccountType::*;
     r.section("Assets", 0);
     r.section("Current Assets", 1);
-    let current_assets = account_rows(&mut r, company, &amounts, &[Bank, AccountsReceivable, OtherCurrentAsset], 2);
-    r.money(RowKind::Subtotal, "Total Current Assets", 1, &[current_assets], None);
+    let current_assets = account_rows(
+        &mut r,
+        company,
+        &amounts,
+        &[Bank, AccountsReceivable, OtherCurrentAsset],
+        2,
+    );
+    r.money(
+        RowKind::Subtotal,
+        "Total Current Assets",
+        1,
+        &[current_assets],
+        None,
+    );
     let fixed = account_rows(&mut r, company, &amounts, &[FixedAsset], 1);
     let other_assets = account_rows(&mut r, company, &amounts, &[OtherAsset], 1);
     let assets = sum([current_assets, fixed, other_assets]);
@@ -144,10 +201,22 @@ pub fn balance_sheet(company: &Company, as_of: Date) -> Report {
 
     r.section("Liabilities and Equity", 0);
     r.section("Liabilities", 1);
-    let current_liab = account_rows(&mut r, company, &amounts, &[AccountsPayable, CreditCard, OtherCurrentLiability], 2);
+    let current_liab = account_rows(
+        &mut r,
+        company,
+        &amounts,
+        &[AccountsPayable, CreditCard, OtherCurrentLiability],
+        2,
+    );
     let long_term = account_rows(&mut r, company, &amounts, &[LongTermLiability], 2);
     let liabilities = current_liab.saturating_add(long_term);
-    r.money(RowKind::Subtotal, "Total Liabilities", 1, &[liabilities], None);
+    r.money(
+        RowKind::Subtotal,
+        "Total Liabilities",
+        1,
+        &[liabilities],
+        None,
+    );
 
     r.section("Equity", 1);
     // Earlier years' profit folds into Retained Earnings, as on paper books.
@@ -156,7 +225,11 @@ pub fn balance_sheet(company: &Company, as_of: Date) -> Report {
         .iter()
         .find(|a| a.kind == Equity && a.name.eq_ignore_ascii_case("Retained Earnings"));
     let mut equity = Money::ZERO;
-    for a in company.sorted_accounts().into_iter().filter(|a| a.kind == Equity) {
+    for a in company
+        .sorted_accounts()
+        .into_iter()
+        .filter(|a| a.kind == Equity)
+    {
         let mut value = natural(a.kind, amounts.get(&a.id).copied().unwrap_or(Money::ZERO));
         if Some(a.id) == re_account.map(|x| x.id) {
             value = value.saturating_add(retained);
@@ -174,7 +247,13 @@ pub fn balance_sheet(company: &Company, as_of: Date) -> Report {
     equity = equity.saturating_add(this_year);
     r.money(RowKind::Detail, "Net Income", 2, &[this_year], None);
     r.money(RowKind::Subtotal, "Total Equity", 1, &[equity], None);
-    r.money(RowKind::Total, "Total Liabilities and Equity", 0, &[liabilities.saturating_add(equity)], None);
+    r.money(
+        RowKind::Total,
+        "Total Liabilities and Equity",
+        0,
+        &[liabilities.saturating_add(equity)],
+        None,
+    );
     r
 }
 
@@ -188,14 +267,30 @@ pub fn account_register(company: &Company, account: AccountId) -> Report {
         &["Type", "Num", "Name", "Memo", "Amount", "Balance"],
     );
     r.label_header = "Date".into();
-    let Some(acct) = company.account(account) else { return r };
+    let Some(acct) = company.account(account) else {
+        return r;
+    };
     let mut balance = Money::ZERO;
-    for e in company.ledger_entries().into_iter().filter(|e| e.posting.account == account) {
-        let Some(t) = company.txn(e.txn) else { continue };
+    for e in company
+        .ledger_entries()
+        .into_iter()
+        .filter(|e| e.posting.account == account)
+    {
+        let Some(t) = company.txn(e.txn) else {
+            continue;
+        };
         let amount = natural(acct.kind, e.posting.amount);
         balance = balance.saturating_add(amount);
-        let party = e.posting.party.map(|p| company.party_name(p)).unwrap_or_default();
-        let memo = if e.posting.memo.is_empty() { t.memo.clone() } else { e.posting.memo.clone() };
+        let party = e
+            .posting
+            .party
+            .map(|p| company.party_name(p))
+            .unwrap_or_default();
+        let memo = if e.posting.memo.is_empty() {
+            t.memo.clone()
+        } else {
+            e.posting.memo.clone()
+        };
         r.line(
             RowKind::Detail,
             &e.date.to_string(),
@@ -230,7 +325,11 @@ pub fn transaction_list(company: &Company, from: Date, to: Date) -> Report {
         .collect();
     txns.sort_by_key(|t| (t.date, t.id));
     for t in txns {
-        let party = t.body.party().map(|p| company.party_name(p)).unwrap_or_default();
+        let party = t
+            .body
+            .party()
+            .map(|p| company.party_name(p))
+            .unwrap_or_default();
         r.line(
             RowKind::Detail,
             &t.date.to_string(),

@@ -25,7 +25,15 @@ const LAYERS: &[(&str, u8)] = &[
 
 /// The first layer allowed to use a GUI toolkit.
 const UI_LAYER: u8 = 4;
-const GUI_CRATES: &[&str] = &["eframe", "egui", "egui_extras", "winit", "rfd", "wgpu", "glow"];
+const GUI_CRATES: &[&str] = &[
+    "eframe",
+    "egui",
+    "egui_extras",
+    "winit",
+    "rfd",
+    "wgpu",
+    "glow",
+];
 
 fn main() -> ExitCode {
     let task = std::env::args().nth(1).unwrap_or_default();
@@ -69,7 +77,17 @@ fn cargo(root: &Path, args: &[&str]) -> Result<(), String> {
 
 fn ci(root: &Path) -> Result<(), String> {
     cargo(root, &["fmt", "--all", "--", "--check"])?;
-    cargo(root, &["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"])?;
+    cargo(
+        root,
+        &[
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings",
+        ],
+    )?;
     cargo(root, &["test", "--workspace"])?;
     layers(root)?;
     assets(root)?;
@@ -105,7 +123,9 @@ fn parse_manifest(text: &str) -> (String, Vec<String>) {
             section = line.to_string();
             continue;
         }
-        let Some((key, value)) = line.split_once('=') else { continue };
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
         let key = key.trim();
         if section == "[package]" && key == "name" {
             name = value.trim().trim_matches('"').to_string();
@@ -127,10 +147,13 @@ fn layer_of(name: &str) -> Option<u8> {
 fn layers(root: &Path) -> Result<(), String> {
     let mut problems = Vec::new();
     for manifest in manifests(root) {
-        let text = fs::read_to_string(&manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
+        let text =
+            fs::read_to_string(&manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
         let (name, deps) = parse_manifest(&text);
         let Some(mine) = layer_of(&name) else {
-            problems.push(format!("{name}: not in the LAYERS table in xtask/src/main.rs"));
+            problems.push(format!(
+                "{name}: not in the LAYERS table in xtask/src/main.rs"
+            ));
             continue;
         };
         for dep in deps {
@@ -180,7 +203,10 @@ fn assets(root: &Path) -> Result<(), String> {
         println!("assets: ok ({} files)", files.len());
         Ok(())
     } else {
-        Err(format!("assets without a row in ATTRIBUTION.md:\n{}", missing.join("\n")))
+        Err(format!(
+            "assets without a row in ATTRIBUTION.md:\n{}",
+            missing.join("\n")
+        ))
     }
 }
 

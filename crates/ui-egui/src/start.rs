@@ -38,7 +38,11 @@ struct ImportFile {
 
 impl ImportFile {
     fn label(&self) -> String {
-        let name = self.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let name = self
+            .path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
         match self.csv {
             None => format!("{name}  (IIF lists)"),
             Some(kind) => format!("{name}  ({})", kind.label()),
@@ -202,7 +206,11 @@ impl NewCompanyForm {
         let mut summary = ImportSummary::default();
         // IIF first, then CSV lists with accounts before the items that use them.
         let mut order: Vec<&ImportFile> = self.imports.iter().collect();
-        order.sort_by_key(|f| f.csv.map_or(0, |k| 1 + ListKind::ALL.iter().position(|x| *x == k).unwrap_or(0)));
+        order.sort_by_key(|f| {
+            f.csv.map_or(0, |k| {
+                1 + ListKind::ALL.iter().position(|x| *x == k).unwrap_or(0)
+            })
+        });
         for file in order {
             let text = read_import(&file.path)?;
             match file.csv {
@@ -249,7 +257,9 @@ impl NewCompanyForm {
 
 fn read_import(path: &std::path::Path) -> Result<String, String> {
     let shown = path.display();
-    let len = std::fs::metadata(path).map_err(|e| format!("Could not read {shown}: {e}"))?.len();
+    let len = std::fs::metadata(path)
+        .map_err(|e| format!("Could not read {shown}: {e}"))?
+        .len();
     if len > IMPORT_MAX_BYTES {
         return Err(format!("{shown} is too large to import ({len} bytes)."));
     }
@@ -269,7 +279,10 @@ pub(crate) enum CreateOutcome {
 
 /// Draws Create a Company. Returns `None` while the person is still filling
 /// it in.
-pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm) -> Option<CreateOutcome> {
+pub(crate) fn new_company_window(
+    ctx: &egui::Context,
+    form: &mut NewCompanyForm,
+) -> Option<CreateOutcome> {
     let mut outcome = None;
     let mut open = true;
     egui::Window::new("Create a Company")
@@ -281,46 +294,59 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
         .show(ctx, |ui| {
             ui.label("Tell LedgerCraft about the business. Only the name is required.");
             ui.add_space(8.0);
-            egui::Grid::new("new_company").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
-                let field = |ui: &mut egui::Ui, text: &mut String, hint: &str| {
-                    ui.add_sized([280.0, 22.0], egui::TextEdit::singleline(text).hint_text(hint));
-                };
-                ui.label(RichText::new("Company name").strong());
-                field(ui, &mut form.name, "e.g. Acme Repair");
-                ui.end_row();
-                ui.label("Legal name");
-                field(ui, &mut form.legal_name, "if different, e.g. Acme Repair LLC");
-                ui.end_row();
-                ui.label("Fiscal year starts").on_hover_text(
+            egui::Grid::new("new_company")
+                .num_columns(2)
+                .spacing([12.0, 6.0])
+                .show(ui, |ui| {
+                    let field = |ui: &mut egui::Ui, text: &mut String, hint: &str| {
+                        ui.add_sized(
+                            [280.0, 22.0],
+                            egui::TextEdit::singleline(text).hint_text(hint),
+                        );
+                    };
+                    ui.label(RichText::new("Company name").strong());
+                    field(ui, &mut form.name, "e.g. Acme Repair");
+                    ui.end_row();
+                    ui.label("Legal name");
+                    field(
+                        ui,
+                        &mut form.legal_name,
+                        "if different, e.g. Acme Repair LLC",
+                    );
+                    ui.end_row();
+                    ui.label("Fiscal year starts").on_hover_text(
                     "The first month of your financial year. Most small businesses use January.",
                 );
-                let index = usize::try_from(form.fiscal_month.saturating_sub(1)).unwrap_or(0);
-                let current = MONTHS.get(index).copied().unwrap_or("January");
-                egui::ComboBox::from_id_salt("fiscal_month").selected_text(current).width(160.0).show_ui(ui, |ui| {
-                    for (month, label) in (1u32..).zip(MONTHS) {
-                        ui.selectable_value(&mut form.fiscal_month, month, label);
-                    }
+                    let index = usize::try_from(form.fiscal_month.saturating_sub(1)).unwrap_or(0);
+                    let current = MONTHS.get(index).copied().unwrap_or("January");
+                    egui::ComboBox::from_id_salt("fiscal_month")
+                        .selected_text(current)
+                        .width(160.0)
+                        .show_ui(ui, |ui| {
+                            for (month, label) in (1u32..).zip(MONTHS) {
+                                ui.selectable_value(&mut form.fiscal_month, month, label);
+                            }
+                        });
+                    ui.end_row();
+                    ui.label("Email");
+                    field(ui, &mut form.email, "");
+                    ui.end_row();
+                    ui.label("Phone");
+                    field(ui, &mut form.phone, "");
+                    ui.end_row();
+                    ui.label("Street");
+                    field(ui, &mut form.line1, "");
+                    ui.end_row();
+                    ui.label("City");
+                    field(ui, &mut form.city, "");
+                    ui.end_row();
+                    ui.label("State / region");
+                    field(ui, &mut form.region, "");
+                    ui.end_row();
+                    ui.label("Postal code");
+                    field(ui, &mut form.postal_code, "");
+                    ui.end_row();
                 });
-                ui.end_row();
-                ui.label("Email");
-                field(ui, &mut form.email, "");
-                ui.end_row();
-                ui.label("Phone");
-                field(ui, &mut form.phone, "");
-                ui.end_row();
-                ui.label("Street");
-                field(ui, &mut form.line1, "");
-                ui.end_row();
-                ui.label("City");
-                field(ui, &mut form.city, "");
-                ui.end_row();
-                ui.label("State / region");
-                field(ui, &mut form.region, "");
-                ui.end_row();
-                ui.label("Postal code");
-                field(ui, &mut form.postal_code, "");
-                ui.end_row();
-            });
             ui.add_space(8.0);
             ui.label(RichText::new("Chart of accounts").strong());
             ui.radio_value(
@@ -328,7 +354,11 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
                 true,
                 "Start with a standard small-business chart of accounts (recommended)",
             );
-            ui.radio_value(&mut form.starter_accounts, false, "Start with no accounts; I will add my own");
+            ui.radio_value(
+                &mut form.starter_accounts,
+                false,
+                "Start with no accounts; I will add my own",
+            );
             ui.add_space(8.0);
             password_section(ui, form);
             ui.add_space(8.0);
@@ -339,18 +369,24 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
             }
             ui.add_space(10.0);
             ui.horizontal(|ui| {
-                if ui.button(RichText::new("Create Company").strong()).clicked() {
-                    let password = security::check_new(&form.password.0, &form.confirm.0).and_then(|()| {
-                        if form.understood {
-                            Ok(())
-                        } else {
-                            Err("Tick the box to confirm you will keep the password safe.".to_string())
-                        }
-                    });
+                if ui
+                    .button(RichText::new("Create Company").strong())
+                    .clicked()
+                {
+                    let password =
+                        security::check_new(&form.password.0, &form.confirm.0).and_then(|()| {
+                            if form.understood {
+                                Ok(())
+                            } else {
+                                Err("Tick the box to confirm you will keep the password safe."
+                                    .to_string())
+                            }
+                        });
                     match password.and_then(|()| form.build_with_imports()) {
                         Ok((company, summary)) => {
                             let secret = Secret(std::mem::take(&mut form.password.0));
-                            outcome = Some(CreateOutcome::Create(Box::new(company), summary, secret));
+                            outcome =
+                                Some(CreateOutcome::Create(Box::new(company), summary, secret));
                         }
                         Err(e) => form.error = Some(e),
                     }
@@ -378,20 +414,29 @@ fn password_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
         "The company file is encrypted with this password, on disk and in every backup \
          copy. You will need it each time you open the company.",
     );
-    egui::Grid::new("new_company_password").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
-        ui.label("Password");
-        security::password_field(
-            ui,
-            &mut form.password.0,
-            &format!("at least {} characters", ledgercraft_file::MIN_PASSWORD_CHARS),
-        );
-        ui.end_row();
-        ui.label("Confirm");
-        security::password_field(ui, &mut form.confirm.0, "type it again");
-        ui.end_row();
-    });
+    egui::Grid::new("new_company_password")
+        .num_columns(2)
+        .spacing([12.0, 6.0])
+        .show(ui, |ui| {
+            ui.label("Password");
+            security::password_field(
+                ui,
+                &mut form.password.0,
+                &format!(
+                    "at least {} characters",
+                    ledgercraft_file::MIN_PASSWORD_CHARS
+                ),
+            );
+            ui.end_row();
+            ui.label("Confirm");
+            security::password_field(ui, &mut form.confirm.0, "type it again");
+            ui.end_row();
+        });
     security::forgotten_password_note(ui);
-    ui.checkbox(&mut form.understood, "I understand, and I will keep the password safe");
+    ui.checkbox(
+        &mut form.understood,
+        "I understand, and I will keep the password safe",
+    );
 }
 
 /// "Bring in existing data": choose IIF and CSV files to import.
@@ -409,25 +454,37 @@ fn import_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
              Export > Lists to IIF Files. Brings in accounts, customers, vendors and items.",
         );
         if iif.clicked() {
-            if let Some(path) = rfd::FileDialog::new().add_filter("IIF file", &["iif", "txt"]).pick_file() {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("IIF file", &["iif", "txt"])
+                .pick_file()
+            {
                 form.imports.push(ImportFile { path, csv: None });
             }
         }
         ui.separator();
         let current = form.csv_kind.label();
-        egui::ComboBox::from_id_salt("csv_kind").selected_text(current).width(170.0).show_ui(ui, |ui| {
-            for kind in ListKind::ALL {
-                ui.selectable_value(&mut form.csv_kind, kind, kind.label());
-            }
-        });
+        egui::ComboBox::from_id_salt("csv_kind")
+            .selected_text(current)
+            .width(170.0)
+            .show_ui(ui, |ui| {
+                for kind in ListKind::ALL {
+                    ui.selectable_value(&mut form.csv_kind, kind, kind.label());
+                }
+            });
         let csv = ui.button("Add CSV File…").on_hover_text(format!(
             "A CSV file with a header row holding this list. Columns read: {}. Only the \
              name is required.",
             form.csv_kind.columns()
         ));
         if csv.clicked() {
-            if let Some(path) = rfd::FileDialog::new().add_filter("CSV file", &["csv", "txt"]).pick_file() {
-                form.imports.push(ImportFile { path, csv: Some(form.csv_kind) });
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("CSV file", &["csv", "txt"])
+                .pick_file()
+            {
+                form.imports.push(ImportFile {
+                    path,
+                    csv: Some(form.csv_kind),
+                });
             }
         }
     });
@@ -435,7 +492,11 @@ fn import_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
     for (i, file) in form.imports.iter().enumerate() {
         ui.horizontal(|ui| {
             ui.label(format!("•  {}", file.label()));
-            if ui.small_button("x").on_hover_text("Don't import this file").clicked() {
+            if ui
+                .small_button("x")
+                .on_hover_text("Don't import this file")
+                .clicked()
+            {
                 remove = Some(i);
             }
         });
@@ -449,7 +510,9 @@ fn import_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
 
 /// Shows what an import brought in and what it skipped, until closed.
 pub(crate) fn import_report_window(ctx: &egui::Context, report: &mut Option<ImportSummary>) {
-    let Some(summary) = report.as_ref() else { return };
+    let Some(summary) = report.as_ref() else {
+        return;
+    };
     let mut open = true;
     let mut close = false;
     egui::Window::new("Import Results")
@@ -459,30 +522,39 @@ pub(crate) fn import_report_window(ctx: &egui::Context, report: &mut Option<Impo
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .default_width(460.0)
         .show(ctx, |ui| {
-            egui::Grid::new("import_counts").num_columns(2).spacing([24.0, 4.0]).show(ui, |ui| {
-                for (label, n) in [
-                    ("Accounts", summary.accounts),
-                    ("Customers", summary.customers),
-                    ("Vendors", summary.vendors),
-                    ("Products and services", summary.items),
-                ] {
-                    ui.label(label);
-                    ui.label(RichText::new(n.to_string()).strong());
-                    ui.end_row();
-                }
-            });
-            if !summary.skipped.is_empty() {
-                ui.add_space(8.0);
-                ui.label(RichText::new(format!("Not imported ({})", summary.skipped.len())).strong());
-                egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
-                    for line in &summary.skipped {
-                        ui.label(RichText::new(line.as_str()).color(theme::MUTED));
+            egui::Grid::new("import_counts")
+                .num_columns(2)
+                .spacing([24.0, 4.0])
+                .show(ui, |ui| {
+                    for (label, n) in [
+                        ("Accounts", summary.accounts),
+                        ("Customers", summary.customers),
+                        ("Vendors", summary.vendors),
+                        ("Products and services", summary.items),
+                    ] {
+                        ui.label(label);
+                        ui.label(RichText::new(n.to_string()).strong());
+                        ui.end_row();
                     }
                 });
+            if !summary.skipped.is_empty() {
+                ui.add_space(8.0);
                 ui.label(
-                    RichText::new("Fix these in the source file and add them by hand, or leave them out.")
-                        .small()
-                        .color(theme::MUTED),
+                    RichText::new(format!("Not imported ({})", summary.skipped.len())).strong(),
+                );
+                egui::ScrollArea::vertical()
+                    .max_height(220.0)
+                    .show(ui, |ui| {
+                        for line in &summary.skipped {
+                            ui.label(RichText::new(line.as_str()).color(theme::MUTED));
+                        }
+                    });
+                ui.label(
+                    RichText::new(
+                        "Fix these in the source file and add them by hand, or leave them out.",
+                    )
+                    .small()
+                    .color(theme::MUTED),
                 );
             }
             ui.add_space(8.0);
@@ -501,9 +573,15 @@ mod tests {
 
     #[test]
     fn a_name_is_required() {
-        let form = NewCompanyForm { name: "   ".into(), ..NewCompanyForm::default() };
+        let form = NewCompanyForm {
+            name: "   ".into(),
+            ..NewCompanyForm::default()
+        };
         assert!(form.build().is_err());
-        let long = NewCompanyForm { name: "x".repeat(NAME_MAX + 1), ..NewCompanyForm::default() };
+        let long = NewCompanyForm {
+            name: "x".repeat(NAME_MAX + 1),
+            ..NewCompanyForm::default()
+        };
         assert!(long.build().is_err());
     }
 
@@ -515,7 +593,10 @@ mod tests {
         std::fs::write(&csv, "Name,Terms\nAcme,Net 30\n").unwrap();
         let form = NewCompanyForm {
             name: "Import Co".into(),
-            imports: vec![ImportFile { path: csv, csv: Some(ListKind::Customers) }],
+            imports: vec![ImportFile {
+                path: csv,
+                csv: Some(ListKind::Customers),
+            }],
             ..NewCompanyForm::default()
         };
         let (company, summary) = form.build_with_imports().unwrap();
@@ -524,7 +605,10 @@ mod tests {
 
         let missing = NewCompanyForm {
             name: "Missing Co".into(),
-            imports: vec![ImportFile { path: dir.join("nope.csv"), csv: Some(ListKind::Vendors) }],
+            imports: vec![ImportFile {
+                path: dir.join("nope.csv"),
+                csv: Some(ListKind::Vendors),
+            }],
             ..NewCompanyForm::default()
         };
         assert!(missing.build_with_imports().is_err());
@@ -547,7 +631,11 @@ mod tests {
         assert_eq!(company.info.address.city, "Provo");
         assert!(!company.accounts.is_empty());
 
-        let empty = NewCompanyForm { name: "Blank Co".into(), starter_accounts: false, ..NewCompanyForm::default() };
+        let empty = NewCompanyForm {
+            name: "Blank Co".into(),
+            starter_accounts: false,
+            ..NewCompanyForm::default()
+        };
         assert!(empty.build().unwrap().accounts.is_empty());
     }
 }

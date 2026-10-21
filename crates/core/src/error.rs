@@ -15,7 +15,10 @@ impl fmt::Display for CoreError {
             Self::InvalidMoney(s) => write!(f, "{s:?} is not a valid amount"),
             Self::InvalidQty(s) => write!(f, "{s:?} is not a valid quantity"),
             Self::InvalidDate(s) => {
-                write!(f, "{s:?} is not a valid date (use YYYY-MM-DD or MM/DD/YYYY)")
+                write!(
+                    f,
+                    "{s:?} is not a valid date (use YYYY-MM-DD or MM/DD/YYYY)"
+                )
             }
             Self::Overflow => f.write_str("the amount is too large"),
         }

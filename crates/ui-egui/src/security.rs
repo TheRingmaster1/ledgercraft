@@ -25,7 +25,9 @@ impl Drop for Secret {
 pub(crate) fn password_field(ui: &mut egui::Ui, text: &mut String, hint: &str) -> egui::Response {
     ui.add_sized(
         [260.0, 22.0],
-        egui::TextEdit::singleline(text).password(true).hint_text(hint),
+        egui::TextEdit::singleline(text)
+            .password(true)
+            .hint_text(hint),
     )
 }
 
@@ -62,7 +64,12 @@ pub(crate) struct UnlockForm {
 
 impl UnlockForm {
     pub(crate) fn new(path: PathBuf) -> Self {
-        Self { path, password: String::new(), error: None, focused: false }
+        Self {
+            path,
+            password: String::new(),
+            error: None,
+            focused: false,
+        }
     }
 }
 
@@ -172,7 +179,11 @@ pub(crate) fn password_window(
     let mut outcome = None;
     let mut open = true;
     let protected = session.is_protected();
-    let title = if protected { "Change Password" } else { "Set a Password" };
+    let title = if protected {
+        "Change Password"
+    } else {
+        "Set a Password"
+    };
     egui::Window::new(title)
         .open(&mut open)
         .collapsible(false)
@@ -188,23 +199,33 @@ pub(crate) fn password_window(
                 );
             }
             ui.add_space(6.0);
-            egui::Grid::new("password_form").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
-                if protected {
-                    ui.label("Current password");
-                    password_field(ui, &mut form.current, "");
-                    ui.end_row();
-                }
-                if !form.remove {
-                    ui.label("New password");
-                    password_field(ui, &mut form.new, &format!("at least {MIN_PASSWORD_CHARS} characters"));
-                    ui.end_row();
-                    ui.label("Confirm");
-                    password_field(ui, &mut form.confirm, "type it again");
-                    ui.end_row();
-                }
-            });
+            egui::Grid::new("password_form")
+                .num_columns(2)
+                .spacing([12.0, 6.0])
+                .show(ui, |ui| {
+                    if protected {
+                        ui.label("Current password");
+                        password_field(ui, &mut form.current, "");
+                        ui.end_row();
+                    }
+                    if !form.remove {
+                        ui.label("New password");
+                        password_field(
+                            ui,
+                            &mut form.new,
+                            &format!("at least {MIN_PASSWORD_CHARS} characters"),
+                        );
+                        ui.end_row();
+                        ui.label("Confirm");
+                        password_field(ui, &mut form.confirm, "type it again");
+                        ui.end_row();
+                    }
+                });
             if protected {
-                ui.checkbox(&mut form.remove, "Remove the password (the file will no longer be encrypted)");
+                ui.checkbox(
+                    &mut form.remove,
+                    "Remove the password (the file will no longer be encrypted)",
+                );
             }
             ui.add_space(4.0);
             if !form.remove {
@@ -215,7 +236,11 @@ pub(crate) fn password_window(
             }
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                let label = if form.remove { "Remove Password" } else { "Save Password" };
+                let label = if form.remove {
+                    "Remove Password"
+                } else {
+                    "Save Password"
+                };
                 if ui.button(RichText::new(label).strong()).clicked() {
                     form.error = None;
                     if protected && !opens_saved_file(session, &form.current) {
@@ -224,7 +249,9 @@ pub(crate) fn password_window(
                         outcome = Some(PasswordOutcome::Apply(None));
                     } else {
                         match check_new(&form.new, &form.confirm) {
-                            Ok(()) => outcome = Some(PasswordOutcome::Apply(Some(form.new.clone()))),
+                            Ok(()) => {
+                                outcome = Some(PasswordOutcome::Apply(Some(form.new.clone())))
+                            }
                             Err(e) => form.error = Some(e),
                         }
                     }
@@ -271,7 +298,10 @@ pub(crate) fn upgrade_window(ctx: &egui::Context, file_name: &str) -> Option<Upg
             );
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if ui.button(RichText::new("Set a Password…").strong()).clicked() {
+                if ui
+                    .button(RichText::new("Set a Password…").strong())
+                    .clicked()
+                {
                     choice = Some(UpgradeChoice::SetPassword);
                 }
                 if ui.button("Not Now").clicked() {

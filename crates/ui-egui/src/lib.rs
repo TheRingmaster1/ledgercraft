@@ -77,17 +77,25 @@ pub(crate) enum Reset {
 /// Something a page asks the app to do once the frame is drawn.
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
-    Run { cmd: Command, reset: Reset },
+    Run {
+        cmd: Command,
+        reset: Reset,
+    },
     Go(Page),
     InvoiceFor(CustomerId),
     PaymentFrom(CustomerId),
     BillFrom(VendorId),
     PayVendor(VendorId),
-        Error(String),
+    Error(String),
     /// A form was cleared: drop any message about what was in it.
     ClearStatus,
-    ExportCsv { name: String, csv: String },
-        /// A finished .xlsx file, or why it could not be built.
-    ExportXlsx { name: String, data: Result<Vec<u8>, String> },
-
+    ExportCsv {
+        name: String,
+        csv: String,
+    },
+    /// A finished .xlsx file, or why it could not be built.
+    ExportXlsx {
+        name: String,
+        data: Result<Vec<u8>, String>,
+    },
 }

@@ -83,7 +83,10 @@ pub(crate) fn set(currency: Currency) {
 }
 
 pub(crate) fn current() -> Currency {
-    Currency::ALL.get(CURRENT.load(Ordering::Relaxed)).copied().unwrap_or_default()
+    Currency::ALL
+        .get(CURRENT.load(Ordering::Relaxed))
+        .copied()
+        .unwrap_or_default()
 }
 
 /// An amount as the app shows it: `$1,234.56`, `-€89.10`.
@@ -108,6 +111,9 @@ mod tests {
     #[test]
     fn saved_as_the_currency_code() {
         assert_eq!(serde_json::to_string(&Currency::Eur).unwrap(), "\"EUR\"");
-        assert_eq!(serde_json::from_str::<Currency>("\"GBP\"").unwrap(), Currency::Gbp);
+        assert_eq!(
+            serde_json::from_str::<Currency>("\"GBP\"").unwrap(),
+            Currency::Gbp
+        );
     }
 }

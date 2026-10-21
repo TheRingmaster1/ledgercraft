@@ -25,12 +25,16 @@ impl Address {
                 out.push(l.clone());
             }
         }
-        let city_line = [self.city.as_str(), self.region.as_str(), self.postal_code.as_str()]
-            .iter()
-            .filter(|s| !s.is_empty())
-            .copied()
-            .collect::<Vec<_>>()
-            .join(" ");
+        let city_line = [
+            self.city.as_str(),
+            self.region.as_str(),
+            self.postal_code.as_str(),
+        ]
+        .iter()
+        .filter(|s| !s.is_empty())
+        .copied()
+        .collect::<Vec<_>>()
+        .join(" ");
         if !city_line.is_empty() {
             out.push(city_line);
         }

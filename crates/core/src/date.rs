@@ -34,7 +34,9 @@ impl Date {
         let lo = days_from_civil(MIN_YEAR, 1, 1);
         let hi = days_from_civil(MAX_YEAR, 12, 31);
         let clamped = days.clamp(lo, hi);
-        Self { days: i32::try_from(clamped).unwrap_or(0) }
+        Self {
+            days: i32::try_from(clamped).unwrap_or(0),
+        }
     }
 
     /// Today's date (UTC) from the system clock.
@@ -76,7 +78,11 @@ impl Date {
     /// The first day of the fiscal year containing `self`, for a fiscal year
     /// starting on the first of `start_month` (1–12; out of range means January).
     pub fn fiscal_year_start(self, start_month: u32) -> Self {
-        let start_month = if (1..=12).contains(&start_month) { start_month } else { 1 };
+        let start_month = if (1..=12).contains(&start_month) {
+            start_month
+        } else {
+            1
+        };
         let (y, m, _) = self.ymd();
         let year = if m >= start_month { y } else { y - 1 };
         Self::from_ymd(year, start_month, 1).unwrap_or(self)
@@ -170,7 +176,11 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
-    (y, u32::try_from(m).unwrap_or(1), u32::try_from(d).unwrap_or(1))
+    (
+        y,
+        u32::try_from(m).unwrap_or(1),
+        u32::try_from(d).unwrap_or(1),
+    )
 }
 
 #[cfg(test)]
@@ -181,7 +191,13 @@ mod tests {
     fn epoch_and_round_trip() {
         let epoch = Date::from_ymd(1970, 1, 1).unwrap();
         assert_eq!(epoch.days, 0);
-        for &(y, m, d) in &[(2000, 2, 29), (2026, 12, 31), (1, 1, 1), (9999, 12, 31), (1969, 12, 31)] {
+        for &(y, m, d) in &[
+            (2000, 2, 29),
+            (2026, 12, 31),
+            (1, 1, 1),
+            (9999, 12, 31),
+            (1969, 12, 31),
+        ] {
             assert_eq!(Date::from_ymd(y, m, d).unwrap().ymd(), (y, m, d));
         }
     }
@@ -208,7 +224,13 @@ mod tests {
         assert_eq!(d.add_days(1).to_string(), "2027-01-01");
         assert_eq!(Date::from_ymd(2026, 1, 1).unwrap().days_until(d), 364);
         assert_eq!(d.fiscal_year_start(1).to_string(), "2026-01-01");
-        assert_eq!(Date::from_ymd(2026, 3, 5).unwrap().fiscal_year_start(7).to_string(), "2025-07-01");
+        assert_eq!(
+            Date::from_ymd(2026, 3, 5)
+                .unwrap()
+                .fiscal_year_start(7)
+                .to_string(),
+            "2025-07-01"
+        );
     }
 
     #[test]

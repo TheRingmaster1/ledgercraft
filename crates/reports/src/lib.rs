@@ -11,7 +11,9 @@ mod xlsx;
 
 pub use aging::{ap_aging, ar_aging};
 pub use report::{Cell, Report, Row, RowKind};
-pub use statements::{account_register, balance_sheet, profit_and_loss, trial_balance, transaction_list};
+pub use statements::{
+    account_register, balance_sheet, profit_and_loss, transaction_list, trial_balance,
+};
 
 /// The reports the app offers, for menus and the CLI.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -66,7 +68,12 @@ impl ReportKind {
         matches!(self, Self::ProfitAndLoss | Self::TransactionList)
     }
 
-    pub fn build(self, company: &ledgercraft_ledger::Company, from: ledgercraft_core::Date, to: ledgercraft_core::Date) -> Report {
+    pub fn build(
+        self,
+        company: &ledgercraft_ledger::Company,
+        from: ledgercraft_core::Date,
+        to: ledgercraft_core::Date,
+    ) -> Report {
         match self {
             Self::ProfitAndLoss => profit_and_loss(company, from, to),
             Self::BalanceSheet => balance_sheet(company, to),

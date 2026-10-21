@@ -23,7 +23,12 @@ pub(crate) struct NewAccount {
 
 impl Default for NewAccount {
     fn default() -> Self {
-        Self { number: String::new(), name: String::new(), kind: AccountType::Expense, description: String::new() }
+        Self {
+            number: String::new(),
+            name: String::new(),
+            kind: AccountType::Expense,
+            description: String::new(),
+        }
     }
 }
 
@@ -108,7 +113,11 @@ impl Default for ReportState {
     fn default() -> Self {
         let today = Date::today();
         let start = Date::from_ymd(today.year(), 1, 1).unwrap_or(today);
-        Self { kind: ReportKind::ProfitAndLoss, from: start.to_string(), to: today.to_string() }
+        Self {
+            kind: ReportKind::ProfitAndLoss,
+            from: start.to_string(),
+            to: today.to_string(),
+        }
     }
 }
 
@@ -120,9 +129,9 @@ fn title(ui: &mut Ui, text: &str) {
 // ----- home -------------------------------------------------------------------
 
 fn flow_button(ui: &mut Ui, label: &str, page: Page, out: &mut Vec<Action>) {
-    let button = egui::Button::new(RichText::new(label).size(15.0)).min_size(egui::vec2(150.0, 44.0));
-        if ui.add(button).on_hover_text(page.hint()).clicked() {
-
+    let button =
+        egui::Button::new(RichText::new(label).size(15.0)).min_size(egui::vec2(150.0, 44.0));
+    if ui.add(button).on_hover_text(page.hint()).clicked() {
         out.push(Action::Go(page));
     }
 }
@@ -136,8 +145,10 @@ fn arrow(ui: &mut Ui) {
     let start = egui::pos2(rect.left() + 4.0, y);
     let tip = egui::pos2(rect.right() - 4.0, y);
     ui.painter().line_segment([start, tip], stroke);
-    ui.painter().line_segment([tip, egui::pos2(tip.x - 7.0, y - 6.0)], stroke);
-    ui.painter().line_segment([tip, egui::pos2(tip.x - 7.0, y + 6.0)], stroke);
+    ui.painter()
+        .line_segment([tip, egui::pos2(tip.x - 7.0, y - 6.0)], stroke);
+    ui.painter()
+        .line_segment([tip, egui::pos2(tip.x - 7.0, y + 6.0)], stroke);
 }
 
 /// Width of the divider between the Home page columns, in ui points.
@@ -180,7 +191,9 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
         c.accounts
             .iter()
             .filter(|a| a.kind == kind)
-            .fold(Money::ZERO, |acc, a| acc.saturating_add(balances.get(&a.id).copied().unwrap_or(Money::ZERO)))
+            .fold(Money::ZERO, |acc, a| {
+                acc.saturating_add(balances.get(&a.id).copied().unwrap_or(Money::ZERO))
+            })
     };
     let today = Date::today();
     let fy_start = today.fiscal_year_start(c.info.fiscal_year_start_month);
@@ -210,7 +223,12 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
         ui.horizontal(|ui| {
             flow_button(ui, "Create Invoices", Page::Form(FormKind::Invoice), out);
             arrow(ui);
-            flow_button(ui, "Receive Payments", Page::Form(FormKind::ReceivePayment), out);
+            flow_button(
+                ui,
+                "Receive Payments",
+                Page::Form(FormKind::ReceivePayment),
+                out,
+            );
             arrow(ui);
             flow_button(ui, "Record Deposits", Page::Form(FormKind::Deposit), out);
         });
@@ -230,7 +248,11 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
             glance_row(ui, shade.then_some(stripe), label, hint, amount);
             shade = !shade;
         };
-        for a in c.sorted_accounts().into_iter().filter(|a| a.kind == AccountType::Bank && a.active) {
+        for a in c
+            .sorted_accounts()
+            .into_iter()
+            .filter(|a| a.kind == AccountType::Bank && a.active)
+        {
             let balance = balances.get(&a.id).copied().unwrap_or(Money::ZERO);
             row(ui, a.name.as_str(), false, balance);
         }
@@ -295,32 +317,34 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
 
 pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
     title(ui, "Chart of Accounts");
-    egui::CollapsingHeader::new("New account").default_open(false).show(ui, |ui| {
-        let n = &mut s.new_account;
-        ui.horizontal(|ui| {
-            field(ui, &mut n.number, 60.0, "Number");
-            field(ui, &mut n.name, 200.0, "Name");
-            egui::ComboBox::from_id_salt("new_acct_kind")
-                .selected_text(n.kind.label())
-                .show_ui(ui, |ui| {
-                    for k in AccountType::ALL {
-                        ui.selectable_value(&mut n.kind, k, k.label());
-                    }
-                });
-            field(ui, &mut n.description, 200.0, "Description");
-            if ui.button("Add").clicked() {
-                out.push(Action::Run {
-                    cmd: Command::AccountCreate {
-                        number: n.number.clone(),
-                        name: n.name.clone(),
-                        kind: n.kind,
-                        description: n.description.clone(),
-                    },
-                    reset: Reset::NewAccount,
-                });
-            }
+    egui::CollapsingHeader::new("New account")
+        .default_open(false)
+        .show(ui, |ui| {
+            let n = &mut s.new_account;
+            ui.horizontal(|ui| {
+                field(ui, &mut n.number, 60.0, "Number");
+                field(ui, &mut n.name, 200.0, "Name");
+                egui::ComboBox::from_id_salt("new_acct_kind")
+                    .selected_text(n.kind.label())
+                    .show_ui(ui, |ui| {
+                        for k in AccountType::ALL {
+                            ui.selectable_value(&mut n.kind, k, k.label());
+                        }
+                    });
+                field(ui, &mut n.description, 200.0, "Description");
+                if ui.button("Add").clicked() {
+                    out.push(Action::Run {
+                        cmd: Command::AccountCreate {
+                            number: n.number.clone(),
+                            name: n.name.clone(),
+                            kind: n.kind,
+                            description: n.description.clone(),
+                        },
+                        reset: Reset::NewAccount,
+                    });
+                }
+            });
         });
-    });
     ui.checkbox(&mut s.show_inactive, "Show inactive accounts");
     ui.add_space(6.0);
     let balances = widgets::balances(c);
@@ -402,74 +426,94 @@ fn contact_editor(ui: &mut Ui, salt: &str, n: &mut ContactInput) {
 
 pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
     title(ui, "Customers");
-    egui::CollapsingHeader::new("New customer").default_open(c.customers.is_empty()).show(ui, |ui| {
-        contact_editor(ui, "new_customer", &mut s.new_customer);
-        if ui.button("Add customer").clicked() {
-            match s.new_customer.build() {
-                Ok(contact) => out.push(Action::Run { cmd: Command::CustomerCreate { contact }, reset: Reset::NewCustomer }),
-                Err(e) => out.push(Action::Error(e)),
-            }
-        }
-    });
-    ui.add_space(6.0);
-    egui::ScrollArea::vertical().id_salt("customers_scroll").show(ui, |ui| {
-        egui::Grid::new("customers").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
-            for h in ["Name", "Email", "Phone", "Terms", "Balance", "", ""] {
-                widgets::column_header(ui, h);
-            }
-            ui.end_row();
-            for x in c.customers.iter().filter(|x| x.active || s.show_inactive) {
-                ui.label(x.contact.name.as_str());
-                ui.label(x.contact.email.as_str());
-                ui.label(x.contact.phone.as_str());
-                ui.label(terms_label(x.contact.terms_days));
-                money_label(ui, c.customer_balance(x.id), false);
-                if ui.small_button("Invoice").clicked() {
-                    out.push(Action::InvoiceFor(x.id));
+    egui::CollapsingHeader::new("New customer")
+        .default_open(c.customers.is_empty())
+        .show(ui, |ui| {
+            contact_editor(ui, "new_customer", &mut s.new_customer);
+            if ui.button("Add customer").clicked() {
+                match s.new_customer.build() {
+                    Ok(contact) => out.push(Action::Run {
+                        cmd: Command::CustomerCreate { contact },
+                        reset: Reset::NewCustomer,
+                    }),
+                    Err(e) => out.push(Action::Error(e)),
                 }
-                if ui.small_button("Receive payment").clicked() {
-                    out.push(Action::PaymentFrom(x.id));
-                }
-                ui.end_row();
             }
         });
-    });
+    ui.add_space(6.0);
+    egui::ScrollArea::vertical()
+        .id_salt("customers_scroll")
+        .show(ui, |ui| {
+            egui::Grid::new("customers")
+                .striped(true)
+                .spacing([18.0, 4.0])
+                .show(ui, |ui| {
+                    for h in ["Name", "Email", "Phone", "Terms", "Balance", "", ""] {
+                        widgets::column_header(ui, h);
+                    }
+                    ui.end_row();
+                    for x in c.customers.iter().filter(|x| x.active || s.show_inactive) {
+                        ui.label(x.contact.name.as_str());
+                        ui.label(x.contact.email.as_str());
+                        ui.label(x.contact.phone.as_str());
+                        ui.label(terms_label(x.contact.terms_days));
+                        money_label(ui, c.customer_balance(x.id), false);
+                        if ui.small_button("Invoice").clicked() {
+                            out.push(Action::InvoiceFor(x.id));
+                        }
+                        if ui.small_button("Receive payment").clicked() {
+                            out.push(Action::PaymentFrom(x.id));
+                        }
+                        ui.end_row();
+                    }
+                });
+        });
 }
 
 pub(crate) fn vendors(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
     title(ui, "Vendors");
-    egui::CollapsingHeader::new("New vendor").default_open(c.vendors.is_empty()).show(ui, |ui| {
-        contact_editor(ui, "new_vendor", &mut s.new_vendor);
-        if ui.button("Add vendor").clicked() {
-            match s.new_vendor.build() {
-                Ok(contact) => out.push(Action::Run { cmd: Command::VendorCreate { contact }, reset: Reset::NewVendor }),
-                Err(e) => out.push(Action::Error(e)),
-            }
-        }
-    });
-    ui.add_space(6.0);
-    egui::ScrollArea::vertical().id_salt("vendors_scroll").show(ui, |ui| {
-        egui::Grid::new("vendors").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
-            for h in ["Name", "Email", "Phone", "Terms", "Balance", "", ""] {
-                widgets::column_header(ui, h);
-            }
-            ui.end_row();
-            for x in c.vendors.iter().filter(|x| x.active || s.show_inactive) {
-                ui.label(x.contact.name.as_str());
-                ui.label(x.contact.email.as_str());
-                ui.label(x.contact.phone.as_str());
-                ui.label(terms_label(x.contact.terms_days));
-                money_label(ui, c.vendor_balance(x.id), false);
-                if ui.small_button("Enter bill").clicked() {
-                    out.push(Action::BillFrom(x.id));
+    egui::CollapsingHeader::new("New vendor")
+        .default_open(c.vendors.is_empty())
+        .show(ui, |ui| {
+            contact_editor(ui, "new_vendor", &mut s.new_vendor);
+            if ui.button("Add vendor").clicked() {
+                match s.new_vendor.build() {
+                    Ok(contact) => out.push(Action::Run {
+                        cmd: Command::VendorCreate { contact },
+                        reset: Reset::NewVendor,
+                    }),
+                    Err(e) => out.push(Action::Error(e)),
                 }
-                if ui.small_button("Pay").clicked() {
-                    out.push(Action::PayVendor(x.id));
-                }
-                ui.end_row();
             }
         });
-    });
+    ui.add_space(6.0);
+    egui::ScrollArea::vertical()
+        .id_salt("vendors_scroll")
+        .show(ui, |ui| {
+            egui::Grid::new("vendors")
+                .striped(true)
+                .spacing([18.0, 4.0])
+                .show(ui, |ui| {
+                    for h in ["Name", "Email", "Phone", "Terms", "Balance", "", ""] {
+                        widgets::column_header(ui, h);
+                    }
+                    ui.end_row();
+                    for x in c.vendors.iter().filter(|x| x.active || s.show_inactive) {
+                        ui.label(x.contact.name.as_str());
+                        ui.label(x.contact.email.as_str());
+                        ui.label(x.contact.phone.as_str());
+                        ui.label(terms_label(x.contact.terms_days));
+                        money_label(ui, c.vendor_balance(x.id), false);
+                        if ui.small_button("Enter bill").clicked() {
+                            out.push(Action::BillFrom(x.id));
+                        }
+                        if ui.small_button("Pay").clicked() {
+                            out.push(Action::PayVendor(x.id));
+                        }
+                        ui.end_row();
+                    }
+                });
+        });
 }
 
 fn terms_label(days: u32) -> String {
@@ -484,62 +528,75 @@ fn terms_label(days: u32) -> String {
 
 pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
     title(ui, "Products and Services");
-    egui::CollapsingHeader::new("New item").default_open(c.items.is_empty()).show(ui, |ui| {
-        let n = &mut s.new_item;
-        egui::Grid::new("new_item").num_columns(4).spacing([10.0, 4.0]).show(ui, |ui| {
-            widgets::hint_label(ui, "Name");
-            field(ui, &mut n.name, 200.0, "");
-            widgets::hint_label(ui, "Type");
-            egui::ComboBox::from_id_salt("new_item_kind").selected_text(n.kind.label()).show_ui(ui, |ui| {
-                for k in ItemKind::ALL {
-                    ui.selectable_value(&mut n.kind, k, k.label());
+    egui::CollapsingHeader::new("New item")
+        .default_open(c.items.is_empty())
+        .show(ui, |ui| {
+            let n = &mut s.new_item;
+            egui::Grid::new("new_item")
+                .num_columns(4)
+                .spacing([10.0, 4.0])
+                .show(ui, |ui| {
+                    widgets::hint_label(ui, "Name");
+                    field(ui, &mut n.name, 200.0, "");
+                    widgets::hint_label(ui, "Type");
+                    egui::ComboBox::from_id_salt("new_item_kind")
+                        .selected_text(n.kind.label())
+                        .show_ui(ui, |ui| {
+                            for k in ItemKind::ALL {
+                                ui.selectable_value(&mut n.kind, k, k.label());
+                            }
+                        });
+                    ui.end_row();
+                    widgets::hint_label(ui, "Description");
+                    field(ui, &mut n.description, 200.0, "");
+                    widgets::hint_label(ui, "Rate");
+                    field(ui, &mut n.rate, 90.0, "0.00");
+                    ui.end_row();
+                    widgets::hint_label(ui, "Income account");
+                    widgets::account_combo(ui, "new_item_acct", c, &mut n.account, |k| {
+                        matches!(k, AccountType::Income | AccountType::OtherIncome)
+                    });
+                    ui.end_row();
+                });
+            if ui.button("Add item").clicked() {
+                let built = match (n.account, Money::parse_or_zero(&n.rate)) {
+                    (None, _) => Err("Choose an income account".to_string()),
+                    (_, Err(e)) => Err(e.to_string()),
+                    (Some(income_account), Ok(rate)) => Ok(ItemSpec {
+                        name: n.name.trim().to_string(),
+                        description: n.description.clone(),
+                        kind: n.kind,
+                        rate,
+                        income_account,
+                    }),
+                };
+                match built {
+                    Ok(spec) => out.push(Action::Run {
+                        cmd: Command::ItemCreate { spec },
+                        reset: Reset::NewItem,
+                    }),
+                    Err(e) => out.push(Action::Error(e)),
                 }
-            });
-            ui.end_row();
-            widgets::hint_label(ui, "Description");
-            field(ui, &mut n.description, 200.0, "");
-            widgets::hint_label(ui, "Rate");
-            field(ui, &mut n.rate, 90.0, "0.00");
-            ui.end_row();
-            widgets::hint_label(ui, "Income account");
-            widgets::account_combo(ui, "new_item_acct", c, &mut n.account, |k| {
-                matches!(k, AccountType::Income | AccountType::OtherIncome)
-            });
-            ui.end_row();
-        });
-        if ui.button("Add item").clicked() {
-            let built = match (n.account, Money::parse_or_zero(&n.rate)) {
-                (None, _) => Err("Choose an income account".to_string()),
-                (_, Err(e)) => Err(e.to_string()),
-                (Some(income_account), Ok(rate)) => Ok(ItemSpec {
-                    name: n.name.trim().to_string(),
-                    description: n.description.clone(),
-                    kind: n.kind,
-                    rate,
-                    income_account,
-                }),
-            };
-            match built {
-                Ok(spec) => out.push(Action::Run { cmd: Command::ItemCreate { spec }, reset: Reset::NewItem }),
-                Err(e) => out.push(Action::Error(e)),
             }
-        }
-    });
+        });
     ui.add_space(6.0);
-    egui::Grid::new("items").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
-        for h in ["Name", "Type", "Description", "Rate", "Income account"] {
-            widgets::column_header(ui, h);
-        }
-        ui.end_row();
-        for x in c.items.iter().filter(|x| x.active) {
-            ui.label(x.spec.name.as_str());
-            ui.label(x.spec.kind.label());
-            ui.label(x.spec.description.as_str());
-            money_label(ui, x.spec.rate, false);
-            ui.label(c.account_name(x.spec.income_account));
+    egui::Grid::new("items")
+        .striped(true)
+        .spacing([18.0, 4.0])
+        .show(ui, |ui| {
+            for h in ["Name", "Type", "Description", "Rate", "Income account"] {
+                widgets::column_header(ui, h);
+            }
             ui.end_row();
-        }
-    });
+            for x in c.items.iter().filter(|x| x.active) {
+                ui.label(x.spec.name.as_str());
+                ui.label(x.spec.kind.label());
+                ui.label(x.spec.description.as_str());
+                money_label(ui, x.spec.rate, false);
+                ui.label(c.account_name(x.spec.income_account));
+                ui.end_row();
+            }
+        });
 }
 
 // ----- transactions -------------------------------------------------------------------
@@ -548,39 +605,53 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
     title(ui, "Transactions");
     let mut txns: Vec<_> = c.transactions.iter().collect();
     txns.sort_by_key(|t| std::cmp::Reverse((t.date, t.id)));
-    egui::ScrollArea::vertical().id_salt("txn_scroll").show(ui, |ui| {
-        egui::Grid::new("txns").striped(true).spacing([16.0, 4.0]).show(ui, |ui| {
-            for h in ["Date", "Type", "Num", "Name", "Memo", "Amount", ""] {
-                widgets::column_header(ui, h);
-            }
-            ui.end_row();
-            for t in txns {
-                let muted = |s: String| {
-                    if t.voided {
-                        RichText::new(s).color(theme::MUTED).strikethrough()
-                    } else {
-                        RichText::new(s)
+    egui::ScrollArea::vertical()
+        .id_salt("txn_scroll")
+        .show(ui, |ui| {
+            egui::Grid::new("txns")
+                .striped(true)
+                .spacing([16.0, 4.0])
+                .show(ui, |ui| {
+                    for h in ["Date", "Type", "Num", "Name", "Memo", "Amount", ""] {
+                        widgets::column_header(ui, h);
                     }
-                };
-                ui.label(muted(t.date.to_string()));
-                ui.label(muted(c.txn_type_label(t).to_string()));
-                ui.label(muted(t.number.clone()));
-                ui.label(muted(t.body.party().map(|p| c.party_name(p)).unwrap_or_default()));
-                ui.label(muted(t.memo.clone()));
-                money_label(ui, t.body.total().unwrap_or(Money::ZERO), false);
-                if t.voided {
-                    ui.label(RichText::new("VOID").color(theme::NEGATIVE));
-                } else if ui.small_button("Void").on_hover_text("Void keeps the record but removes its effect").clicked() {
-                    out.push(void(t.id));
-                }
-                ui.end_row();
-            }
+                    ui.end_row();
+                    for t in txns {
+                        let muted = |s: String| {
+                            if t.voided {
+                                RichText::new(s).color(theme::MUTED).strikethrough()
+                            } else {
+                                RichText::new(s)
+                            }
+                        };
+                        ui.label(muted(t.date.to_string()));
+                        ui.label(muted(c.txn_type_label(t).to_string()));
+                        ui.label(muted(t.number.clone()));
+                        ui.label(muted(
+                            t.body.party().map(|p| c.party_name(p)).unwrap_or_default(),
+                        ));
+                        ui.label(muted(t.memo.clone()));
+                        money_label(ui, t.body.total().unwrap_or(Money::ZERO), false);
+                        if t.voided {
+                            ui.label(RichText::new("VOID").color(theme::NEGATIVE));
+                        } else if ui
+                            .small_button("Void")
+                            .on_hover_text("Void keeps the record but removes its effect")
+                            .clicked()
+                        {
+                            out.push(void(t.id));
+                        }
+                        ui.end_row();
+                    }
+                });
         });
-    });
 }
 
 fn void(id: TxnId) -> Action {
-    Action::Run { cmd: Command::TxnVoid { id }, reset: Reset::Nothing }
+    Action::Run {
+        cmd: Command::TxnVoid { id },
+        reset: Reset::Nothing,
+    }
 }
 
 // ----- reports ----------------------------------------------------------------------------
@@ -602,7 +673,9 @@ pub(crate) fn reports(ui: &mut Ui, c: &Company, s: &mut ReportState, out: &mut V
         field(ui, &mut s.to, 110.0, "YYYY-MM-DD");
         if ui.button("This year").clicked() {
             let today = Date::today();
-            s.from = today.fiscal_year_start(c.info.fiscal_year_start_month).to_string();
+            s.from = today
+                .fiscal_year_start(c.info.fiscal_year_start_month)
+                .to_string();
             s.to = today.to_string();
         }
         if ui.button("This month").clicked() {
@@ -619,19 +692,27 @@ pub(crate) fn reports(ui: &mut Ui, c: &Company, s: &mut ReportState, out: &mut V
         }
     };
     let report = s.kind.build(c, from, to);
-        ui.horizontal(|ui| {
+    ui.horizontal(|ui| {
         let excel = ui.button("Export to Excel…").on_hover_text(
             "A formatted Excel workbook (.xlsx): money formats, bold totals and sized columns.",
         );
         if excel.clicked() {
-            out.push(Action::ExportXlsx { name: format!("{}.xlsx", s.kind.cli_id()), data: report.to_xlsx(crate::currency::current().symbol()) });
+            out.push(Action::ExportXlsx {
+                name: format!("{}.xlsx", s.kind.cli_id()),
+                data: report.to_xlsx(crate::currency::current().symbol()),
+            });
         }
-        let csv = ui.button("Export CSV…").on_hover_text("Plain values only, for importing into other programs.");
+        let csv = ui
+            .button("Export CSV…")
+            .on_hover_text("Plain values only, for importing into other programs.");
         if csv.clicked() {
-            out.push(Action::ExportCsv { name: format!("{}.csv", s.kind.cli_id()), csv: report.to_csv() });
+            out.push(Action::ExportCsv {
+                name: format!("{}.csv", s.kind.cli_id()),
+                csv: report.to_csv(),
+            });
         }
     });
 
     ui.separator();
     widgets::report_view(ui, &report, out);
-}   
+}

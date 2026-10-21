@@ -135,10 +135,21 @@ impl Command {
                 c.info.fiscal_year_start_month = month;
                 None
             }
-            Self::AccountCreate { number, name, kind, description } => {
-                Some(c.add_account(&number, &name, kind, &description)?.to_string())
-            }
-            Self::AccountUpdate { id, number, name, description } => {
+            Self::AccountCreate {
+                number,
+                name,
+                kind,
+                description,
+            } => Some(
+                c.add_account(&number, &name, kind, &description)?
+                    .to_string(),
+            ),
+            Self::AccountUpdate {
+                id,
+                number,
+                name,
+                description,
+            } => {
                 c.update_account(id, &number, &name, &description)?;
                 None
             }
@@ -157,9 +168,12 @@ impl Command {
                 None
             }
             Self::ItemCreate { spec } => Some(c.add_item(spec)?.to_string()),
-            Self::TxnPost { date, number, memo, body } => {
-                Some(c.post(date, &number, &memo, body)?.to_string())
-            }
+            Self::TxnPost {
+                date,
+                number,
+                memo,
+                body,
+            } => Some(c.post(date, &number, &memo, body)?.to_string()),
             Self::TxnVoid { id } => {
                 c.void(id)?;
                 None

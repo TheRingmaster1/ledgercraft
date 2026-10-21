@@ -9,7 +9,9 @@ use crate::{parse_scaled, CoreError, CoreResult, Qty, ScaleError};
 pub const MAX_CENTS: i64 = 9_000_000_000_000_000;
 
 /// An exact amount of money in the company's currency, stored as cents.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[serde(transparent)]
 pub struct Money(i64);
 
@@ -148,7 +150,11 @@ fn strip_currency(s: &str) -> String {
         None => ("", s),
     };
     let code_len = rest.chars().take_while(char::is_ascii_alphabetic).count();
-    let rest = if code_len > 0 && code_len <= 3 { rest[code_len..].trim_start() } else { rest };
+    let rest = if code_len > 0 && code_len <= 3 {
+        rest[code_len..].trim_start()
+    } else {
+        rest
+    };
     let mut out = String::with_capacity(s.len());
     out.push_str(sign);
     let mut removed = false;
@@ -192,7 +198,10 @@ mod tests {
         assert_eq!(Money::parse("$-12").unwrap().cents(), -1200);
         assert_eq!(Money::parse("(12.00)").unwrap().cents(), -1200);
         assert!(Money::parse("12.345").is_err());
-        assert_eq!(Money::parse("€1.234").unwrap_err(), CoreError::InvalidMoney("€1.234".into()));
+        assert_eq!(
+            Money::parse("€1.234").unwrap_err(),
+            CoreError::InvalidMoney("€1.234".into())
+        );
         assert_eq!(Money::parse("€1,234.50").unwrap().cents(), 123_450);
         assert_eq!(Money::parse("-£7").unwrap().cents(), -700);
         assert_eq!(Money::parse("CHF 12.00").unwrap().cents(), 1200);
@@ -230,7 +239,10 @@ mod tests {
     #[test]
     fn multiply_rounds_half_away_from_zero() {
         let rate = Money::from_cents(333); // 3.33
-        assert_eq!(rate.times(Qty::from_milli(1500)), Some(Money::from_cents(500))); // 4.995 → 5.00
+        assert_eq!(
+            rate.times(Qty::from_milli(1500)),
+            Some(Money::from_cents(500))
+        ); // 4.995 → 5.00
         assert_eq!(
             Money::from_cents(-333).times(Qty::from_milli(1500)),
             Some(Money::from_cents(-500))
@@ -244,6 +256,9 @@ mod tests {
             Money::checked_sum([Money::from_cents(1), Money::from_cents(2)]),
             Some(Money::from_cents(3))
         );
-        assert_eq!(Money::checked_sum([Money::from_cents(i64::MAX), Money::from_cents(1)]), None);
+        assert_eq!(
+            Money::checked_sum([Money::from_cents(i64::MAX), Money::from_cents(1)]),
+            None
+        );
     }
 }

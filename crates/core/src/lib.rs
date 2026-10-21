@@ -86,6 +86,9 @@ mod tests {
         assert_eq!(parse_scaled("", 2), Err(ScaleError::Invalid));
         assert_eq!(parse_scaled("-", 2), Err(ScaleError::Invalid));
         assert_eq!(parse_scaled("1.2.3", 2), Err(ScaleError::Invalid));
-        assert_eq!(parse_scaled("99999999999999999999", 2), Err(ScaleError::Overflow));
+        assert_eq!(
+            parse_scaled("99999999999999999999", 2),
+            Err(ScaleError::Overflow)
+        );
     }
 }

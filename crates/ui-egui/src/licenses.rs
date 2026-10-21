@@ -116,12 +116,14 @@ fn summary(ui: &mut egui::Ui, tab: &mut LicenseTab) {
 
 /// A scrollable, selectable view of a licence text.
 fn text(ui: &mut egui::Ui, body: &str) {
-    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-        let mut shown = body;
-        ui.add(
-            egui::TextEdit::multiline(&mut shown)
-                .font(egui::TextStyle::Monospace)
-                .desired_width(f32::INFINITY),
-        );
-    });
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            let mut shown = body;
+            ui.add(
+                egui::TextEdit::multiline(&mut shown)
+                    .font(egui::TextStyle::Monospace)
+                    .desired_width(f32::INFINITY),
+            );
+        });
 }

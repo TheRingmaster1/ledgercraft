@@ -16,13 +16,26 @@ fn bucket(days_past_due: i64) -> usize {
 }
 
 fn aging(company: &Company, as_of: Date, receivable: bool) -> Report {
-    let title = if receivable { "A/R Aging Summary" } else { "A/P Aging Summary" };
-    let mut r = Report::new(title, &company.info.name, format!("As of {as_of}"), &BUCKETS);
+    let title = if receivable {
+        "A/R Aging Summary"
+    } else {
+        "A/P Aging Summary"
+    };
+    let mut r = Report::new(
+        title,
+        &company.info.name,
+        format!("As of {as_of}"),
+        &BUCKETS,
+    );
     r.label_header = if receivable { "Customer" } else { "Vendor" }.into();
 
     // (party, buckets) in first-seen order, sorted by name below.
     let mut rows: Vec<(Party, [Money; 6])> = Vec::new();
-    for t in company.transactions.iter().filter(|t| !t.voided && t.date <= as_of) {
+    for t in company
+        .transactions
+        .iter()
+        .filter(|t| !t.voided && t.date <= as_of)
+    {
         let (party, due) = match (&t.body, receivable) {
             (TxnBody::Invoice(i), true) => (Party::Customer(i.customer), i.due_date),
             (TxnBody::Bill(b), false) => (Party::Vendor(b.vendor), b.due_date),
@@ -54,7 +67,13 @@ fn aging(company: &Company, as_of: Date, receivable: bool) -> Report {
         for (t, v) in totals.iter_mut().zip(values) {
             *t = t.saturating_add(*v);
         }
-        r.money(RowKind::Detail, &company.party_name(*party), 0, values, None);
+        r.money(
+            RowKind::Detail,
+            &company.party_name(*party),
+            0,
+            values,
+            None,
+        );
     }
     r.money(RowKind::Total, "Total", 0, &totals, None);
     r

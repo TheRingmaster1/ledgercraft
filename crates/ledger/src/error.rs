@@ -13,9 +13,19 @@ pub enum LedgerError {
     Inactive(String),
     Duplicate(String),
     Required(&'static str),
-    Unbalanced { debits: Money, credits: Money },
-    WrongAccountType { account: String, expected: &'static str },
-    OverApplied { txn: TxnId, open: Money, applied: Money },
+    Unbalanced {
+        debits: Money,
+        credits: Money,
+    },
+    WrongAccountType {
+        account: String,
+        expected: &'static str,
+    },
+    OverApplied {
+        txn: TxnId,
+        open: Money,
+        applied: Money,
+    },
     NotPositive(&'static str),
     InUse(String),
     Invalid(String),

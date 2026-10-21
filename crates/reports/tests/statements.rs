@@ -2,7 +2,9 @@
 
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_ledger::{AccountLine, Bill, Check, Company, Contact, Invoice, SalesLine, TxnBody};
-use ledgercraft_reports::{ap_aging, ar_aging, balance_sheet, profit_and_loss, trial_balance, Cell, RowKind};
+use ledgercraft_reports::{
+    ap_aging, ar_aging, balance_sheet, profit_and_loss, trial_balance, Cell, RowKind,
+};
 
 fn d(s: &str) -> Date {
     Date::parse(s).unwrap()
@@ -11,28 +13,52 @@ fn d(s: &str) -> Date {
 fn books() -> Company {
     let mut c = Company::with_default_accounts("Report Co");
     let id = |c: &Company, n: &str| c.account_by_name(n).unwrap().id;
-    let cust = c.add_customer(Contact { name: "Zed".into(), ..Contact::default() }).unwrap();
-    let vend = c.add_vendor(Contact { name: "Landlord".into(), ..Contact::default() }).unwrap();
+    let cust = c
+        .add_customer(Contact {
+            name: "Zed".into(),
+            ..Contact::default()
+        })
+        .unwrap();
+    let vend = c
+        .add_vendor(Contact {
+            name: "Landlord".into(),
+            ..Contact::default()
+        })
+        .unwrap();
     // Last year: 1,000 of income.
     let inv = TxnBody::Invoice(Invoice {
         customer: cust,
         due_date: d("2025-07-01"),
         ar_account: id(&c, "Accounts Receivable"),
-        lines: vec![SalesLine { item: None, description: String::new(), qty: Qty::ONE, rate: Money::from_dollars(1000), account: id(&c, "Service Income") }],
+        lines: vec![SalesLine {
+            item: None,
+            description: String::new(),
+            qty: Qty::ONE,
+            rate: Money::from_dollars(1000),
+            account: id(&c, "Service Income"),
+        }],
     });
     c.post(d("2025-06-01"), "1", "", inv).unwrap();
     // This year: 300 rent by check, 200 bill unpaid.
     let check = TxnBody::Check(Check {
         payee: None,
         pay_from: id(&c, "Checking"),
-        lines: vec![AccountLine { account: id(&c, "Rent"), description: String::new(), amount: Money::from_dollars(300) }],
+        lines: vec![AccountLine {
+            account: id(&c, "Rent"),
+            description: String::new(),
+            amount: Money::from_dollars(300),
+        }],
     });
     c.post(d("2026-02-01"), "101", "", check).unwrap();
     let bill = TxnBody::Bill(Bill {
         vendor: vend,
         due_date: d("2026-03-01"),
         ap_account: id(&c, "Accounts Payable"),
-        lines: vec![AccountLine { account: id(&c, "Utilities"), description: String::new(), amount: Money::from_dollars(200) }],
+        lines: vec![AccountLine {
+            account: id(&c, "Utilities"),
+            description: String::new(),
+            amount: Money::from_dollars(200),
+        }],
     });
     c.post(d("2026-02-15"), "", "", bill).unwrap();
     c
@@ -68,10 +94,19 @@ fn balance_sheet_balances_with_retained_earnings() {
     let r = balance_sheet(&books(), d("2026-12-31"));
     // Assets: AR 1000 − checking 300 = 700. Liabilities: AP 200.
     assert_eq!(last_money(&r, "Total Assets"), Money::from_dollars(700));
-    assert_eq!(last_money(&r, "Total Liabilities"), Money::from_dollars(200));
-    assert_eq!(last_money(&r, "3900 · Retained Earnings"), Money::from_dollars(1000));
+    assert_eq!(
+        last_money(&r, "Total Liabilities"),
+        Money::from_dollars(200)
+    );
+    assert_eq!(
+        last_money(&r, "3900 · Retained Earnings"),
+        Money::from_dollars(1000)
+    );
     assert_eq!(last_money(&r, "Net Income"), Money::from_dollars(-500));
-    assert_eq!(last_money(&r, "Total Liabilities and Equity"), Money::from_dollars(700));
+    assert_eq!(
+        last_money(&r, "Total Liabilities and Equity"),
+        Money::from_dollars(700)
+    );
 }
 
 #[test]
