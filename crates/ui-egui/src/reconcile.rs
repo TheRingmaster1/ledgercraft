@@ -95,7 +95,7 @@ fn body(
             ui.label("");
             ui.label("");
             widgets::hint_label(ui, "Ending balance");
-            field(ui, &mut s.ending_balance, 110.0, "0.00");
+            field(ui, &mut s.ending_balance, 110.0, "from statement");
             ui.end_row();
         });
     if s.account != before {
@@ -221,7 +221,7 @@ fn body(
             match &ending {
                 Some(Ok(e)) => amount(ui, money(*e)),
                 Some(Err(_)) => amount(ui, RichText::new("not a number").color(theme::NEGATIVE)),
-                None => amount(ui, RichText::new("type it above").color(theme::MUTED)),
+                None => amount(ui, RichText::new("—").color(theme::MUTED)),
             }
             ui.end_row();
             ui.label(RichText::new("Difference").strong());
