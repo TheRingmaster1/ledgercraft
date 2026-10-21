@@ -33,35 +33,197 @@ const INTER_LIGHT: &[u8] = include_bytes!("../../../assets/fonts/Inter-Light.ttf
 /// The font's licence, which must travel with it (shown in Help > Licenses).
 pub(crate) const INTER_LICENSE: &str = include_str!("../../../assets/fonts/OFL.txt");
 
-/// The text font, chosen in Help > Preferences > Text.
+/// The text font, chosen in Help > Preferences > Text: one LedgerCraft
+/// bundles, or one already installed on this computer. Installed fonts are
+/// read from their usual place at run time, never copied or bundled.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Font {
     /// egui's built-in Ubuntu Light, as in LedgerCraft 0.2.
-    #[default]
     Classic,
     Inter,
+    #[default]
     InterLight,
+    // Windows
+    SegoeUi,
+    SegoeUiSemilight,
+    SegoeUiLight,
+    Calibri,
+    CalibriLight,
+    Verdana,
+    Tahoma,
+    Arial,
+    // Linux
+    DejaVuSans,
+    NotoSans,
+    LiberationSans,
+    Ubuntu,
+    Cantarell,
 }
 
+/// Biggest font file LedgerCraft will read.
+const MAX_FONT_BYTES: u64 = 50 * 1024 * 1024;
+
 impl Font {
-    pub(crate) const ALL: [Self; 3] = [Self::Classic, Self::Inter, Self::InterLight];
+    /// Fonts that come with LedgerCraft, always available.
+    pub(crate) const BUNDLED: [Self; 3] = [Self::Classic, Self::Inter, Self::InterLight];
+    /// Fonts used when this computer has them installed.
+    const SYSTEM: [Self; 13] = [
+        Self::SegoeUi,
+        Self::SegoeUiSemilight,
+        Self::SegoeUiLight,
+        Self::Calibri,
+        Self::CalibriLight,
+        Self::Verdana,
+        Self::Tahoma,
+        Self::Arial,
+        Self::DejaVuSans,
+        Self::NotoSans,
+        Self::LiberationSans,
+        Self::Ubuntu,
+        Self::Cantarell,
+    ];
 
     pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Classic => "Classic (Ubuntu Light)",
             Self::Inter => "Inter",
             Self::InterLight => "Inter Light",
+            Self::SegoeUi => "Segoe UI",
+            Self::SegoeUiSemilight => "Segoe UI Semilight",
+            Self::SegoeUiLight => "Segoe UI Light",
+            Self::Calibri => "Calibri",
+            Self::CalibriLight => "Calibri Light",
+            Self::Verdana => "Verdana",
+            Self::Tahoma => "Tahoma",
+            Self::Arial => "Arial",
+            Self::DejaVuSans => "DejaVu Sans",
+            Self::NotoSans => "Noto Sans",
+            Self::LiberationSans => "Liberation Sans",
+            Self::Ubuntu => "Ubuntu",
+            Self::Cantarell => "Cantarell",
         }
     }
 
-    fn bytes(self) -> Option<&'static [u8]> {
+    /// Where an installed font may be, on the systems that have it.
+    fn system_files(self) -> Vec<std::path::PathBuf> {
+        use std::path::PathBuf;
+        let windows = |file: &str| -> Vec<PathBuf> {
+            windows_fonts_dir()
+                .map(|dir| dir.join(file))
+                .into_iter()
+                .collect()
+        };
+        let linux = |paths: &[&str]| -> Vec<PathBuf> {
+            if cfg!(target_os = "linux") {
+                paths.iter().map(PathBuf::from).collect()
+            } else {
+                Vec::new()
+            }
+        };
         match self {
-            Self::Classic => None,
-            Self::Inter => Some(INTER),
-            Self::InterLight => Some(INTER_LIGHT),
+            Self::Classic | Self::Inter | Self::InterLight => Vec::new(),
+            Self::SegoeUi => windows("segoeui.ttf"),
+            Self::SegoeUiSemilight => windows("segoeuisl.ttf"),
+            Self::SegoeUiLight => windows("segoeuil.ttf"),
+            Self::Calibri => windows("calibri.ttf"),
+            Self::CalibriLight => windows("calibril.ttf"),
+            Self::Verdana => windows("verdana.ttf"),
+            Self::Tahoma => windows("tahoma.ttf"),
+            Self::Arial => windows("arial.ttf"),
+            Self::DejaVuSans => linux(&[
+                "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+                "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+            ]),
+            Self::NotoSans => linux(&[
+                "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+                "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+                "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
+                "/usr/share/fonts/google-noto-sans-fonts/NotoSans-Regular.ttf",
+            ]),
+            Self::LiberationSans => linux(&[
+                "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf",
+            ]),
+            Self::Ubuntu => linux(&[
+                "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+                "/usr/share/fonts/ubuntu/Ubuntu-R.ttf",
+                "/usr/share/fonts/TTF/Ubuntu-R.ttf",
+            ]),
+            Self::Cantarell => linux(&[
+                "/usr/share/fonts/cantarell/Cantarell-VF.otf",
+                "/usr/share/fonts/opentype/cantarell/Cantarell-VF.otf",
+                "/usr/share/fonts/abattis-cantarell-vf-fonts/Cantarell-VF.otf",
+            ]),
         }
     }
+
+    /// The font file to read, if this font is installed here.
+    fn installed_file(self) -> Option<std::path::PathBuf> {
+        self.system_files().into_iter().find(|p| p.is_file())
+    }
+
+    /// Whether this font can be used on this computer.
+    pub(crate) fn is_available(self) -> bool {
+        Self::BUNDLED.contains(&self) || installed().contains(&self)
+    }
+
+    /// The font to hand egui; `None` for Classic (egui's own) or a font that
+    /// cannot be found or read here.
+    fn data(self) -> Option<egui::FontData> {
+        match self {
+            Self::Classic => None,
+            Self::Inter => Some(egui::FontData::from_static(INTER)),
+            Self::InterLight => Some(egui::FontData::from_static(INTER_LIGHT)),
+            _ => {
+                let bytes = read_font(&self.installed_file()?)?;
+                Some(egui::FontData::from_owned(bytes))
+            }
+        }
+    }
+}
+
+/// The installed fonts found on this computer, looked up once.
+pub(crate) fn installed() -> &'static [Font] {
+    static FOUND: std::sync::OnceLock<Vec<Font>> = std::sync::OnceLock::new();
+    FOUND.get_or_init(|| {
+        Font::SYSTEM
+            .into_iter()
+            .filter(|f| f.installed_file().is_some())
+            .collect()
+    })
+}
+
+/// `C:\Windows\Fonts` (from WINDIR) on Windows; `None` elsewhere.
+fn windows_fonts_dir() -> Option<std::path::PathBuf> {
+    if !cfg!(windows) {
+        return None;
+    }
+    let root = std::env::var_os("WINDIR")
+        .or_else(|| std::env::var_os("SystemRoot"))
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from(r"C:\Windows"));
+    Some(root.join("Fonts"))
+}
+
+/// Reads an installed font file, if it is a sensible size and a font egui
+/// can use. egui stops the app on a font it cannot read, so check first.
+fn read_font(path: &std::path::Path) -> Option<Vec<u8>> {
+    let size = std::fs::metadata(path).ok()?.len();
+    if size > MAX_FONT_BYTES {
+        return None;
+    }
+    let bytes = std::fs::read(path).ok()?;
+    usable(&bytes).then_some(bytes)
+}
+
+/// Whether egui's font reader accepts these bytes.
+fn usable(bytes: &[u8]) -> bool {
+    ab_glyph::FontRef::try_from_slice(bytes).is_ok()
 }
 
 /// How big text is, chosen in Help > Preferences > Text.
@@ -97,15 +259,14 @@ impl TextSize {
 }
 
 /// Sets the text font and size for the whole app. egui's own fonts stay
-/// behind a chosen font for any character it lacks, and for monospace.
-/// Rebuilds the font atlas, so call it only when the choice changes.
+/// behind a chosen font for any character it lacks, and for monospace. A
+/// font that cannot be found or read falls back to Classic. Rebuilds the
+/// font atlas, so call it only when the choice changes.
 pub(crate) fn set_text(ctx: &egui::Context, font: Font, size: TextSize) {
     let mut fonts = egui::FontDefinitions::default();
-    if let Some(bytes) = font.bytes() {
+    if let Some(data) = font.data() {
         let name = "LedgerCraft text".to_owned();
-        fonts
-            .font_data
-            .insert(name.clone(), egui::FontData::from_static(bytes));
+        fonts.font_data.insert(name.clone(), data);
         fonts
             .families
             .entry(egui::FontFamily::Proportional)
@@ -173,7 +334,7 @@ mod tests {
 
     #[test]
     fn every_font_and_size_lays_out_text() {
-        for font in Font::ALL {
+        for font in Font::BUNDLED {
             for size in TextSize::ALL {
                 let ctx = egui::Context::default();
                 apply(&ctx);
@@ -191,8 +352,36 @@ mod tests {
     }
 
     #[test]
-    fn the_default_looks_like_0_2() {
-        assert_eq!(Font::default(), Font::Classic);
+    fn the_default_is_inter_light_at_standard_size() {
+        assert_eq!(Font::default(), Font::InterLight);
         assert_eq!(TextSize::default().body(), 12.5);
+    }
+
+    #[test]
+    fn only_real_fonts_are_used() {
+        assert!(usable(INTER));
+        assert!(usable(INTER_LIGHT));
+        assert!(!usable(b"not a font at all"));
+        assert!(!usable(&[]));
+        let missing = std::env::temp_dir().join("ledgercraft-no-such-font.ttf");
+        assert!(read_font(&missing).is_none());
+    }
+
+    #[test]
+    fn installed_fonts_are_real_and_bundled_ones_always_available() {
+        for font in Font::BUNDLED {
+            assert!(font.is_available());
+        }
+        // Whatever this computer has must load (or the test machine has none).
+        for font in installed() {
+            assert!(font.data().is_some(), "{font:?} was listed but cannot be read");
+            let ctx = egui::Context::default();
+            set_text(&ctx, *font, TextSize::Standard);
+            let _ = ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    ui.label("Accounts Receivable $1,234.56");
+                });
+            });
+        }
     }
 }

@@ -16,7 +16,10 @@ has no row. Adding an asset without a row is a bug.
 Notes
 
 * The bundled fonts are Inter Regular and Inter Light (above), unmodified,
-  offered in Help > Preferences > Text; the default is egui's built-in font. The SIL
+  offered in Help > Preferences > Text (Inter Light is the default). Fonts
+  listed there under "On this computer" (Segoe UI, Calibri, DejaVu Sans and
+  others) are read at run time from where the operating system keeps them;
+  LedgerCraft never includes, copies or redistributes them. The SIL
   Open Font License allows bundling it with software under any licence, as
   long as the licence text travels with it (assets/fonts/OFL.txt, also shown
   in Help > Licenses) and the font is not sold on its own. egui's built-in
