@@ -92,7 +92,11 @@ pub(crate) fn confirm_field(ui: &mut egui::Ui, confirm: &mut String, password: &
         password_field(ui, confirm, "type it again");
         match confirmation(password, confirm) {
             Some(false) => {
-                ui.label(RichText::new("Doesn't match").small().color(theme::NEGATIVE));
+                ui.label(
+                    RichText::new("Doesn't match")
+                        .small()
+                        .color(theme::NEGATIVE),
+                );
             }
             Some(true) => {
                 ui.label(RichText::new("Matches").small().color(theme::POSITIVE));
