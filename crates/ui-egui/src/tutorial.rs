@@ -84,8 +84,12 @@ const LESSONS: &[Lesson] = &[
             Heading("Messages"),
             Text(
                 "The status bar along the bottom confirms what just happened (\"Invoice \
-                 recorded\") or explains a problem in red. The right side shows the company \
-                 file you have open and whether it has unsaved changes.",
+                 recorded\") or explains a problem in red. Messages clear themselves after a \
+                 few seconds (problems stay for 20). The right side shows the name of the \
+                 company file you have open, whether it is password protected and whether \
+                 it has unsaved changes; rest the mouse on it to see the file's full \
+                 location. In a narrow window both sides shorten with \"…\"; rest the \
+                 mouse on them to read them in full.",
             ),
             Heading("Keyboard shortcuts"),
             Bullets(&[
@@ -158,6 +162,13 @@ const LESSONS: &[Lesson] = &[
                  refused. Four or more unrelated words make a strong password that is easy \
                  to remember. Files with older, shorter passwords still open.",
             ),
+            Bullets(&[
+                "Show, beside the password box, reveals what you typed (Hide covers it \
+                 again). Check nobody can see your screen first. Every password window \
+                 opens with it hidden.",
+                "Next to Confirm, \"Doesn't match\" (red) or \"Matches\" (green) tells you \
+                 straight away whether the two passwords agree.",
+            ]),
             Text(
                 "Company files made before passwords existed still open. LedgerCraft \
                  offers to protect them when you open one; say yes, or use File > \
@@ -197,7 +208,8 @@ const LESSONS: &[Lesson] = &[
             Steps(&[
                 "Open Chart of Accounts from the side bar.",
                 "Click any account's name to see its register: every transaction in that \
-                 account with a running balance.",
+                 account with a running balance. Click a transaction's date (or \
+                 double-click its row) to open it and change it.",
                 "To add one, open \"New account\", enter a number (optional), a name and \
                  the type, then click Add.",
                 "Make inactive hides an account you no longer use. It is only allowed once \
@@ -442,6 +454,8 @@ const LESSONS: &[Lesson] = &[
             Bullets(&[
                 "Set From and To (or As of), or click This year or This month.",
                 "Click an account name in a report to open its register.",
+                "In the Transaction List, click a date (or double-click a row) to open that \
+                 transaction and change it.",
                 "Export to Excel saves a formatted workbook; Export CSV saves plain values \
                  for other programs.",
             ]),

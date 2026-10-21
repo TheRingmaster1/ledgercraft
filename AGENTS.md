@@ -57,7 +57,7 @@ their trust for good. This outranks feature work.
 ## Everything is a command
 
 User-visible changes to the books are `ledgercraft_engine::Command` variants
-with a stable id (`account.create`, `txn.post`, …) listed in `CATALOG`. The
+with a stable id (`account.create`, `txn.post`, `txn.update`, …) listed in `CATALOG`. The
 desktop UI, the CLI and future agent interfaces reach the books only through
 `Session::execute`. UI-only state (open page, half-typed forms) lives in
 `crates/ui-egui`.

@@ -33,6 +33,25 @@ Voiding keeps the transaction on file for the audit trail and removes all of
 its postings. An invoice or bill with payments applied cannot be voided until
 those payments are voided.
 
+## Editing
+
+A recorded transaction can be edited (`txn.update`; in the app, open it from
+the Transactions page, a register or the Transaction List). The edit replaces
+the transaction's date, number, memo and form contents in place and keeps its
+id, so payments applied to an invoice or bill stay applied; every report reads
+the new postings straight away. An edit is validated exactly like a new
+transaction, with these extra rules:
+
+* It stays the same type of transaction (an invoice stays an invoice).
+* A void transaction cannot be edited.
+* An invoice or bill cannot drop below the total that live payments apply to
+  it, and cannot change customer or vendor while any payment is applied.
+* When a payment is edited, its own earlier applications are left out of the
+  open balances it is checked against, so it can apply the same amounts again.
+
+Undo restores the transaction as it was. There is no change history in the
+file yet; an audit trail report is planned (ROADMAP M2.7).
+
 ## Balance Sheet equity
 
 Income and expense from before the start of the current fiscal year are rolled

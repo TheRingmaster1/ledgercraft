@@ -65,6 +65,11 @@ fixes to a release. See docs/releasing.md.
   columns gets one scrolling column.)
 
 ### Changed
+- Tutorial brought up to date: opening and changing recorded transactions
+  (Fixing mistakes, Working with accounts, Reports), status bar messages that
+  clear themselves and the file name on the right (Getting around), and the
+  Show / Hide and Matches / Doesn't match password helpers (Company files).
+  docs/accounting.md explains editing and its rules.
 - New passwords need at least 12 characters (was 8). Files protected with an
   older, shorter password still open; only new passwords are checked.
 - README: requirements for Linux (Arch, Debian/Ubuntu and Fedora packages)
