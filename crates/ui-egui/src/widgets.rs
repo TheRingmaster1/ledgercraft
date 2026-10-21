@@ -6,8 +6,7 @@ use std::hash::Hash;
 use eframe::egui::{self, Align, Layout, RichText, Ui};
 use ledgercraft_core::Money;
 use ledgercraft_ledger::{
-    Account, AccountId, AccountType, Company, CustomerId, ItemId, Party, TxnBody, TxnId,
-    VendorId,
+    Account, AccountId, AccountType, Company, CustomerId, ItemId, Party, TxnBody, TxnId, VendorId,
 };
 use ledgercraft_reports::{Cell, Report, RowKind};
 

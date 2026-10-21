@@ -1031,10 +1031,19 @@ mod tests {
         let inv = c
             .post(d("2026-01-02"), "1001", "", invoice(&c, cust, 50_000))
             .unwrap();
-        c.update(inv, d("2026-01-05"), "1001A", "fixed", invoice(&c, cust, 30_000))
-            .unwrap();
+        c.update(
+            inv,
+            d("2026-01-05"),
+            "1001A",
+            "fixed",
+            invoice(&c, cust, 30_000),
+        )
+        .unwrap();
         let t = c.txn(inv).unwrap();
-        assert_eq!((t.date, t.number.as_str(), t.memo.as_str()), (d("2026-01-05"), "1001A", "fixed"));
+        assert_eq!(
+            (t.date, t.number.as_str(), t.memo.as_str()),
+            (d("2026-01-05"), "1001A", "fixed")
+        );
         assert_eq!(c.transactions.len(), 1);
         assert_eq!(
             c.account_balance(acct(&c, "Accounts Receivable"), None),
@@ -1124,15 +1133,27 @@ mod tests {
         assert_eq!(open[0].1, Money::from_cents(100_000));
         // Changing only the date re-applies the same amount without tripping
         // the overpayment check.
-        c.update(pay, d("2026-01-11"), "", "", payment(&c, cust, inv, 100_000))
-            .unwrap();
+        c.update(
+            pay,
+            d("2026-01-11"),
+            "",
+            "",
+            payment(&c, cust, inv, 100_000),
+        )
+        .unwrap();
         // Lowering it leaves the rest open.
         c.update(pay, d("2026-01-11"), "", "", payment(&c, cust, inv, 70_000))
             .unwrap();
         assert_eq!(c.open_balance(inv, None), Money::from_cents(30_000));
         // But it still cannot overpay.
         assert!(c
-            .update(pay, d("2026-01-11"), "", "", payment(&c, cust, inv, 100_001))
+            .update(
+                pay,
+                d("2026-01-11"),
+                "",
+                "",
+                payment(&c, cust, inv, 100_001)
+            )
             .is_err());
     }
 

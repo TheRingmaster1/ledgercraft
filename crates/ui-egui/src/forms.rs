@@ -673,7 +673,12 @@ pub(crate) fn receive_payment(
     total_row(ui, "Amount received", total);
     let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::ReceivePayment, f.editing, build_receive(c, f, total));
+        finish(
+            out,
+            FormKind::ReceivePayment,
+            f.editing,
+            build_receive(c, f, total),
+        );
     }
     if clear {
         let editing = f.editing;
@@ -738,7 +743,12 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
     total_row(ui, "Payment total", total);
     let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::PayBills, f.editing, build_pay_bills(c, f, total));
+        finish(
+            out,
+            FormKind::PayBills,
+            f.editing,
+            build_pay_bills(c, f, total),
+        );
     }
     if clear {
         let editing = f.editing;

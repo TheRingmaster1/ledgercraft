@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText};
 use ledgercraft_engine::{sample_company, Command, EngineError, Session};
-use ledgercraft_ledger::TxnId;
 use ledgercraft_file::FileError;
+use ledgercraft_ledger::TxnId;
 
 use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
@@ -535,7 +535,9 @@ impl LedgerApp {
                         }
                         self.lists.reset(reset);
                         if was_edit {
-                            self.info(format!("{label}: changes saved. Edit > Undo puts the original back."));
+                            self.info(format!(
+                                "{label}: changes saved. Edit > Undo puts the original back."
+                            ));
                             if let Some(page) = self.edit_return.take() {
                                 self.page = page;
                             }
@@ -602,7 +604,12 @@ impl LedgerApp {
 
     /// Opens a recorded transaction in its form, ready to change.
     fn open_txn(&mut self, id: TxnId) {
-        let Some(t) = self.session.as_ref().and_then(|s| s.company().txn(id)).cloned() else {
+        let Some(t) = self
+            .session
+            .as_ref()
+            .and_then(|s| s.company().txn(id))
+            .cloned()
+        else {
             self.error(format!("Transaction {id} was not found."));
             return;
         };
