@@ -302,7 +302,11 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ReconcileState, out: &mut Vec<Action>,
 }
 
 /// What to do next, in plain words, under the summary.
-fn guidance(ui: &mut Ui, ending: Option<&Result<Money, ledgercraft_core::CoreError>>, balances: bool) {
+fn guidance(
+    ui: &mut Ui,
+    ending: Option<&Result<Money, ledgercraft_core::CoreError>>,
+    balances: bool,
+) {
     let (lead, text, colour) = match ending {
         None => (
             "Next: ",
