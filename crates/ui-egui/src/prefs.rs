@@ -209,7 +209,9 @@ const PAGE_ID: &str = "prefs_page";
 /// straight away; the app saves them.
 pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
     let id = egui::Id::new(PAGE_ID);
-    let mut page = ctx.data(|d| d.get_temp::<PrefsPage>(id)).unwrap_or_default();
+    let mut page = ctx
+        .data(|d| d.get_temp::<PrefsPage>(id))
+        .unwrap_or_default();
     egui::Window::new("Preferences")
         .open(open)
         .collapsible(false)
@@ -590,7 +592,11 @@ mod tests {
                 window(ctx, &mut open, &mut prefs);
             });
             assert!(open);
-            assert_eq!(prefs, Prefs::default(), "{page:?} changed a setting by drawing");
+            assert_eq!(
+                prefs,
+                Prefs::default(),
+                "{page:?} changed a setting by drawing"
+            );
         }
     }
 
