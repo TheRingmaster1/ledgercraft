@@ -51,11 +51,23 @@ fn fonts(ctx: &egui::Context) {
 fn text_styles(style: &mut egui::Style) {
     use egui::{FontFamily, FontId, TextStyle};
     style.text_styles = [
-        (TextStyle::Small, FontId::new(10.5, FontFamily::Proportional)),
+        (
+            TextStyle::Small,
+            FontId::new(10.5, FontFamily::Proportional),
+        ),
         (TextStyle::Body, FontId::new(13.5, FontFamily::Proportional)),
-        (TextStyle::Button, FontId::new(13.5, FontFamily::Proportional)),
-        (TextStyle::Heading, FontId::new(19.0, FontFamily::Proportional)),
-        (TextStyle::Monospace, FontId::new(12.5, FontFamily::Monospace)),
+        (
+            TextStyle::Button,
+            FontId::new(13.5, FontFamily::Proportional),
+        ),
+        (
+            TextStyle::Heading,
+            FontId::new(19.0, FontFamily::Proportional),
+        ),
+        (
+            TextStyle::Monospace,
+            FontId::new(12.5, FontFamily::Monospace),
+        ),
     ]
     .into();
 }
