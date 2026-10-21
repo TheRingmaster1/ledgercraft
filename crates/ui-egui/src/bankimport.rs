@@ -212,13 +212,24 @@ fn choose_file(c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
     }
 }
 
+/// Widths of the two choice boxes, and the room a one-line row needs.
+const ACTION_WIDTH: f32 = 220.0;
+const CATEGORY_WIDTH: f32 = 200.0;
+const ONE_LINE_WIDTH: f32 = 900.0;
+
 fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
     ui.add_space(8.0);
+    let wide = ui.available_width() >= ONE_LINE_WIDTH;
     egui::Grid::new("import_lines")
         .striped(true)
         .spacing([12.0, 4.0])
         .show(ui, |ui| {
-            for h in ["Date", "Payee / memo", "Amount", "Action"] {
+            let headers: &[&str] = if wide {
+                &["Date", "Payee / memo", "Amount", "Action", "Category"]
+            } else {
+                &["Date", "Payee / memo", "Amount", "Action"]
+            };
+            for h in headers {
                 widgets::column_header(ui, h);
             }
             ui.end_row();
@@ -239,6 +250,9 @@ fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
                 money_label(ui, row.line.amount, false);
                 if row.duplicate {
                     ui.label(RichText::new("Already imported").color(theme::MUTED));
+                    if wide {
+                        ui.label("");
+                    }
                     ui.end_row();
                     continue;
                 }
@@ -251,12 +265,10 @@ fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
                     (Choice::Add, _) => "Add".to_string(),
                     (Choice::Skip, _) => "Skip".to_string(),
                 };
-                // The choice, with the category under it when adding, so the row
-                // stays as narrow as the window.
-                ui.vertical(|ui| {
+                let choice = |ui: &mut Ui, row: &mut Row| {
                     egui::ComboBox::from_id_salt(("import_choice", i))
                         .selected_text(label(row.choice))
-                        .width(250.0)
+                        .width(ACTION_WIDTH)
                         .show_ui(ui, |ui| {
                             if matched.is_some() {
                                 ui.selectable_value(
@@ -272,20 +284,38 @@ fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
                             );
                             ui.selectable_value(&mut row.choice, Choice::Skip, "Skip");
                         });
+                };
+                let category = |ui: &mut Ui, row: &mut Row| {
+                    ui.horizontal(|ui| {
+                        widgets::account_combo_width(
+                            ui,
+                            ("import_category", i),
+                            c,
+                            &mut row.category,
+                            |k| !k.needs_party(),
+                            CATEGORY_WIDTH,
+                        );
+                        ui.checkbox(&mut row.remember, "Remember")
+                            .on_hover_text("Use this category for this payee next time");
+                    });
+                };
+                if wide {
+                    // One line per row: the category in its own column.
+                    choice(ui, row);
                     if row.choice == Choice::Add {
-                        ui.horizontal_wrapped(|ui| {
-                            widgets::account_combo(
-                                ui,
-                                ("import_category", i),
-                                c,
-                                &mut row.category,
-                                |k| !k.needs_party(),
-                            );
-                            ui.checkbox(&mut row.remember, "Remember")
-                                .on_hover_text("Use this category for this payee next time");
-                        });
+                        category(ui, row);
+                    } else {
+                        ui.label("");
                     }
-                });
+                } else {
+                    // Short of room: the category goes under the choice.
+                    ui.vertical(|ui| {
+                        choice(ui, row);
+                        if row.choice == Choice::Add {
+                            category(ui, row);
+                        }
+                    });
+                }
                 ui.end_row();
             }
         });

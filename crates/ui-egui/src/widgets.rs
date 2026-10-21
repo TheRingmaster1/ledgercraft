@@ -50,13 +50,25 @@ pub(crate) fn account_combo(
     value: &mut Option<AccountId>,
     allow: impl Fn(AccountType) -> bool,
 ) {
+    account_combo_width(ui, salt, c, value, allow, 230.0);
+}
+
+/// [`account_combo`] at a chosen width, for tables short of room.
+pub(crate) fn account_combo_width(
+    ui: &mut Ui,
+    salt: impl Hash + std::fmt::Debug,
+    c: &Company,
+    value: &mut Option<AccountId>,
+    allow: impl Fn(AccountType) -> bool,
+    width: f32,
+) {
     let text = (*value)
         .and_then(|id| c.account(id))
         .map(Account::display_name)
         .unwrap_or_else(|| "Choose account…".into());
     egui::ComboBox::from_id_salt(salt)
         .selected_text(text)
-        .width(230.0)
+        .width(width)
         .show_ui(ui, |ui| {
             for a in c.sorted_accounts() {
                 if a.active && allow(a.kind) {

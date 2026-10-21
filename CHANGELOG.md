@@ -42,8 +42,9 @@ fixes to a release. See docs/releasing.md.
 - Nothing is left off screen in a small window. Every page scrolls sideways
   as well as down when it has to; toolbars, button rows and memo and total
   lines wrap onto the next line; Reconcile stacks its two lists when the
-  window is narrow; and Import Bank Transactions puts the category and
-  Remember under the Add choice instead of in a far-right column.
+  window is narrow; and Import Bank Transactions keeps each line on one row,
+  with narrower Action and Category boxes, moving the category under Add
+  only when the window is too narrow for it.
 - The user interface library is upgraded from egui/eframe 0.29 to 0.37. Text
   is now drawn with font hinting (letters fitted to the screen's pixels), so
   it is noticeably sharper in every font, and many egui fixes come with it.
