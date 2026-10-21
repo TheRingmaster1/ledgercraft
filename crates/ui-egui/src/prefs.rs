@@ -216,7 +216,9 @@ const PAGE_ID: &str = "prefs_page";
 /// straight away; the app saves them.
 pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
     let id = egui::Id::NULL.with(PAGE_ID);
-    let mut page = ctx.data(|d| d.get_temp::<PrefsPage>(id)).unwrap_or_default();
+    let mut page = ctx
+        .data(|d| d.get_temp::<PrefsPage>(id))
+        .unwrap_or_default();
     egui::Window::new("Preferences")
         .open(open)
         .collapsible(false)
@@ -266,10 +268,8 @@ fn page_list(ui: &mut egui::Ui, page: &mut PrefsPage) {
                     ui.spacing_mut().item_spacing.y = 4.0;
                     for p in PrefsPage::ALL {
                         let text = RichText::new(p.label()).size(15.0).color(theme::NAV_TEXT);
-                        let item = ui.add_sized(
-                            [inner.x, 34.0],
-                            egui::Button::selectable(*page == p, text),
-                        );
+                        let item = ui
+                            .add_sized([inner.x, 34.0], egui::Button::selectable(*page == p, text));
                         if item.clicked() {
                             *page = p;
                         }
@@ -489,13 +489,12 @@ fn grey_picker(ui: &mut egui::Ui, grey: &mut u8) {
         ui.painter()
             .rect_filled(cell, 0.0, Color32::from_gray(level));
     }
-    ui.painter()
-        .rect_stroke(
-            rect,
-            2.0,
-            egui::Stroke::new(1.0_f32, theme::MUTED),
-            egui::StrokeKind::Inside,
-        );
+    ui.painter().rect_stroke(
+        rect,
+        2.0,
+        egui::Stroke::new(1.0_f32, theme::MUTED),
+        egui::StrokeKind::Inside,
+    );
     // Marker at the current level.
     let t = (hi as f32 - (*grey).clamp(lo, hi) as f32) / (hi - lo) as f32;
     let x = rect.left() + t * rect.width();
