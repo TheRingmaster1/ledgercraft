@@ -91,9 +91,8 @@ fn main() -> ExitCode {
     // APIs only, unless WGPU_BACKEND asks for something else (such as `gl` on
     // a machine without Vulkan).
     let mut setup = eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle();
-    setup.instance_descriptor.backends =
-        eframe::egui_wgpu::wgpu::Backends::from_env()
-            .unwrap_or(eframe::egui_wgpu::wgpu::Backends::PRIMARY);
+    setup.instance_descriptor.backends = eframe::egui_wgpu::wgpu::Backends::from_env()
+        .unwrap_or(eframe::egui_wgpu::wgpu::Backends::PRIMARY);
     options.wgpu_options.wgpu_setup = setup.into();
     let result = eframe::run_native(
         "LedgerCraft",
