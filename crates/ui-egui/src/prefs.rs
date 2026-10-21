@@ -53,7 +53,7 @@ impl Default for Prefs {
             hover_menus: false,
             currency: Currency::Usd,
             reopen_last: true,
-            font: Font::Classic,
+            font: Font::default(),
             text_size: TextSize::Standard,
         }
     }
@@ -236,12 +236,28 @@ fn text_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
         .spacing([12.0, 6.0])
         .show(ui, |ui| {
             ui.label("Font");
+            let shown = if prefs.font.is_available() {
+                prefs.font.label().to_string()
+            } else {
+                // Chosen on another computer: Classic is used here instead.
+                format!("{} (not on this computer)", prefs.font.label())
+            };
             egui::ComboBox::from_id_salt("prefs_font")
-                .selected_text(prefs.font.label())
-                .width(200.0)
+                .selected_text(shown)
+                .width(220.0)
+                .height(360.0)
                 .show_ui(ui, |ui| {
-                    for font in Font::ALL {
+                    ui.label(RichText::new("Included with LedgerCraft").small().color(theme::MUTED));
+                    for font in Font::BUNDLED {
                         ui.selectable_value(&mut prefs.font, font, font.label());
+                    }
+                    let installed = theme::installed();
+                    if !installed.is_empty() {
+                        ui.separator();
+                        ui.label(RichText::new("On this computer").small().color(theme::MUTED));
+                        for font in installed {
+                            ui.selectable_value(&mut prefs.font, *font, font.label());
+                        }
                     }
                 });
             ui.end_row();
@@ -264,7 +280,9 @@ fn text_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
         });
     ui.label(
         RichText::new(
-            "Changes apply straight away. Classic at Standard size is how LedgerCraft 0.2 looked.",
+            "Changes apply straight away. Fonts under \"On this computer\" are read from \
+             your system, not included with LedgerCraft. Classic at Standard size is how \
+             LedgerCraft 0.2 looked.",
         )
         .small()
         .color(theme::MUTED),
@@ -497,12 +515,12 @@ mod tests {
     }
 
     #[test]
-    fn older_files_keep_the_classic_text() {
+    fn older_files_get_the_default_text() {
         let path = temp_file("text");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, "{\"stripe_grey\": 190}").unwrap();
         let loaded = load_from(&path);
-        assert_eq!(loaded.font, Font::Classic);
+        assert_eq!(loaded.font, Font::InterLight);
         assert_eq!(loaded.text_size, TextSize::Standard);
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }

@@ -65,12 +65,16 @@ fixes to a release. See docs/releasing.md.
   columns gets one scrolling column.)
 
 ### Changed
-- Help > Preferences > Text: choose the font (Classic, the egui font
-  LedgerCraft 0.2 used; Inter; or Inter Light) and the size (Standard,
-  Larger, Largest). Changes apply to the whole app at once, with a preview,
-  and are saved with the preferences. The default stays Classic at Standard
-  size. Inter Regular and Light are bundled under the SIL Open Font License;
-  Help > Licenses has a new Inter Font tab with its licence.
+- Help > Preferences > Text: choose the font and the size (Standard, Larger,
+  Largest) for the whole app, with a preview. Included with LedgerCraft:
+  Classic (the egui font 0.2 used), Inter and Inter Light, the new default.
+  Also offered when installed on the computer, read from where the system
+  keeps them and never bundled: Segoe UI, Segoe UI Semilight, Segoe UI Light,
+  Calibri, Calibri Light, Verdana, Tahoma and Arial on Windows; DejaVu Sans,
+  Noto Sans, Liberation Sans, Ubuntu and Cantarell on Linux. A font that
+  cannot be found or read falls back to Classic instead of stopping the app.
+  Inter is bundled under the SIL Open Font License; Help > Licenses has a new
+  Inter Font tab with its licence.
 - Tutorial brought up to date: opening and changing recorded transactions
   (Fixing mistakes, Working with accounts, Reports), status bar messages that
   clear themselves and the file name on the right (Getting around), and the
