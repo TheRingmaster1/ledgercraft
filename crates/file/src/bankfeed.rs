@@ -3,8 +3,7 @@
 //! Produces [`FeedLine`]s for the ledger to match or add; it never changes
 //! the books itself.
 
-use ledgercraft_core::{Date, Money};
-use ledgercraft_ledger::FeedLine;
+use ledgercraft_ledger::{Date, FeedLine, Money};
 
 use crate::import::parse_csv;
 
