@@ -204,9 +204,10 @@ impl Font {
 pub(crate) fn installed() -> &'static [Font] {
     static FOUND: std::sync::OnceLock<Vec<Font>> = std::sync::OnceLock::new();
     FOUND.get_or_init(|| {
+        // Read each one once: a font is offered only if egui can draw it.
         Font::SYSTEM
             .into_iter()
-            .filter(|f| f.installed_file().is_some())
+            .filter(|f| f.installed_file().as_deref().and_then(read_font).is_some())
             .collect()
     })
 }
@@ -234,9 +235,21 @@ fn read_font(path: &std::path::Path) -> Option<Vec<u8>> {
     usable(&bytes).then_some(bytes)
 }
 
-/// Whether egui's font reader (skrifa) accepts these bytes.
+/// Tables holding embedded bitmap or colour glyphs. egui 0.37 draws those
+/// glyphs as images in their own colour, not the text colour, so a font that
+/// has them (such as Windows' regular Calibri) shows letters that are white
+/// or missing. Such fonts are not offered until egui handles them.
+const IMAGE_GLYPH_TABLES: [&[u8; 4]; 4] = [b"EBDT", b"CBDT", b"sbix", b"COLR"];
+
+/// Whether egui's font reader (skrifa) accepts these bytes and draws every
+/// glyph as an outline in the text colour.
 fn usable(bytes: &[u8]) -> bool {
-    skrifa::FontRef::new(bytes).is_ok()
+    let Ok(font) = skrifa::FontRef::new(bytes) else {
+        return false;
+    };
+    IMAGE_GLYPH_TABLES
+        .iter()
+        .all(|tag| font.table_data(skrifa::raw::types::Tag::new(tag)).is_none())
 }
 
 /// Text darkness, as a grey level for ordinary text: 0 is black (as in
@@ -431,6 +444,7 @@ mod tests {
 
     #[test]
     fn only_real_fonts_are_used() {
+        // Inter is outlines only, so it passes the image-glyph check too.
         assert!(usable(INTER));
         assert!(usable(INTER_LIGHT));
         assert!(!usable(b"not a font at all"));
