@@ -79,13 +79,22 @@ fn main() -> ExitCode {
         Err(e) => eprintln!("ledgercraft: could not load the app icon: {e}"),
     }
 
-    let options = eframe::NativeOptions {
+    let mut options = eframe::NativeOptions {
         // wgpu (DirectX 12 / Vulkan / Metal), not OpenGL: glutin's Windows
         // OpenGL path panics in debug builds (see Cargo.toml).
         renderer: eframe::Renderer::Wgpu,
         viewport,
         ..Default::default()
     };
+    // wgpu would also start its OpenGL backend as a fallback; on Windows its
+    // WGL start-up thread overflows its stack in debug builds. Use the native
+    // APIs only, unless WGPU_BACKEND asks for something else (such as `gl` on
+    // a machine without Vulkan).
+    let mut setup = eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle();
+    setup.instance_descriptor.backends =
+        eframe::egui_wgpu::wgpu::Backends::from_env()
+            .unwrap_or(eframe::egui_wgpu::wgpu::Backends::PRIMARY);
+    options.wgpu_options.wgpu_setup = setup.into();
     let result = eframe::run_native(
         "LedgerCraft",
         options,
