@@ -122,11 +122,23 @@ pub(crate) fn set_text(ctx: &egui::Context, font: Font, size: TextSize) {
 fn text_styles(style: &mut egui::Style, body: f32) {
     use egui::{FontFamily, FontId, TextStyle};
     style.text_styles = [
-        (TextStyle::Small, FontId::new(body - 3.5, FontFamily::Proportional)),
+        (
+            TextStyle::Small,
+            FontId::new(body - 3.5, FontFamily::Proportional),
+        ),
         (TextStyle::Body, FontId::new(body, FontFamily::Proportional)),
-        (TextStyle::Button, FontId::new(body, FontFamily::Proportional)),
-        (TextStyle::Heading, FontId::new(body + 5.5, FontFamily::Proportional)),
-        (TextStyle::Monospace, FontId::new(body - 0.5, FontFamily::Monospace)),
+        (
+            TextStyle::Button,
+            FontId::new(body, FontFamily::Proportional),
+        ),
+        (
+            TextStyle::Heading,
+            FontId::new(body + 5.5, FontFamily::Proportional),
+        ),
+        (
+            TextStyle::Monospace,
+            FontId::new(body - 0.5, FontFamily::Monospace),
+        ),
     ]
     .into();
 }
