@@ -472,7 +472,6 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
     let mut remove = None;
     let mut total = Money::ZERO;
     egui::Grid::new("inv_lines")
-        .striped(true)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             for h in [
@@ -874,7 +873,6 @@ fn account_lines(ui: &mut Ui, salt: &str, c: &Company, lines: &mut Vec<AccountLi
     let mut remove = None;
     let mut total = Money::ZERO;
     egui::Grid::new(salt)
-        .striped(true)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             for h in ["Account", "Description", "Amount", ""] {
@@ -1144,7 +1142,6 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
     let mut debits = Money::ZERO;
     let mut credits = Money::ZERO;
     egui::Grid::new("je_lines")
-        .striped(true)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             for h in ["Account", "Debit", "Credit", "Memo", "Name", ""] {

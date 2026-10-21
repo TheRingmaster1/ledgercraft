@@ -13,6 +13,8 @@ pub(crate) const POSITIVE: Color32 = Color32::from_rgb(0x2e, 0x7d, 0x4f);
 pub(crate) const WARNING: Color32 = Color32::from_rgb(0xb9, 0x6a, 0x00);
 /// The empty part of a meter.
 pub(crate) const TRACK: Color32 = Color32::from_rgb(0xdd, 0xe1, 0xe6);
+/// The outline of entry boxes, buttons and drop-downs at rest.
+pub(crate) const FIELD_BORDER: Color32 = Color32::from_rgb(0xb4, 0xba, 0xc2);
 pub(crate) const MUTED: Color32 = Color32::from_rgb(0x6b, 0x72, 0x80);
 pub(crate) const NAV_BG: Color32 = Color32::from_rgb(0x1d, 0x2b, 0x36);
 pub(crate) const NAV_TEXT: Color32 = Color32::from_rgb(0xe8, 0xee, 0xf2);
@@ -430,6 +432,10 @@ pub(crate) fn apply(ctx: &egui::Context) {
     // One dark text colour everywhere; text with its own colour (side bar,
     // links, muted hints, negative amounts) keeps it.
     v.override_text_color = Some(v.strong_text_color());
+    // Entry boxes: white with a thin outline, so they stand out on the page
+    // and on shaded rows alike (focus still shows the accent outline).
+    v.text_edit_bg_color = Some(Color32::WHITE);
+    v.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, FIELD_BORDER);
     style.visuals = v;
     style.spacing.item_spacing = egui::vec2(8.0, 6.0);
     style.spacing.button_padding = egui::vec2(10.0, 4.0);
