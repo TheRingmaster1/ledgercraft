@@ -2059,6 +2059,7 @@ dependencies = [
 name = "ledgercraft-ui-egui"
 version = "0.2.0"
 dependencies = [
+ "ab_glyph",
  "eframe",
  "ledgercraft-core",
  "ledgercraft-engine",

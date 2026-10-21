@@ -374,7 +374,10 @@ mod tests {
         }
         // Whatever this computer has must load (or the test machine has none).
         for font in installed() {
-            assert!(font.data().is_some(), "{font:?} was listed but cannot be read");
+            assert!(
+                font.data().is_some(),
+                "{font:?} was listed but cannot be read"
+            );
             let ctx = egui::Context::default();
             set_text(&ctx, *font, TextSize::Standard);
             let _ = ctx.run(egui::RawInput::default(), |ctx| {
