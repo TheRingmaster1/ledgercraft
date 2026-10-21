@@ -1,4 +1,4 @@
-use ledgercraft_core::Date;
+use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
     AccountId, AccountType, Company, Contact, CustomerId, ItemSpec, LedgerResult, TxnBody, TxnId,
     VendorId,
@@ -65,6 +65,15 @@ pub enum Command {
     },
     #[serde(rename = "txn.void")]
     TxnVoid { id: TxnId },
+    #[serde(rename = "account.reconcile")]
+    AccountReconcile {
+        account: AccountId,
+        statement_date: Date,
+        ending_balance: Money,
+        cleared: Vec<TxnId>,
+    },
+    #[serde(rename = "account.undoReconciliation")]
+    AccountUndoReconciliation { account: AccountId },
 }
 
 /// One row of the command catalog shown by `ledgercraft-cli commands`.
@@ -87,6 +96,8 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "txn.post", summary: "Record a transaction. {date, number?, memo?, body:{type: invoice|receive_payment|bill|pay_bill|check|deposit|journal, …}}" },
     CommandInfo { id: "txn.update", summary: "Edit a recorded transaction; it keeps its id and type. {id, date, number?, memo?, body}" },
     CommandInfo { id: "txn.void", summary: "Void a transaction (it stays on file). {id}" },
+    CommandInfo { id: "account.reconcile", summary: "Reconcile a bank or credit card account against a statement; the cleared items must match the ending balance exactly. {account, statement_date, ending_balance, cleared:[txn ids]}" },
+    CommandInfo { id: "account.undoReconciliation", summary: "Undo an account's last reconciliation. {account}" },
 ];
 
 impl Command {
@@ -105,6 +116,8 @@ impl Command {
             Self::TxnPost { .. } => "txn.post",
             Self::TxnUpdate { .. } => "txn.update",
             Self::TxnVoid { .. } => "txn.void",
+            Self::AccountReconcile { .. } => "account.reconcile",
+            Self::AccountUndoReconciliation { .. } => "account.undoReconciliation",
         }
     }
 
@@ -125,6 +138,8 @@ impl Command {
             Self::TxnPost { body, .. } => body.label().to_string(),
             Self::TxnUpdate { body, .. } => format!("Edit {}", body.label()),
             Self::TxnVoid { id } => format!("Void {id}"),
+            Self::AccountReconcile { .. } => "Reconcile".into(),
+            Self::AccountUndoReconciliation { .. } => "Undo Reconciliation".into(),
         }
     }
 
@@ -199,6 +214,19 @@ impl Command {
             }
             Self::TxnVoid { id } => {
                 c.void(id)?;
+                None
+            }
+            Self::AccountReconcile {
+                account,
+                statement_date,
+                ending_balance,
+                cleared,
+            } => {
+                c.reconcile(account, statement_date, ending_balance, cleared)?;
+                None
+            }
+            Self::AccountUndoReconciliation { account } => {
+                c.undo_last_reconciliation(account)?;
                 None
             }
         })

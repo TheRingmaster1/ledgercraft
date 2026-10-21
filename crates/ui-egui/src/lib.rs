@@ -13,6 +13,7 @@ mod licenses;
 mod pages;
 mod prefs;
 mod recent;
+mod reconcile;
 mod security;
 mod start;
 mod theme;
@@ -35,6 +36,7 @@ pub(crate) enum Page {
     Items,
     Transactions,
     Reports,
+    Reconcile,
     Form(FormKind),
 }
 
@@ -84,6 +86,8 @@ pub(crate) enum Action {
         reset: Reset,
     },
     Go(Page),
+    /// Open Reconcile for this account.
+    Reconcile(AccountId),
     InvoiceFor(CustomerId),
     PaymentFrom(CustomerId),
     BillFrom(VendorId),

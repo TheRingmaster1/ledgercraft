@@ -384,9 +384,21 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
 }
 
 pub(crate) fn register(ui: &mut Ui, c: &Company, account: AccountId, out: &mut Vec<Action>) {
-    if ui.link("< Back to Chart of Accounts").clicked() {
-        out.push(Action::Go(Page::Accounts));
-    }
+    ui.horizontal(|ui| {
+        if ui.link("< Back to Chart of Accounts").clicked() {
+            out.push(Action::Go(Page::Accounts));
+        }
+        if c.can_reconcile(account) {
+            ui.add_space(16.0);
+            if ui
+                .link("Reconcile")
+                .on_hover_text("Check this account against its statement")
+                .clicked()
+            {
+                out.push(Action::Reconcile(account));
+            }
+        }
+    });
     let report = account_register(c, account);
     widgets::report_view(ui, &report, out);
 }

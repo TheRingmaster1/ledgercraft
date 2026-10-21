@@ -11,6 +11,7 @@ mod error;
 mod ids;
 mod item;
 mod party;
+mod reconcile;
 mod template;
 mod txn;
 
@@ -20,6 +21,7 @@ pub use error::{LedgerError, LedgerResult};
 pub use ids::{AccountId, CustomerId, ItemId, TxnId, VendorId};
 pub use item::{Item, ItemKind, ItemSpec};
 pub use party::{Address, Contact, Customer, Party, Vendor};
+pub use reconcile::{ReconcileItem, Reconciliation};
 pub use template::{default_chart_of_accounts, AccountTemplate};
 pub use txn::{
     AccountLine, Applied, Bill, Check, Deposit, Invoice, JournalEntry, JournalLine, PayBill,

@@ -264,7 +264,7 @@ pub fn account_register(company: &Company, account: AccountId) -> Report {
         &format!("Register: {name}"),
         &company.info.name,
         "All dates".into(),
-        &["Type", "Num", "Name", "Memo", "Amount", "Balance"],
+        &["Type", "Num", "Name", "Memo", "Amount", "Balance", "Rec"],
     );
     r.label_header = "Date".into();
     let Some(acct) = company.account(account) else {
@@ -300,6 +300,12 @@ pub fn account_register(company: &Company, account: AccountId) -> Report {
                 Cell::Text(memo),
                 Cell::Money(amount),
                 Cell::Money(balance),
+                // R: reconciled against a statement.
+                Cell::Text(if company.is_reconciled(t.id, account) {
+                    "R".into()
+                } else {
+                    String::new()
+                }),
             ],
             t.id,
         );
@@ -339,6 +345,86 @@ pub fn transaction_list(company: &Company, from: Date, to: Date) -> Report {
             ],
             t.id,
         );
+    }
+    r
+}
+
+/// One reconciliation of a bank or credit card account (`index`, oldest
+/// first): the beginning balance, the items it cleared, the cleared balance
+/// that matched the statement, and what was still uncleared on that date.
+pub fn reconciliation_report(company: &Company, account: AccountId, index: usize) -> Report {
+    let name = company.account_name(account);
+    let recs = company.reconciliations_for(account);
+    let Some(rec) = recs.get(index) else {
+        return Report::new(
+            &format!("Reconciliation: {name}"),
+            &company.info.name,
+            "Not found".into(),
+            &["Type", "Num", "Name", "Amount"],
+        );
+    };
+    let mut r = Report::new(
+        &format!("Reconciliation: {name}"),
+        &company.info.name,
+        format!("Statement ending {}", rec.statement_date),
+        &["Type", "Num", "Name", "Amount"],
+    );
+    r.label_header = "Date".into();
+    let row = |r: &mut Report, id: ledgercraft_ledger::TxnId, amount: Money| {
+        let Some(t) = company.txn(id) else {
+            return;
+        };
+        let party = t
+            .body
+            .party()
+            .map(|p| company.party_name(p))
+            .unwrap_or_default();
+        r.txn_line(
+            &t.date.to_string(),
+            vec![
+                Cell::Text(company.txn_type_label(t).into()),
+                Cell::Text(t.number.clone()),
+                Cell::Text(party),
+                Cell::Money(amount),
+            ],
+            id,
+        );
+    };
+    let amount_of = |id: ledgercraft_ledger::TxnId| {
+        company
+            .txn(id)
+            .and_then(|t| company.amount_in(&t.body, account))
+            .unwrap_or(Money::ZERO)
+    };
+    r.money(RowKind::Detail, "Beginning balance", 0, &[rec.beginning_balance], None);
+    let mut cleared: Vec<_> = rec.cleared.iter().map(|id| (*id, amount_of(*id))).collect();
+    cleared.sort_by_key(|(id, _)| (company.txn(*id).map(|t| t.date), *id));
+    for (title, increases) in [("Cleared increases", true), ("Cleared decreases", false)] {
+        let items: Vec<_> = cleared
+            .iter()
+            .filter(|(_, a)| a.is_positive() == increases && !a.is_zero())
+            .collect();
+        if items.is_empty() {
+            continue;
+        }
+        r.section(title, 0);
+        for (id, amount) in &items {
+            row(&mut r, *id, *amount);
+        }
+        let total = sum(items.iter().map(|(_, a)| *a));
+        r.money(RowKind::Subtotal, &format!("Total {}", title.to_lowercase()), 0, &[total], None);
+    }
+    r.money(RowKind::Total, "Cleared balance", 0, &[rec.ending_balance], None);
+    r.money(RowKind::Detail, "Statement ending balance", 0, &[rec.ending_balance], None);
+    // What had not cleared by the statement date (and is still not reconciled).
+    let uncleared = company.unreconciled(account, rec.statement_date);
+    if !uncleared.is_empty() {
+        r.section(&format!("Uncleared as of {}", rec.statement_date), 0);
+        for item in &uncleared {
+            row(&mut r, item.txn, item.amount);
+        }
+        let total = sum(uncleared.iter().map(|i| i.amount));
+        r.money(RowKind::Subtotal, "Total uncleared", 0, &[total], None);
     }
     r
 }

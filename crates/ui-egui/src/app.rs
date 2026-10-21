@@ -10,6 +10,7 @@ use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
 use crate::recent::{AppState, WindowState};
+use crate::reconcile::{self, ReconcileState};
 use crate::security::{
     self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice,
 };
@@ -46,6 +47,7 @@ pub struct LedgerApp {
     forms: Forms,
     lists: ListState,
     reports: ReportState,
+    reconcile: ReconcileState,
     status: String,
     status_is_error: bool,
     /// When the status message appeared (egui time, seconds); `None` until
@@ -158,6 +160,7 @@ impl LedgerApp {
             forms: Forms::default(),
             lists: ListState::default(),
             reports: ReportState::default(),
+            reconcile: ReconcileState::default(),
             status: "Ready".into(),
             status_is_error: false,
             status_since: None,
@@ -420,6 +423,7 @@ impl LedgerApp {
         }
         self.forms = Forms::default();
         self.lists = ListState::default();
+        self.reconcile = ReconcileState::default();
         self.page = Page::Home;
     }
 
@@ -430,6 +434,7 @@ impl LedgerApp {
         self.password = None;
         self.forms = Forms::default();
         self.lists = ListState::default();
+        self.reconcile = ReconcileState::default();
         self.page = Page::Home;
     }
 
@@ -568,6 +573,10 @@ impl LedgerApp {
                 }
             }
             Action::Go(page) => self.page = page,
+            Action::Reconcile(account) => {
+                self.reconcile.start(account);
+                self.page = Page::Reconcile;
+            }
             Action::InvoiceFor(id) => {
                 self.forms.invoice.customer = Some(id);
                 let terms = self
@@ -874,6 +883,11 @@ impl LedgerApp {
                                 self.page = Page::Form(kind);
                             }
                         }
+                        ui.separator();
+                        if ui.button("Reconcile…").clicked() {
+                            ui.close();
+                            self.page = Page::Reconcile;
+                        }
                     })
                     .response,
                 );
@@ -960,7 +974,7 @@ impl LedgerApp {
                     });
                 });
                 ui.add_space(12.0);
-                let items: [(&str, Page); 8] = [
+                let items: [(&str, Page); 9] = [
                     ("Home", Page::Home),
                     ("Chart of Accounts", Page::Accounts),
                     ("Customers", Page::Customers),
@@ -968,6 +982,7 @@ impl LedgerApp {
                     ("Products & Services", Page::Items),
                     ("Transactions", Page::Transactions),
                     ("Reports", Page::Reports),
+                    ("Reconcile", Page::Reconcile),
                     ("Journal Entry", Page::Form(FormKind::Journal)),
                 ];
                 for (label, page) in items {
@@ -1340,6 +1355,7 @@ impl eframe::App for LedgerApp {
                 Page::Vendors => pages::vendors(ui, company, &mut self.lists, &mut actions),
                 Page::Transactions => pages::transactions(ui, company, &mut actions),
                 Page::Reports => pages::reports(ui, company, &mut self.reports, &mut actions),
+                Page::Reconcile => reconcile::page(ui, company, &mut self.reconcile, &mut actions),
                 _ => {
                     let stripe = self.prefs.stripe();
                     let salt = ("page", format!("{page:?}"));

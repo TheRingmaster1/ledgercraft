@@ -12,7 +12,8 @@ mod xlsx;
 pub use aging::{ap_aging, ar_aging};
 pub use report::{Cell, Report, Row, RowKind};
 pub use statements::{
-    account_register, balance_sheet, profit_and_loss, transaction_list, trial_balance,
+    account_register, balance_sheet, profit_and_loss, reconciliation_report, transaction_list,
+    trial_balance,
 };
 
 /// The reports the app offers, for menus and the CLI.

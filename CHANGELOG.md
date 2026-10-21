@@ -7,6 +7,20 @@ fixes to a release. See docs/releasing.md.
 
 ## [Unreleased]
 
+### Added
+- Bank and credit card reconciliation (Banking > Reconcile, the side bar, or
+  the Reconcile link on a bank or credit card register). Enter the statement
+  date and ending balance, tick the items on the statement in two lists
+  (money in, money out; Mark All / Unmark All), and Reconcile Now becomes
+  available when the Difference is $0.00. A reconciliation report (beginning
+  balance, cleared items, cleared balance, items still uncleared) opens
+  afterwards, and earlier ones can be reopened and exported to Excel or CSV.
+  Registers show R beside reconciled items. A reconciled transaction cannot be
+  voided or have its amount in that account changed until Undo Last
+  Reconciliation. New engine commands `account.reconcile` and
+  `account.undoReconciliation`; company files keep their reconciliations
+  (older files open with none). A new tutorial lesson explains it.
+
 ### Changed
 - The user interface library is upgraded from egui/eframe 0.29 to 0.37. Text
   is now drawn with font hinting (letters fitted to the screen's pixels), so

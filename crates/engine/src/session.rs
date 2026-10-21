@@ -331,6 +331,29 @@ mod tests {
     }
 
     #[test]
+    fn reconciling_through_the_session_can_be_undone() {
+        use ledgercraft_core::{Date, Money};
+        let mut s = Session::new(crate::sample_company().unwrap());
+        let checking = s.company().account_by_name("Checking").unwrap().id;
+        let through = Date::parse("2099-12-31").unwrap();
+        let items = s.company().unreconciled(checking, through);
+        assert!(!items.is_empty());
+        let ending = items
+            .iter()
+            .fold(Money::ZERO, |total, i| total.saturating_add(i.amount));
+        s.execute(crate::Command::AccountReconcile {
+            account: checking,
+            statement_date: through,
+            ending_balance: ending,
+            cleared: items.iter().map(|i| i.txn).collect(),
+        })
+        .unwrap();
+        assert_eq!(s.company().reconciled_balance(checking), ending);
+        assert_eq!(s.undo().as_deref(), Some("Reconcile"));
+        assert!(s.company().reconciliations.is_empty());
+    }
+
+    #[test]
     fn sample_company_is_valid() {
         let c = crate::sample_company().unwrap();
         assert!(c.transactions.len() > 10);

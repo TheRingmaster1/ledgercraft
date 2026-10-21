@@ -52,6 +52,25 @@ transaction, with these extra rules:
 Undo restores the transaction as it was. There is no change history in the
 file yet; an audit trail report is planned (ROADMAP M2.7).
 
+## Reconciliation
+
+A reconciliation compares a bank or credit card account with its statement.
+Amounts use the account's own sign: for a bank, money in is positive and
+money out negative; for a credit card, charges are positive and payments
+negative, so the ending balance is what the statement says you owe.
+
+* The beginning balance is the previous reconciliation's ending balance
+  (zero for the first).
+* Cleared balance = beginning balance + the ticked items. A reconciliation is
+  recorded only when it equals the statement's ending balance exactly.
+* Ticked items must be live, touch the account, not be reconciled already, and
+  be dated on or before the statement date, which cannot be earlier than the
+  last reconciliation's.
+* Reconciled transactions are protected: they cannot be voided, and an edit
+  cannot change what they move the reconciled account by (other details,
+  such as the memo, can change). Undo Last Reconciliation removes the most
+  recent reconciliation of an account and frees its items.
+
 ## Balance Sheet equity
 
 Income and expense from before the start of the current fiscal year are rolled
