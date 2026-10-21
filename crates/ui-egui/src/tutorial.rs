@@ -488,7 +488,8 @@ const LESSONS: &[Lesson] = &[
                 "Bank reconciliation, importing bank \
                  statements, sales tax, printable invoices and more. See ROADMAP.md in the \
                  project for the plan. Help > Licenses and Help > About explain the open- \
-                 source licence.",
+                 source licence (and the licence of Inter, the font LedgerCraft's text is \
+                 set in).",
             ),
         ],
         try_it: &[],

@@ -25,8 +25,45 @@ pub(crate) fn nav_visuals(ui: &mut egui::Ui) {
     v.widgets.active.weak_bg_fill = ACCENT;
 }
 
+/// Inter, the text font, by Rasmus Andersson. SIL Open Font License 1.1;
+/// see assets/fonts/OFL.txt and ATTRIBUTION.md.
+const INTER: &[u8] = include_bytes!("../../../assets/fonts/Inter-Regular.ttf");
+/// The font's licence, which must travel with it (shown in Help > Licenses).
+pub(crate) const INTER_LICENSE: &str = include_str!("../../../assets/fonts/OFL.txt");
+
+/// Inter for all text, the same on every system. egui's own fonts stay
+/// behind it for any character Inter lacks, and for monospace.
+fn fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    fonts
+        .font_data
+        .insert("Inter".to_owned(), egui::FontData::from_static(INTER));
+    fonts
+        .families
+        .entry(egui::FontFamily::Proportional)
+        .or_default()
+        .insert(0, "Inter".to_owned());
+    ctx.set_fonts(fonts);
+}
+
+/// Text sizes in points. Slightly larger than egui's defaults: small text
+/// drawn without hinting reads better with a little more room.
+fn text_styles(style: &mut egui::Style) {
+    use egui::{FontFamily, FontId, TextStyle};
+    style.text_styles = [
+        (TextStyle::Small, FontId::new(10.5, FontFamily::Proportional)),
+        (TextStyle::Body, FontId::new(13.5, FontFamily::Proportional)),
+        (TextStyle::Button, FontId::new(13.5, FontFamily::Proportional)),
+        (TextStyle::Heading, FontId::new(19.0, FontFamily::Proportional)),
+        (TextStyle::Monospace, FontId::new(12.5, FontFamily::Monospace)),
+    ]
+    .into();
+}
+
 pub(crate) fn apply(ctx: &egui::Context) {
+    fonts(ctx);
     let mut style = (*ctx.style()).clone();
+    text_styles(&mut style);
     let mut v = egui::Visuals::light();
     v.selection.bg_fill = ACCENT_SOFT;
     v.selection.stroke.color = ACCENT;
@@ -38,4 +75,30 @@ pub(crate) fn apply(ctx: &egui::Context) {
     style.spacing.item_spacing = egui::vec2(8.0, 6.0);
     style.spacing.button_padding = egui::vec2(10.0, 4.0);
     ctx.set_style(style);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inter_is_a_truetype_font_with_its_licence() {
+        // TrueType outlines start with version 1.0 (00 01 00 00).
+        assert_eq!(INTER.get(..4), Some(&[0, 1, 0, 0][..]));
+        assert!(INTER_LICENSE.contains("SIL OPEN FONT LICENSE"));
+    }
+
+    #[test]
+    fn text_lays_out_in_inter() {
+        let ctx = egui::Context::default();
+        apply(&ctx);
+        let _ = ctx.run(egui::RawInput::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.label("Accounts Receivable $1,234.56 • € £ …");
+            });
+        });
+        let style = ctx.style();
+        let body = style.text_styles.get(&egui::TextStyle::Body);
+        assert_eq!(body.map(|f| f.size), Some(13.5));
+    }
 }

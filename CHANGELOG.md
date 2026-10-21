@@ -65,6 +65,11 @@ fixes to a release. See docs/releasing.md.
   columns gets one scrolling column.)
 
 ### Changed
+- Text is set in Inter, a typeface designed for screens, on every system,
+  and is slightly larger (body text 13.5 pt, was 12.5), so it looks smoother
+  and less choppy than egui's built-in thin font. Inter is bundled under the
+  SIL Open Font License; Help > Licenses has a new Inter Font tab with its
+  licence. egui's fonts stay as a fallback for any missing character.
 - Tutorial brought up to date: opening and changing recorded transactions
   (Fixing mistakes, Working with accounts, Reports), status bar messages that
   clear themselves and the file name on the right (Getting around), and the
