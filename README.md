@@ -8,9 +8,9 @@ double-entry ledger; the Profit & Loss, Balance Sheet, Trial Balance and aging
 reports read straight from it. Your books live in one open, documented file you
 own. No subscription, no licence server, no telemetry.
 
-> **Status: pre-alpha (0.2), Windows first.** Builds and releases currently
-> target Windows 10/11 (x64). The code stays portable, but macOS and Linux are
-> not tested or shipped until the Windows build is solid.
+> **Status: pre-alpha (0.2).** Tested and supported on **Windows 10/11 (x64)**
+> and **Linux (x86_64)**. **macOS** is being tested; it should build from
+> source, but there is no macOS release package yet.
 >
 > **Pre-alpha:** Use it to learn, test and contribute. Keep your
 > real books in your existing software until LedgerCraft reaches beta.
@@ -25,9 +25,10 @@ own. No subscription, no licence server, no telemetry.
 * **Correct by construction.** Money is exact integer cents, never floating
   point. Every form becomes balanced double-entry postings and is validated
   before it touches the books. A failed command changes nothing.
-* **Yours.** Company files are plain JSON in a documented format
-  ([docs/file-format.md](docs/file-format.md)), saved atomically so a crash or
-  power cut can never leave half a file.
+* **Yours.** Company files use an open, documented format
+  ([docs/file-format.md](docs/file-format.md)): JSON inside password-based
+  encryption, saved atomically so a crash or power cut can never leave half a
+  file.
 * **Scriptable.** Every change is a command. The desktop app, the CLI and
   (soon) an MCP server for agents all run the same commands.
 * **Native and fast.** One Rust codebase for Windows, macOS and Linux. No
@@ -35,13 +36,51 @@ own. No subscription, no licence server, no telemetry.
 
 ## Quick start
 
-### Requirements (Windows 10/11, x64)
+### Requirements
+
+#### Windows 10/11 (x64)
 
 | Requirement | Version | Notes |
 |---|---|---|
 | [Rust](https://rustup.rs) (stable, MSVC toolchain) | **1.88 or newer** | `rustup update stable` to upgrade; `rustc --version` to check |
 | Microsoft C++ Build Tools | 2019 or newer | The "Desktop development with C++" workload; provides the linker and the resource compiler that embeds the app icon |
 | Graphics | DirectX 12 (or Vulkan) | Drawn with wgpu. If the window is blank or slow, run `$env:WGPU_BACKEND="vulkan"` first |
+
+#### Linux (x86_64)
+
+| Requirement | Version | Notes |
+|---|---|---|
+| [Rust](https://rustup.rs) (stable) | **1.88 or newer** | From `rustup`, or your distribution's `rustup` package |
+| C compiler and linker | any | `base-devel` (Arch), `build-essential` (Debian/Ubuntu), `gcc` (Fedora) |
+| Window system libraries | — | xkbcommon, Wayland and X11 (Xcursor, Xrandr, Xi); see the commands below |
+| Graphics | Vulkan | The driver for your graphics card; in a virtual machine, the Mesa software driver (lavapipe). If the window does not appear, try `WGPU_BACKEND=gl` |
+| File dialogs | xdg-desktop-portal | Plus the backend for your desktop (GNOME, KDE, GTK for XFCE/Sway/i3, Hyprland). Without it, Open and Save dialogs do not appear |
+
+```sh
+# Arch
+sudo pacman -S --needed base-devel git rustup libxkbcommon wayland libx11 libxcursor \
+  libxrandr libxi vulkan-icd-loader xdg-desktop-portal xdg-desktop-portal-gtk
+# plus one of: vulkan-radeon, vulkan-intel, nvidia-utils, vulkan-swrast (virtual machine)
+
+# Debian / Ubuntu
+sudo apt install build-essential git curl libxkbcommon-dev libwayland-dev libx11-dev \
+  libxcursor-dev libxrandr-dev libxi-dev mesa-vulkan-drivers xdg-desktop-portal xdg-desktop-portal-gtk
+
+# Fedora
+sudo dnf install gcc git libxkbcommon-devel wayland-devel libX11-devel libXcursor-devel \
+  libXrandr-devel libXi-devel mesa-vulkan-drivers xdg-desktop-portal xdg-desktop-portal-gtk
+```
+
+Then install Rust with `rustup default stable` (Arch) or from
+[rustup.rs](https://rustup.rs). Preferences are saved in
+`~/.config/ledgercraft/`.
+
+#### macOS (in testing)
+
+Rust 1.88 or newer and the Xcode command-line tools (`xcode-select --install`).
+Drawn with Metal. Reports from Mac users are welcome.
+
+#### All platforms
 
 Rust 1.88 is the minimum because of the Excel export library
 (`rust_xlsxwriter`) and the clippy lints the project builds with; it is set as
@@ -51,7 +90,9 @@ few minutes; later builds take seconds.
 
 ### Build and run
 
-```powershell
+The same commands work in PowerShell (Windows) and a terminal (Linux, macOS):
+
+```sh
 git clone https://github.com/TheRingmaster1/ledgercraft
 cd ledgercraft
 cargo run --release -p ledgercraft -- --sample          # the desktop app with the sample company
@@ -62,6 +103,20 @@ cargo xtask ci                                          # fmt, clippy, tests, la
 
 Keep the source folder outside OneDrive and other synced folders: syncing the
 `target` build folder slows builds and can lock files.
+
+### Installing a release
+
+Download the package for your system from
+[Releases](https://github.com/TheRingmaster1/ledgercraft/releases):
+
+* **Windows:** `ledgercraft-<version>-x86_64-pc-windows-msvc.zip`. Unzip it and
+  run `ledgercraft.exe`. The app is not code-signed yet, so SmartScreen may ask
+  you to confirm (More info → Run anyway).
+* **Linux:** `ledgercraft-<version>-x86_64-unknown-linux-gnu.tar.gz`. Unpack it
+  and run `./install.sh` to add LedgerCraft to your Applications menu for your
+  user (no root needed; `./install.sh --uninstall` removes it), or run
+  `./ledgercraft` directly. It needs the graphics and file dialog packages
+  listed above.
 
 Command line:
 
@@ -77,12 +132,15 @@ ledgercraft-cli commands                                # every command and its 
 
 | Area | Highlights |
 |------|-----------|
-| Company | New company with a starter chart of accounts, sample company, fiscal year start, open/save/save as, unsaved-changes guard, undo/redo (200 steps) |
+| Company | Start page, Create a Company window (standard or empty chart of accounts), sample company, fiscal year start, open/save/save as/close, unsaved-changes guard, undo/redo (200 steps) |
+| Security | Password-protected, encrypted company files; older files upgrade in place |
+| Import | Accounts, customers, vendors and products/services from IIF or CSV when creating a company |
 | Lists | Chart of accounts (15 account types, active/inactive), customers, vendors (contact, address, terms), products and services |
 | Customers | Create invoices (items, qty × rate, per-line income account, due date from terms, auto-numbering), receive payments applied to open invoices, Undeposited Funds, make deposits |
 | Vendors | Enter bills, pay bills applied to open bills |
 | Banking | Write checks / expenses (bank or credit card), deposits, journal entries with names on AR/AP lines |
-| Reports | Profit & Loss, Balance Sheet (retained earnings rolled forward by fiscal year), Trial Balance, A/R and A/P Aging, Transaction List, account registers; CSV export |
+| Reports | Profit & Loss, Balance Sheet (retained earnings rolled forward by fiscal year), Trial Balance, A/R and A/P Aging, Transaction List, account registers; CSV and Excel export, currency symbol of your choice |
+| Help | Thirteen-lesson tutorial with "Try it" buttons, hover help, Preferences |
 | Safety | Void instead of delete (audit trail), payments block voiding the invoices they pay, all-or-nothing commands, atomic saves |
 
 The honest picture, and what comes next, is in [ROADMAP.md](ROADMAP.md).

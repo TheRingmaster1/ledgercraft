@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LedgerCraft
+GenericName=Accounting
+Comment=Open-source small-business accounting
+Exec=ledgercraft %f
+Icon=ledgercraft
+Terminal=false
+Categories=Office;Finance;
+Keywords=accounting;bookkeeping;invoices;ledger;
+StartupWMClass=ledgercraft

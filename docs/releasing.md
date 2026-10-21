@@ -27,8 +27,10 @@ automatically from `main`.
    git push origin v0.2.0
    ```
 6. The Release workflow (`.github/workflows/release.yml`) checks that the tag
-   matches the version in `Cargo.toml`, builds Windows, macOS and Linux
-   binaries, and creates a **draft** GitHub Release with them attached.
+   matches the version in `Cargo.toml`, builds the Windows (`.zip`) and Linux
+   (`.tar.gz`, with `install.sh`, a desktop entry and the icon) packages, and
+   creates a **draft** GitHub Release with them and `SHA256SUMS.txt`
+   attached. macOS joins once it has been tested.
 7. Review the draft on GitHub (Releases), paste the changelog section into the
    notes, and press **Publish release**.
 
@@ -36,4 +38,5 @@ automatically from `main`.
 
 * Code signing (Windows Authenticode, macOS notarization). Until then, Windows
   SmartScreen and macOS Gatekeeper will warn that the app is unsigned.
-* Installers (MSI, DMG, AppImage, deb/rpm). Releases ship zipped binaries.
+* Installers (MSI, DMG, AppImage, AUR PKGBUILD, deb/rpm). Releases ship a
+  zip for Windows and a tarball with a per-user `install.sh` for Linux.

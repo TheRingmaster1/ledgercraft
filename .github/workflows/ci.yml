@@ -5,10 +5,17 @@ on:
   pull_request:
 jobs:
   ci:
-    # Windows only for now; macOS and Linux return after the Windows build is solid.
-    runs-on: windows-latest
+    # Windows and Linux are supported; macOS joins after it has been tested.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy

@@ -66,6 +66,9 @@ fn main() -> ExitCode {
 
     let mut viewport = egui::ViewportBuilder::default()
         .with_title("LedgerCraft")
+        // Linux: the Wayland app id and X11 window class, which desktops use to
+        // match the window to ledgercraft.desktop and its icon. Ignored elsewhere.
+        .with_app_id("ledgercraft")
         // The minimum size is set by `LedgerApp` once the window's
         // monitor scale is known (see `LedgerApp::fit_window`).
         .with_inner_size([1280.0, 800.0]);

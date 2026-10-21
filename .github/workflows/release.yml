@@ -29,10 +29,18 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: .exe
-          # macOS and Linux targets return after the Windows build is solid.
+          # Built on the oldest supported Ubuntu so the binary runs on older
+          # glibc too (Debian 12, Ubuntu 22.04 and newer, Fedora, Arch).
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+          # macOS returns after it has been tested on a Mac.
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -46,6 +54,11 @@ jobs:
           cp "target/${{ matrix.target }}/release/ledgercraft${{ matrix.ext }}" "$name/"
           cp "target/${{ matrix.target }}/release/ledgercraft-cli${{ matrix.ext }}" "$name/"
           cp README.md CHANGELOG.md LICENSE-MIT LICENSE-APACHE NOTICE "$name/"
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            cp packaging/linux/ledgercraft.desktop packaging/linux/install.sh "$name/"
+            cp assets/app-icon/ledgercraft-256.png "$name/ledgercraft.png"
+            chmod +x "$name/install.sh" "$name/ledgercraft" "$name/ledgercraft-cli"
+          fi
           if [ "${{ runner.os }}" = "Windows" ]; then
             7z a "$name.zip" "$name" > /dev/null
           else

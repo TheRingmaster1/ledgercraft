@@ -7,6 +7,21 @@ fixes to a release. See docs/releasing.md.
 
 ## [Unreleased]
 
+### Added
+- Linux is tested and supported (x86_64; first run on Arch Linux with XFCE).
+  CI now runs every gate on Linux as well as Windows, and releases include
+  `ledgercraft-<version>-x86_64-unknown-linux-gnu.tar.gz` with an `install.sh`
+  that adds LedgerCraft to the Applications menu with its icon for the
+  current user.
+- The window identifies itself as `ledgercraft` to Linux desktops, so the
+  taskbar and dock match it to the menu entry and icon (including Wayland).
+
+### Changed
+- README: requirements for Linux (Arch, Debian/Ubuntu and Fedora packages)
+  and macOS (in testing), how to install a release, and an updated "What works
+  today" table. ROADMAP updated for 0.2 and the new platforms, with a
+  security hardening list.
+
 ## [0.2.0] - 2026-10-21
 
 Highlights: password-protected, encrypted company files (with an upgrade path
