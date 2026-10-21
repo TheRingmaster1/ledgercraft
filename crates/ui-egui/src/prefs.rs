@@ -12,7 +12,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::currency::Currency;
-use crate::theme;
+use crate::theme::{self, Font, TextSize};
 
 const FILE_NAME: &str = "preferences.json";
 /// Far more than any preferences file needs; anything bigger is not ours.
@@ -40,6 +40,9 @@ pub(crate) struct Prefs {
     pub(crate) currency: Currency,
     /// Open the company that was open last when the app starts.
     pub(crate) reopen_last: bool,
+    /// The text font and size.
+    pub(crate) font: Font,
+    pub(crate) text_size: TextSize,
 }
 
 impl Default for Prefs {
@@ -50,6 +53,8 @@ impl Default for Prefs {
             hover_menus: false,
             currency: Currency::Usd,
             reopen_last: true,
+            font: Font::Classic,
+            text_size: TextSize::Standard,
         }
     }
 }
@@ -191,6 +196,11 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
                 currency_section(ui, prefs);
             }
             ui.add_space(6.0);
+            if section_header(ui, "prefs_text_selected", "Text") {
+                ui.add_space(4.0);
+                text_section(ui, prefs);
+            }
+            ui.add_space(6.0);
             if section_header(ui, "prefs_files_selected", "Files") {
                 ui.add_space(4.0);
                 crate::assoc::section(ui);
@@ -217,6 +227,48 @@ fn section_header(ui: &mut egui::Ui, key: &str, label: &str) -> bool {
         }
     });
     open
+}
+
+/// The text font and size, applied to the whole app straight away.
+fn text_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
+    egui::Grid::new("prefs_text")
+        .num_columns(2)
+        .spacing([12.0, 6.0])
+        .show(ui, |ui| {
+            ui.label("Font");
+            egui::ComboBox::from_id_salt("prefs_font")
+                .selected_text(prefs.font.label())
+                .width(200.0)
+                .show_ui(ui, |ui| {
+                    for font in Font::ALL {
+                        ui.selectable_value(&mut prefs.font, font, font.label());
+                    }
+                });
+            ui.end_row();
+            ui.label("Size");
+            ui.horizontal(|ui| {
+                for size in TextSize::ALL {
+                    ui.radio_value(&mut prefs.text_size, size, size.label());
+                }
+            });
+            ui.end_row();
+        });
+    ui.add_space(4.0);
+    egui::Frame::none()
+        .stroke(egui::Stroke::new(1.0_f32, theme::MUTED))
+        .inner_margin(6.0)
+        .show(ui, |ui| {
+            ui.set_width(PREVIEW_WIDTH);
+            ui.label("Invoice 1001 for Pine Ridge Woodworks: $1,234.56");
+            ui.label(RichText::new("Due in 30 days.").small().color(theme::MUTED));
+        });
+    ui.label(
+        RichText::new(
+            "Changes apply straight away. Classic at Standard size is how LedgerCraft 0.2 looked.",
+        )
+        .small()
+        .color(theme::MUTED),
+    );
 }
 
 /// The currency amounts are shown in, with a preview.
@@ -354,6 +406,8 @@ mod tests {
             hover_menus: true,
             currency: Currency::Eur,
             reopen_last: false,
+            font: Font::InterLight,
+            text_size: TextSize::Larger,
         };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
@@ -430,6 +484,8 @@ mod tests {
             hover_menus: true,
             currency: Currency::Gbp,
             reopen_last: false,
+            font: Font::Inter,
+            text_size: TextSize::Largest,
         };
         prefs.reset_global();
         // The currency is not a Global setting, so Reset leaves it.
@@ -438,6 +494,17 @@ mod tests {
         assert!(!prefs.hover_menus);
         assert!(prefs.reopen_last);
         assert!(!prefs.show_tutorial);
+    }
+
+    #[test]
+    fn older_files_keep_the_classic_text() {
+        let path = temp_file("text");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "{\"stripe_grey\": 190}").unwrap();
+        let loaded = load_from(&path);
+        assert_eq!(loaded.font, Font::Classic);
+        assert_eq!(loaded.text_size, TextSize::Standard);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]

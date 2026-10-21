@@ -475,6 +475,8 @@ const LESSONS: &[Lesson] = &[
                 "Reset To Default puts those settings back.",
                 "Currency: the symbol shown with every amount ($, €, £ and others), in the \
                  app and in Excel exports. It changes how amounts look, not their value.",
+                "Text: the font (Classic, Inter or Inter Light) and the size (Standard, \
+                 Larger or Largest) for the whole app. A preview shows the result.",
                 "Files (Windows): make double-clicking a .lcbooks file open it in \
                  LedgerCraft.",
             ]),
