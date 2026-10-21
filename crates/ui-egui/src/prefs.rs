@@ -199,8 +199,9 @@ impl PrefsPage {
 /// Size of the Preferences window's content. Fixed, so new settings go on
 /// a new page instead of making the window ever taller.
 const WINDOW_SIZE: egui::Vec2 = egui::vec2(680.0, 420.0);
-/// Width of the page list on the left.
-const LIST_WIDTH: f32 = 150.0;
+/// Width of the page list on the left, and the space between it and the page.
+const LIST_WIDTH: f32 = 160.0;
+const PAGE_GAP: f32 = 16.0;
 /// Where the open page is remembered for the session.
 const PAGE_ID: &str = "prefs_page";
 
@@ -218,8 +219,10 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
         .show(ctx, |ui| {
             ui.horizontal_top(|ui| {
                 page_list(ui, &mut page);
-                ui.add_space(14.0);
+                ui.add_space(PAGE_GAP);
                 ui.vertical(|ui| {
+                    // The settings side takes the rest of the window.
+                    ui.set_width(WINDOW_SIZE.x - LIST_WIDTH - PAGE_GAP);
                     ui.label(RichText::new(page.label()).heading().color(theme::ACCENT));
                     ui.label(RichText::new(page.summary()).small().color(theme::MUTED));
                     ui.separator();
@@ -238,27 +241,35 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
     ctx.data_mut(|d| d.insert_temp(id, page));
 }
 
-/// The page list, styled like the app's side bar.
+/// The page list, styled like the app's side bar: pages stacked top to
+/// bottom in a column of fixed width.
 fn page_list(ui: &mut egui::Ui, page: &mut PrefsPage) {
     let margin = 8.0;
+    let inner = egui::vec2(LIST_WIDTH - 2.0 * margin, WINDOW_SIZE.y - 2.0 * margin);
     egui::Frame::none()
         .fill(theme::NAV_BG)
         .rounding(4.0)
         .inner_margin(margin)
         .show(ui, |ui| {
-            ui.set_width(LIST_WIDTH - 2.0 * margin);
-            ui.set_height(WINDOW_SIZE.y - 2.0 * margin);
-            theme::nav_visuals(ui);
-            for p in PrefsPage::ALL {
-                let text = RichText::new(p.label()).size(15.0).color(theme::NAV_TEXT);
-                let item = ui.add_sized(
-                    [LIST_WIDTH - 2.0 * margin, 34.0],
-                    egui::SelectableLabel::new(*page == p, text),
-                );
-                if item.clicked() {
-                    *page = p;
-                }
-            }
+            ui.allocate_ui_with_layout(
+                inner,
+                egui::Layout::top_down_justified(egui::Align::Center),
+                |ui| {
+                    ui.set_min_size(inner);
+                    theme::nav_visuals(ui);
+                    ui.spacing_mut().item_spacing.y = 4.0;
+                    for p in PrefsPage::ALL {
+                        let text = RichText::new(p.label()).size(15.0).color(theme::NAV_TEXT);
+                        let item = ui.add_sized(
+                            [inner.x, 34.0],
+                            egui::SelectableLabel::new(*page == p, text),
+                        );
+                        if item.clicked() {
+                            *page = p;
+                        }
+                    }
+                },
+            );
         });
 }
 
