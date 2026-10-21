@@ -47,6 +47,28 @@ pub(crate) struct ImportState {
     sent: Option<usize>,
     /// The last import went through: offer to reconcile.
     done: Option<String>,
+    /// How many lines the books held as imported when the page last looked;
+    /// a change it did not cause (Undo, Redo) means the rows are stale.
+    links_seen: usize,
+}
+
+/// Keeps the page in step with the books: notices an import going through,
+/// and an Undo or Redo of one, which brings the download's lines back.
+fn sync(c: &Company, s: &mut ImportState) {
+    let now = c.feed_links.len();
+    if let Some(before) = s.sent.take() {
+        if let (true, Some(account)) = (now > before, s.account) {
+            let count = now - before;
+            s.done = Some(format!("{count} lines imported into {}.", c.account_name(account)));
+            s.rows.clear();
+        }
+    } else if now != s.links_seen {
+        s.done = None;
+        if let (Some(account), Some(statement)) = (s.account, &s.statement) {
+            s.rows = build_rows(c, account, statement);
+        }
+    }
+    s.links_seen = now;
 }
 
 fn is_feed_account(kind: AccountType) -> bool {
@@ -106,15 +128,7 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
     );
     ui.add_space(6.0);
 
-    // Did the import just sent go through?
-    if let (Some(before), Some(account)) = (s.sent, s.account) {
-        if c.feed_links.len() > before {
-            let count = c.feed_links.len() - before;
-            s.done = Some(format!("{count} lines imported into {}.", c.account_name(account)));
-            s.rows.clear();
-        }
-        s.sent = None;
-    }
+    sync(c, s);
 
     let before = s.account;
     ui.horizontal(|ui| {
@@ -187,6 +201,7 @@ fn choose_file(c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
             s.statement = Some(statement);
             s.file_name = name;
             s.done = None;
+            s.links_seen = c.feed_links.len();
         }
         Err(e) => out.push(Action::Error(format!("Could not read {name}: {e}"))),
     }
@@ -450,5 +465,43 @@ mod tests {
         // Check 1001 and the February deposit are already in the books.
         assert_eq!(rows.iter().filter(|r| r.choice == Choice::Match).count(), 2);
         assert_eq!(rows.iter().filter(|r| r.choice == Choice::Add).count(), 3);
+    }
+
+    #[test]
+    fn undoing_an_import_brings_the_lines_back() {
+        let before = ledgercraft_engine::sample_company().unwrap();
+        let checking = before.account_by_name("Checking").unwrap().id;
+        let text = include_str!("../../../docs/samples/pine-ridge-checking.ofx");
+        let statement = read_statement(text).unwrap();
+        let mut s = ImportState {
+            account: Some(checking),
+            rows: build_rows(&before, checking, &statement),
+            statement: Some(statement.clone()),
+            ..ImportState::default()
+        };
+        sync(&before, &mut s);
+
+        // Import the two lines that match recorded transactions.
+        let mut after = before.clone();
+        let entries = s
+            .rows
+            .iter()
+            .filter_map(|r| {
+                Some(FeedEntry {
+                    line: r.line.clone(),
+                    action: FeedAction::Match { txn: r.candidate? },
+                })
+            })
+            .collect();
+        assert_eq!(after.import_feed(checking, entries).unwrap(), 2);
+        s.sent = Some(before.feed_links.len());
+        sync(&after, &mut s);
+        assert!(s.done.is_some() && s.rows.is_empty());
+
+        // Undo puts the books back: the lines show again, ready to import.
+        sync(&before, &mut s);
+        assert!(s.done.is_none());
+        assert_eq!(s.rows.len(), 5);
+        assert!(s.rows.iter().all(|r| !r.duplicate));
     }
 }

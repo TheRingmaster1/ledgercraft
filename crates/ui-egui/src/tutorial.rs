@@ -453,7 +453,7 @@ const LESSONS: &[Lesson] = &[
                  there is one). Add records it as a new transaction: choose its category, \
                  such as Utilities or Sales. Skip leaves it out.",
                 "Click Import. Everything comes in at once, and Edit > Undo takes it all \
-                 back out.",
+                 back out; the download's lines then show again, ready to import.",
                 "Then click Reconcile with This Statement: Reconcile opens with the \
                  statement date and ending balance from the download filled in.",
             ]),

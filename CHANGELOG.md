@@ -20,6 +20,8 @@ fixes to a release. See docs/releasing.md.
   Reconcile with This Statement opens Reconcile with the download's date and
   ending balance. New engine commands `bank.import` and `bank.removeRule`; a
   sample download is in docs/samples; a new tutorial lesson explains it.
+  Undoing (or redoing) an import puts the page back in step: the download's
+  lines show again, ready to import.
 - Bank and credit card reconciliation (Banking > Reconcile, the side bar, or
   the Reconcile link on a bank or credit card register). Enter the statement
   date and ending balance, tick the items on the statement in two lists
