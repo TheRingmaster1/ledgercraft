@@ -76,6 +76,32 @@ pub(crate) fn strength(password: &str, context: &[&str]) -> Option<Strength> {
     )))
 }
 
+/// Whether the confirmation agrees with the password, once something has
+/// been typed into it.
+pub(crate) fn confirmation(password: &str, confirm: &str) -> Option<bool> {
+    if confirm.is_empty() {
+        None
+    } else {
+        Some(password == confirm)
+    }
+}
+
+/// The Confirm field, with "Doesn't match" or "Matches" to its right.
+pub(crate) fn confirm_field(ui: &mut egui::Ui, confirm: &mut String, password: &str) {
+    ui.horizontal(|ui| {
+        password_field(ui, confirm, "type it again");
+        match confirmation(password, confirm) {
+            Some(false) => {
+                ui.label(RichText::new("Doesn't match").small().color(theme::NEGATIVE));
+            }
+            Some(true) => {
+                ui.label(RichText::new("Matches").small().color(theme::POSITIVE));
+            }
+            None => {}
+        }
+    });
+}
+
 /// Checks a new password and its confirmation. `context` is words the
 /// password should not lean on, such as the company name.
 pub(crate) fn check_new(password: &str, confirm: &str, context: &[&str]) -> Result<(), String> {
@@ -328,7 +354,7 @@ pub(crate) fn password_window(
                         strength_meter(ui, form.strength);
                         ui.end_row();
                         ui.label("Confirm");
-                        password_field(ui, &mut form.confirm, "type it again");
+                        confirm_field(ui, &mut form.confirm, &form.new);
                         ui.end_row();
                     }
                 });
@@ -452,6 +478,13 @@ mod tests {
             let rated = strength(weak, &[]);
             assert!(!rated.is_some_and(Strength::acceptable), "{weak}: {rated:?}");
         }
+    }
+
+    #[test]
+    fn confirmation_shows_once_typed() {
+        assert_eq!(confirmation("maple trumpet", ""), None);
+        assert_eq!(confirmation("maple trumpet", "maple"), Some(false));
+        assert_eq!(confirmation("maple trumpet", "maple trumpet"), Some(true));
     }
 
     // Regression: "beautiful" (9 characters) showed "Good" on the meter, but

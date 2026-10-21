@@ -17,6 +17,8 @@ fixes to a release. See docs/releasing.md.
   At Startup turns this off.
 - The window size, maximized state and side bar are remembered between
   launches.
+- The Confirm password box says "Doesn't match" (red) or "Matches" (green)
+  to its right as you type, in Create a Company and File > Password….
 - Password strength meter on every new password (Create a Company and File >
   Password…), using zxcvbn. Passwords that are easy to guess (common
   passwords, names, dates, keyboard runs, repeated characters, or the

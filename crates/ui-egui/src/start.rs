@@ -346,7 +346,7 @@ pub(crate) enum CreateOutcome {
 /// Draws Create a Company. Returns `None` while the person is still filling
 /// it in.
 /// Width of each column of Create a Company, in points.
-const COLUMN_WIDTH: f32 = 420.0;
+const COLUMN_WIDTH: f32 = 430.0;
 /// Space between the two columns.
 const COLUMN_GAP: f32 = 28.0;
 /// Room the window needs around its scrolling part: title bar, the line at
@@ -550,7 +550,7 @@ fn password_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
             security::strength_meter(ui, form.strength);
             ui.end_row();
             ui.label("Confirm");
-            security::password_field(ui, &mut form.confirm.0, "type it again");
+            security::confirm_field(ui, &mut form.confirm.0, &form.password.0);
             ui.end_row();
         });
     security::passphrase_tip(ui);
