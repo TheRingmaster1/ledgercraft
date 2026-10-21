@@ -230,6 +230,8 @@ pub(crate) struct NewCompanyForm {
     confirm: Secret,
     /// How strong `password` is, worked out when it changes.
     strength: Option<security::Strength>,
+    /// Show the password and confirmation instead of dots.
+    show_password: bool,
     /// "I understand a forgotten password cannot be recovered."
     understood: bool,
     /// The list the next CSV file holds.
@@ -254,6 +256,7 @@ impl Default for NewCompanyForm {
             password: Secret::default(),
             confirm: Secret::default(),
             strength: None,
+            show_password: false,
             understood: false,
             csv_kind: ListKind::Customers,
             error: None,
@@ -534,13 +537,14 @@ fn password_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
         .spacing([12.0, 6.0])
         .show(ui, |ui| {
             ui.label("Password");
-            let typed = security::password_field(
+            let typed = security::password_with_peek(
                 ui,
                 &mut form.password.0,
                 &format!(
                     "at least {} characters",
                     ledgercraft_file::MIN_PASSWORD_CHARS
                 ),
+                &mut form.show_password,
             );
             if typed.changed() {
                 form.strength = security::strength(&form.password.0, &[form.name.trim()]);
@@ -550,7 +554,12 @@ fn password_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
             security::strength_meter(ui, form.strength);
             ui.end_row();
             ui.label("Confirm");
-            security::confirm_field(ui, &mut form.confirm.0, &form.password.0);
+            security::confirm_field(
+                ui,
+                &mut form.confirm.0,
+                &form.password.0,
+                form.show_password,
+            );
             ui.end_row();
         });
     security::passphrase_tip(ui);

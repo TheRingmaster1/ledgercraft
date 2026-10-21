@@ -21,14 +21,49 @@ impl Drop for Secret {
     }
 }
 
-/// A password field: dots instead of letters.
-pub(crate) fn password_field(ui: &mut egui::Ui, text: &mut String, hint: &str) -> egui::Response {
+/// A password field: dots instead of letters, unless `shown` (the window's
+/// Show button) is on.
+pub(crate) fn password_field(
+    ui: &mut egui::Ui,
+    text: &mut String,
+    hint: &str,
+    shown: bool,
+) -> egui::Response {
     ui.add_sized(
         [260.0, 22.0],
         egui::TextEdit::singleline(text)
-            .password(true)
+            .password(!shown)
             .hint_text(hint),
     )
+}
+
+/// Show / Hide: lets the person check what they typed. It applies to every
+/// password box in the window, and each window starts with it off.
+pub(crate) fn peek_button(ui: &mut egui::Ui, shown: &mut bool) {
+    let label = if *shown { "Hide" } else { "Show" };
+    let hint = if *shown {
+        "Hide the password again"
+    } else {
+        "Show what you typed. Check nobody can see your screen first."
+    };
+    if ui.small_button(label).on_hover_text(hint).clicked() {
+        *shown = !*shown;
+    }
+}
+
+/// A password field with the Show / Hide button to its right.
+pub(crate) fn password_with_peek(
+    ui: &mut egui::Ui,
+    text: &mut String,
+    hint: &str,
+    shown: &mut bool,
+) -> egui::Response {
+    ui.horizontal(|ui| {
+        let field = password_field(ui, text, hint, *shown);
+        peek_button(ui, shown);
+        field
+    })
+    .inner
 }
 
 /// The lowest strength accepted for a new password, on zxcvbn's 0 to 4
@@ -87,9 +122,14 @@ pub(crate) fn confirmation(password: &str, confirm: &str) -> Option<bool> {
 }
 
 /// The Confirm field, with "Doesn't match" or "Matches" to its right.
-pub(crate) fn confirm_field(ui: &mut egui::Ui, confirm: &mut String, password: &str) {
+pub(crate) fn confirm_field(
+    ui: &mut egui::Ui,
+    confirm: &mut String,
+    password: &str,
+    shown: bool,
+) {
     ui.horizontal(|ui| {
-        password_field(ui, confirm, "type it again");
+        password_field(ui, confirm, "type it again", shown);
         match confirmation(password, confirm) {
             Some(false) => {
                 ui.label(RichText::new("Doesn't match").small().color(theme::NEGATIVE));
@@ -188,6 +228,8 @@ pub(crate) struct UnlockForm {
     password: String,
     error: Option<String>,
     focused: bool,
+    /// Show the password instead of dots.
+    shown: bool,
 }
 
 impl UnlockForm {
@@ -197,6 +239,7 @@ impl UnlockForm {
             password: String::new(),
             error: None,
             focused: false,
+            shown: false,
         }
     }
 }
@@ -230,7 +273,7 @@ pub(crate) fn unlock_window(ctx: &egui::Context, form: &mut UnlockForm) -> Optio
         .show(ctx, |ui| {
             ui.label(format!("{name} is password protected."));
             ui.add_space(6.0);
-            let field = password_field(ui, &mut form.password, "Password");
+            let field = password_with_peek(ui, &mut form.password, "Password", &mut form.shown);
             if !form.focused {
                 field.request_focus();
                 form.focused = true;
@@ -277,6 +320,8 @@ pub(crate) struct PasswordForm {
     error: Option<String>,
     /// How strong `new` is, worked out when it changes.
     strength: Option<Strength>,
+    /// Show the passwords instead of dots.
+    shown: bool,
 }
 
 impl Drop for PasswordForm {
@@ -336,16 +381,18 @@ pub(crate) fn password_window(
                 .show(ui, |ui| {
                     if protected {
                         ui.label("Current password");
-                        password_field(ui, &mut form.current, "");
+                        password_with_peek(ui, &mut form.current, "", &mut form.shown);
                         ui.end_row();
                     }
                     if !form.remove {
                         ui.label("New password");
-                        let typed = password_field(
-                            ui,
-                            &mut form.new,
-                            &format!("at least {MIN_PASSWORD_CHARS} characters"),
-                        );
+                        let hint = format!("at least {MIN_PASSWORD_CHARS} characters");
+                        // The Show button sits on the first password box.
+                        let typed = if protected {
+                            password_field(ui, &mut form.new, &hint, form.shown)
+                        } else {
+                            password_with_peek(ui, &mut form.new, &hint, &mut form.shown)
+                        };
                         if typed.changed() {
                             form.strength = strength(&form.new, &[company_name]);
                         }
@@ -354,7 +401,7 @@ pub(crate) fn password_window(
                         strength_meter(ui, form.strength);
                         ui.end_row();
                         ui.label("Confirm");
-                        confirm_field(ui, &mut form.confirm, &form.new);
+                        confirm_field(ui, &mut form.confirm, &form.new, form.shown);
                         ui.end_row();
                     }
                 });

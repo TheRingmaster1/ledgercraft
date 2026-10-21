@@ -17,6 +17,9 @@ fixes to a release. See docs/releasing.md.
   At Startup turns this off.
 - The window size, maximized state and side bar are remembered between
   launches.
+- Show / Hide button beside the password boxes (Create a Company, File >
+  Password… and the password prompt when opening a protected company), to
+  check what was typed. Every window opens with passwords hidden.
 - The Confirm password box says "Doesn't match" (red) or "Matches" (green)
   to its right as you type, in Create a Company and File > Password….
 - Password strength meter on every new password (Create a Company and File >
