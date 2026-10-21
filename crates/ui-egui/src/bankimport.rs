@@ -215,7 +215,10 @@ const ONE_LINE_WIDTH: f32 = 900.0;
 fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
     ui.add_space(8.0);
     let wide = ui.available_width() >= ONE_LINE_WIDTH;
-    egui::Grid::new("import_lines")
+    // Each layout keeps its own grid: a grid remembers its row heights, and
+    // the two-line rows of the narrow layout must not carry over when the
+    // window widens.
+    egui::Grid::new(("import_lines", wide))
         .striped(true)
         .spacing([12.0, 4.0])
         .show(ui, |ui| {
