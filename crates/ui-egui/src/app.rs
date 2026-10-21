@@ -222,6 +222,10 @@ impl LedgerApp {
             theme::set_text(ctx, text.0, text.1);
             self.applied_text = Some(text);
         }
+        let ink = theme::text_colour(self.prefs.text_grey);
+        if ctx.style().visuals.override_text_color != Some(ink) {
+            ctx.style_mut(|s| s.visuals.override_text_color = Some(ink));
+        }
         let stripe = self.prefs.stripe();
         if ctx.style().visuals.faint_bg_color != stripe {
             ctx.style_mut(|s| s.visuals.faint_bg_color = stripe);

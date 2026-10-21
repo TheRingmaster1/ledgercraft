@@ -77,7 +77,11 @@ fixes to a release. See docs/releasing.md.
   Calibri, Calibri Light, Verdana, Tahoma and Arial on Windows; DejaVu Sans,
   Noto Sans, Liberation Sans, Ubuntu and Cantarell on Linux. A font that
   cannot be found or read falls back to Classic instead of stopping the app.
-  Each font's name in the list is shown in that font. Inter is bundled under
+  Each font's name in the list is shown in that font. A Darkness slider
+  (Darker to Softer, with Default) softens ordinary text from black towards
+  dark grey, which makes heavy fonts such as Verdana, Tahoma and Arial look
+  lighter; egui draws text without hinting, so this is the adjustment it
+  offers. The default stays black. Inter is bundled under
   the SIL Open Font License; Help > Licenses has a new Inter Font tab with its
   licence.
 - Tutorial brought up to date: opening and changing recorded transactions

@@ -43,6 +43,8 @@ pub(crate) struct Prefs {
     /// The text font and size.
     pub(crate) font: Font,
     pub(crate) text_size: TextSize,
+    /// How dark ordinary text is: a grey level, 0 = black.
+    pub(crate) text_grey: u8,
 }
 
 impl Default for Prefs {
@@ -55,6 +57,7 @@ impl Default for Prefs {
             reopen_last: true,
             font: Font::default(),
             text_size: TextSize::Standard,
+            text_grey: 0,
         }
     }
 }
@@ -323,6 +326,24 @@ fn text_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
                 }
             });
             ui.end_row();
+            ui.label("Darkness").on_hover_text(
+                "Softer text makes heavy fonts such as Verdana, Tahoma and Arial look lighter.",
+            );
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Darker").small().color(theme::MUTED));
+                ui.add(
+                    egui::Slider::new(&mut prefs.text_grey, theme::TEXT_GREY_RANGE)
+                        .show_value(false),
+                );
+                ui.label(RichText::new("Softer").small().color(theme::MUTED));
+                if ui
+                    .add_enabled(prefs.text_grey != 0, egui::Button::new("Default"))
+                    .clicked()
+                {
+                    prefs.text_grey = 0;
+                }
+            });
+            ui.end_row();
         });
     ui.add_space(4.0);
     egui::Frame::none()
@@ -482,6 +503,7 @@ mod tests {
             reopen_last: false,
             font: Font::InterLight,
             text_size: TextSize::Larger,
+            text_grey: 60,
         };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
@@ -560,6 +582,7 @@ mod tests {
             reopen_last: false,
             font: Font::Inter,
             text_size: TextSize::Largest,
+            text_grey: 90,
         };
         prefs.reset_global();
         // The currency is not a General setting, so Reset leaves it.
@@ -578,6 +601,7 @@ mod tests {
         let loaded = load_from(&path);
         assert_eq!(loaded.font, Font::InterLight);
         assert_eq!(loaded.text_size, TextSize::Standard);
+        assert_eq!(loaded.text_grey, 0, "older files keep black text");
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 
