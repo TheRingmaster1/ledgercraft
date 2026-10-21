@@ -140,6 +140,11 @@ const LESSONS: &[Lesson] = &[
                  password in a password manager: if it is forgotten, the books cannot be \
                  recovered by anyone.",
             ),
+            Text(
+                "Company files made before passwords existed still open. LedgerCraft \
+                 offers to protect them when you open one; say yes, or use File > \
+                 Password… later, and the file is upgraded to an encrypted one.",
+            ),
             Heading("Backups"),
             Text(
                 "Back up by copying the .lcbooks file somewhere safe, such as a USB drive or \

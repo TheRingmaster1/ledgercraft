@@ -14,6 +14,7 @@ usage:
   ledgercraft-cli run FILE --cmd JSON [--cmd JSON ...]
   ledgercraft-cli report FILE KIND [--from DATE] [--to DATE] [--csv]
   ledgercraft-cli accounts FILE
+  ledgercraft-cli protect FILE         (password from LEDGERCRAFT_NEW_PASSWORD)
   ledgercraft-cli commands
   ledgercraft-cli --version
 
@@ -125,6 +126,20 @@ fn run(args: &[String]) -> Result<(), String> {
             } else {
                 print!("{}", report.to_text());
             }
+            Ok(())
+        }
+        "protect" => {
+            // Encrypts a company file with a new password, in place. Upgrades
+            // files made before encryption; also changes the password of a
+            // protected file (opened with LEDGERCRAFT_PASSWORD).
+            let file = rest.first().ok_or("protect: which file?")?;
+            let new = std::env::var("LEDGERCRAFT_NEW_PASSWORD")
+                .ok()
+                .filter(|p| !p.is_empty())
+                .ok_or("protect: set LEDGERCRAFT_NEW_PASSWORD to the new password")?;
+            let mut session = open(file)?;
+            session.set_password(Some(&new)).map_err(|e| e.to_string())?;
+            println!("{file}: protected and encrypted");
             Ok(())
         }
         "accounts" => {

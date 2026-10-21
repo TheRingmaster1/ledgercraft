@@ -240,6 +240,56 @@ pub(crate) fn password_window(
     outcome
 }
 
+// ----- upgrading older files ----------------------------------------------------
+
+/// What the person chose when offered protection for an unprotected file.
+pub(crate) enum UpgradeChoice {
+    SetPassword,
+    NotNow,
+}
+
+/// Shown after opening a company file that has no password (made before
+/// LedgerCraft encrypted files, or with its password removed).
+pub(crate) fn upgrade_window(ctx: &egui::Context, file_name: &str) -> Option<UpgradeChoice> {
+    let mut choice = None;
+    let mut open = true;
+    egui::Window::new("Protect This Company?")
+        .open(&mut open)
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .default_width(420.0)
+        .show(ctx, |ui| {
+            ui.label(format!(
+                "{file_name} is not password protected, so anyone who gets a copy of it can \
+                 read your books."
+            ));
+            ui.add_space(4.0);
+            ui.label(
+                "Set a password to upgrade it to an encrypted file. The file is re-saved \
+                 encrypted straight away; nothing else about the books changes.",
+            );
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button(RichText::new("Set a Password…").strong()).clicked() {
+                    choice = Some(UpgradeChoice::SetPassword);
+                }
+                if ui.button("Not Now").clicked() {
+                    choice = Some(UpgradeChoice::NotNow);
+                }
+            });
+            ui.label(
+                RichText::new("You can do this any time with File > Password….")
+                    .small()
+                    .color(theme::MUTED),
+            );
+        });
+    if !open {
+        choice = Some(UpgradeChoice::NotNow);
+    }
+    choice
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

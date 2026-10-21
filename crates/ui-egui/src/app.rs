@@ -8,7 +8,7 @@ use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
-use crate::security::{self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome};
+use crate::security::{self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice};
 use crate::start::{self, NewCompanyForm, StartChoice, StartPage};
 use crate::{forms, theme, tutorial, Action, FormKind, Page, Reset};
 
@@ -31,6 +31,8 @@ pub struct LedgerApp {
     unlock: Option<UnlockForm>,
     /// File > Password…, while open.
     password: Option<PasswordForm>,
+    /// Offer to protect the unprotected file just opened.
+    offer_protection: bool,
     /// What the last import brought in, shown until closed.
     import_report: Option<ledgercraft_file::import::ImportSummary>,
     start: StartPage,
@@ -99,6 +101,7 @@ impl LedgerApp {
             import_report: None,
             unlock: None,
             password: None,
+            offer_protection: false,
             start: StartPage::default(),
             page: Page::Home,
             forms: Forms::default(),
@@ -229,8 +232,12 @@ impl LedgerApp {
     pub(crate) fn open_path(&mut self, path: PathBuf) {
         match Session::open(&path) {
             Ok(s) => {
+                let protected = s.is_protected();
                 self.replace_session(s);
                 self.info(format!("Opened {}", path.display()));
+                // A file from before encryption (or with its password removed):
+                // offer to upgrade it.
+                self.offer_protection = !protected;
             }
             Err(EngineError::File(FileError::PasswordRequired)) => self.unlock = Some(UnlockForm::new(path)),
             Err(e) => self.error(format!("Could not open {}: {e}", path.display())),
@@ -250,6 +257,8 @@ impl LedgerApp {
     fn replace_session(&mut self, s: Session) {
         self.session = Some(s);
         self.create = None;
+        self.offer_protection = false;
+        self.password = None;
         self.forms = Forms::default();
         self.lists = ListState::default();
         self.page = Page::Home;
@@ -707,6 +716,27 @@ impl LedgerApp {
             None => {}
         }
 
+        let file_name = self
+            .session
+            .as_ref()
+            .filter(|s| self.offer_protection && !s.is_protected())
+            .and_then(|s| s.path())
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().into_owned());
+        if let Some(name) = file_name {
+            match security::upgrade_window(ctx, &name) {
+                Some(UpgradeChoice::SetPassword) => {
+                    self.offer_protection = false;
+                    self.password = Some(PasswordForm::default());
+                }
+                Some(UpgradeChoice::NotNow) => {
+                    self.offer_protection = false;
+                    self.info("This company file is not password protected. Use File > Password… to protect it.");
+                }
+                None => {}
+            }
+        }
+
         let changed = match (self.password.as_mut(), self.session.as_ref()) {
             (Some(form), Some(session)) => security::password_window(ctx, form, session),
             (Some(_), None) => Some(PasswordOutcome::Cancel),
@@ -1021,6 +1051,28 @@ mod tests {
         app.request(Pending::New, &ctx);
         assert!(app.create.is_some());
         assert!(app.session.is_some());
+    }
+
+    #[test]
+    fn opening_an_unprotected_file_offers_to_protect_it() {
+        let dir = std::env::temp_dir().join(format!("lc-offer-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let plain = dir.join("plain.lcbooks");
+        ledgercraft_file::save(&plain, &new_company("Plain Co"), None).unwrap();
+        let mut app = LedgerApp::blank(None);
+        app.open_path(plain);
+        assert!(app.session.is_some());
+        assert!(app.offer_protection);
+
+        let locked = dir.join("locked.lcbooks");
+        let protection = ledgercraft_file::Protection::new("already locked").unwrap();
+        ledgercraft_file::save(&locked, &new_company("Locked Co"), Some(&protection)).unwrap();
+        let mut app = LedgerApp::blank(None);
+        app.open_path(locked);
+        assert!(app.session.is_none(), "a protected file waits for its password");
+        assert!(app.unlock.is_some());
+        assert!(!app.offer_protection);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

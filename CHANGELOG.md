@@ -35,6 +35,10 @@ fixes to a release. See docs/releasing.md.
   changes or removes it for the open company. A wrong password or a tampered
   file is detected. Plain (version 1) files still open. The CLI reads the
   password from LEDGERCRAFT_PASSWORD.
+- Upgrading older files: opening a company file made before encryption (or
+  with its password removed) offers to protect it; File > Password… does the
+  same any time. The file is rewritten encrypted in place with its books
+  unchanged. `ledgercraft-cli protect FILE` does it from the command line.
 - Amounts are shown with a currency symbol everywhere in the app ($1,234.56),
   and Excel exports format them the same way. Help > Preferences has a new
   Currency section (US, Canadian, Australian, New Zealand and Mexican dollars,

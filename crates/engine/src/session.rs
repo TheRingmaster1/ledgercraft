@@ -211,6 +211,31 @@ impl Session {
 mod tests {
     use super::*;
 
+    /// A file saved before encryption existed (format version 1) opens, takes
+    /// a password, and is rewritten encrypted in place with its books intact.
+    #[test]
+    fn older_plain_files_upgrade_to_encrypted() {
+        let dir = std::env::temp_dir().join(format!("lc-upgrade-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("old.lcbooks");
+        let company = crate::sample_company().unwrap();
+        // Exactly what LedgerCraft wrote before this change: plain version 1 JSON.
+        std::fs::write(&path, ledgercraft_file::to_json(&company).unwrap()).unwrap();
+        assert!(std::fs::read_to_string(&path).unwrap().contains("\"version\": 1"));
+
+        let mut s = Session::open(&path).unwrap();
+        assert!(!s.is_protected());
+        s.set_password(Some("upgrade me please")).unwrap();
+        assert!(!s.is_dirty(), "the upgrade is saved straight away");
+
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("\"version\": 2"));
+        assert!(!text.contains("Pine Ridge"));
+        let reopened = Session::open_with_password(&path, "upgrade me please").unwrap();
+        assert_eq!(reopened.company(), &company);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn protected_sessions_save_encrypted_and_reopen_with_the_password() {
         let dir = std::env::temp_dir().join(format!("lc-session-{}", std::process::id()));

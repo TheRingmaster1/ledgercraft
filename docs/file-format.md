@@ -66,3 +66,15 @@ A company with a password is saved as:
   them hang.
 * Only the encrypted form is ever written to disk, including the temporary
   file used for atomic saves. There is no password recovery.
+
+### Upgrading a version 1 file
+
+Version 1 files keep opening. Setting a password (File > Password…, the offer
+shown when an unprotected file is opened, or `ledgercraft-cli protect`)
+rewrites the same file as version 2 straight away. The books inside are
+unchanged: the encrypted payload is the version 1 JSON.
+
+Note that on most drives, especially SSDs, the old unencrypted bytes may
+remain in free space until overwritten. For data that must not be recovered,
+also delete older plain copies and backups, and rely on full-disk encryption
+(BitLocker on Windows) for the free space.
