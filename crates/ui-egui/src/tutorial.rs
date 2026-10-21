@@ -76,6 +76,11 @@ const LESSONS: &[Lesson] = &[
                 "The Home page: buttons laid out in the order work usually happens, and your \
                  key balances under At A Glance.",
             ]),
+            Text(
+                "Any window size works. Rows of buttons and fields wrap to fit, side-by-side \
+                 lists stack in a narrow window, and anything still too wide for the window \
+                 scrolls sideways (Shift + mouse wheel, or the scroll bar along the bottom).",
+            ),
             Heading("Help is built in"),
             Text(
                 "Rest the mouse on almost anything (a side bar item, a button, a field label \

@@ -412,7 +412,7 @@ fn footer(ui: &mut Ui, editing: Option<TxnId>) -> (bool, bool) {
     } else {
         ("Save & New", "Clear")
     };
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         save = ui.button(RichText::new(save_label).strong()).clicked();
         clear = ui.button(clear_label).clicked();
     });
@@ -464,7 +464,7 @@ fn cleared(out: &mut Vec<Action>, editing: Option<TxnId>) {
 }
 
 fn total_row(ui: &mut Ui, label: &str, total: Money) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(label).strong());
         ui.label(RichText::new(currency::format(total)).strong().size(16.0));
     });
@@ -569,7 +569,7 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
     }
     tidy_lines(&mut f.lines, 1, SalesLineInput::is_blank);
     ui.add_space(6.0);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
@@ -701,7 +701,7 @@ pub(crate) fn receive_payment(
         None => Vec::new(),
     };
     let total = open_docs_grid(ui, "rp_docs", &docs, &mut f.amounts);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
@@ -771,7 +771,7 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
         None => Vec::new(),
     };
     let total = open_docs_grid(ui, "pb_docs", &docs, &mut f.amounts);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
@@ -995,7 +995,7 @@ pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Ac
         });
     ui.add_space(8.0);
     let total = account_lines(ui, "bill_lines", c, &mut f.lines);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
@@ -1062,7 +1062,7 @@ pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<A
         });
     ui.add_space(8.0);
     let total = account_lines(ui, "chk_lines", c, &mut f.lines);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
@@ -1121,7 +1121,7 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
     if let Some(uf) = c.account_by_name("Undeposited Funds") {
         let waiting = c.account_balance(uf.id, None);
         if waiting.is_positive() {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(format!(
                     "{} is waiting in Undeposited Funds.",
                     currency::format(waiting)
@@ -1140,7 +1140,7 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
     }
     ui.add_space(8.0);
     let total = account_lines(ui, "dep_lines", c, &mut f.lines);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
@@ -1173,7 +1173,7 @@ fn build_deposit(f: &LinesForm) -> Result<Command, String> {
 
 pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut Vec<Action>) {
     header(ui, FormKind::Journal, f.editing);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Date");
         field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
         widgets::hint_label(ui, "Entry #");
@@ -1212,11 +1212,11 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
         }
     }
     tidy_lines(&mut f.lines, 2, JournalLineInput::is_blank);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         let totals = format!(
             "Debits {}   Credits {}",
             currency::format(debits),

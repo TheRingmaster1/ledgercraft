@@ -67,11 +67,14 @@ fn list_titles(kind: Option<AccountType>) -> (&'static str, &'static str) {
     }
 }
 
+/// Narrower than this, the two tick lists stack instead of sitting side by side.
+const SIDE_BY_SIDE_WIDTH: f32 = 760.0;
+
 pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut ReconcileState, out: &mut Vec<Action>) {
     // The two lists share what height the window has; the page scrolls as a
     // whole when a report is open below them.
     let list_height = (ui.available_height() - 300.0).max(140.0);
-    egui::ScrollArea::vertical()
+    egui::ScrollArea::both()
         .id_salt("rec_page")
         .auto_shrink(false)
         .show(ui, |ui| body(ui, c, s, out, list_height));
@@ -157,7 +160,7 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ReconcileState, out: &mut Vec<Action>,
     s.cleared.retain(|id| listed.contains(id));
 
     ui.add_space(6.0);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if ui.button("Mark All").clicked() {
             s.cleared = listed.clone();
         }
@@ -168,28 +171,20 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ReconcileState, out: &mut Vec<Action>,
     let (up_title, down_title) = list_titles(kind);
     let (ups, downs): (Vec<&ReconcileItem>, Vec<&ReconcileItem>) =
         items.iter().partition(|i| !i.amount.is_negative());
-    ui.columns(2, |cols| {
-        if let [left, right] = cols {
-            item_list(
-                left,
-                "rec_up",
-                up_title,
-                c,
-                &ups,
-                &mut s.cleared,
-                list_height,
-            );
-            item_list(
-                right,
-                "rec_down",
-                down_title,
-                c,
-                &downs,
-                &mut s.cleared,
-                list_height,
-            );
-        }
-    });
+    // Side by side when there is room; one above the other in a narrow window.
+    if ui.available_width() >= SIDE_BY_SIDE_WIDTH {
+        ui.columns(2, |cols| {
+            if let [left, right] = cols {
+                item_list(left, "rec_up", up_title, c, &ups, &mut s.cleared, list_height);
+                item_list(right, "rec_down", down_title, c, &downs, &mut s.cleared, list_height);
+            }
+        });
+    } else {
+        let half = (list_height / 2.0).max(140.0);
+        item_list(ui, "rec_up", up_title, c, &ups, &mut s.cleared, half);
+        ui.add_space(6.0);
+        item_list(ui, "rec_down", down_title, c, &downs, &mut s.cleared, half);
+    }
 
     // The summary, and Reconcile Now once it balances.
     let picked = |want_up: bool| -> (usize, Money) {
@@ -264,7 +259,7 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ReconcileState, out: &mut Vec<Action>,
     let balances = matches!(&ending, Some(Ok(e)) if *e == cleared_balance);
     guidance(ui, ending.as_ref(), balances);
     ui.add_space(6.0);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         let now = ui
             .add_enabled(
                 balances,
@@ -447,7 +442,7 @@ fn history(
         .resizable(true)
         .default_size([680.0, 520.0])
         .show(ui.ctx(), |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if ui.button("Export to Excel…").clicked() {
                     out.push(Action::ExportXlsx {
                         name: "reconciliation.xlsx".into(),
@@ -494,6 +489,24 @@ mod tests {
             !s.statement_date.is_empty(),
             "the statement date defaults to today"
         );
+    }
+
+    #[test]
+    fn a_narrow_window_stacks_the_lists() {
+        let c = ledgercraft_engine::sample_company().unwrap();
+        let checking = c.account_by_name("Checking").unwrap().id;
+        let mut s = ReconcileState::default();
+        s.start(checking);
+        let ctx = egui::Context::default();
+        crate::theme::apply(&ctx);
+        let mut out = Vec::new();
+        let mut width = 0.0;
+        crate::theme::test_frame_sized(&ctx, egui::vec2(480.0, 600.0), |ui| {
+            width = ui.available_width();
+            page(ui, &c, &mut s, &mut out);
+        });
+        assert!(width < SIDE_BY_SIDE_WIDTH);
+        assert!(out.is_empty());
     }
 
     #[test]

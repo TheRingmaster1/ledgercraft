@@ -111,7 +111,7 @@ fn build_rows(c: &Company, account: AccountId, statement: &Statement) -> Vec<Row
 }
 
 pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
-    egui::ScrollArea::vertical()
+    egui::ScrollArea::both()
         .id_salt("import_page")
         .auto_shrink(false)
         .show(ui, |ui| body(ui, c, s, out));
@@ -136,7 +136,7 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
     sync(c, s);
 
     let before = s.account;
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Account");
         widgets::account_combo(ui, "import_account", c, &mut s.account, is_feed_account);
         if ui.button("Choose File…").clicked() {
@@ -218,7 +218,7 @@ fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
         .striped(true)
         .spacing([12.0, 4.0])
         .show(ui, |ui| {
-            for h in ["Date", "Payee / memo", "Amount", "Action", ""] {
+            for h in ["Date", "Payee / memo", "Amount", "Action"] {
                 widgets::column_header(ui, h);
             }
             ui.end_row();
@@ -239,7 +239,6 @@ fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
                 money_label(ui, row.line.amount, false);
                 if row.duplicate {
                     ui.label(RichText::new("Already imported").color(theme::MUTED));
-                    ui.label("");
                     ui.end_row();
                     continue;
                 }
@@ -252,39 +251,33 @@ fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
                     (Choice::Add, _) => "Add".to_string(),
                     (Choice::Skip, _) => "Skip".to_string(),
                 };
-                egui::ComboBox::from_id_salt(("import_choice", i))
-                    .selected_text(label(row.choice))
-                    .width(250.0)
-                    .show_ui(ui, |ui| {
-                        if matched.is_some() {
-                            ui.selectable_value(
-                                &mut row.choice,
-                                Choice::Match,
-                                label(Choice::Match),
+                // The choice, with the category under it when adding, so the row
+                // stays as narrow as the window.
+                ui.vertical(|ui| {
+                    egui::ComboBox::from_id_salt(("import_choice", i))
+                        .selected_text(label(row.choice))
+                        .width(250.0)
+                        .show_ui(ui, |ui| {
+                            if matched.is_some() {
+                                ui.selectable_value(&mut row.choice, Choice::Match, label(Choice::Match));
+                            }
+                            ui.selectable_value(&mut row.choice, Choice::Add, "Add as a new transaction");
+                            ui.selectable_value(&mut row.choice, Choice::Skip, "Skip");
+                        });
+                    if row.choice == Choice::Add {
+                        ui.horizontal_wrapped(|ui| {
+                            widgets::account_combo(
+                                ui,
+                                ("import_category", i),
+                                c,
+                                &mut row.category,
+                                |k| !k.needs_party(),
                             );
-                        }
-                        ui.selectable_value(
-                            &mut row.choice,
-                            Choice::Add,
-                            "Add as a new transaction",
-                        );
-                        ui.selectable_value(&mut row.choice, Choice::Skip, "Skip");
-                    });
-                if row.choice == Choice::Add {
-                    ui.horizontal(|ui| {
-                        widgets::account_combo(
-                            ui,
-                            ("import_category", i),
-                            c,
-                            &mut row.category,
-                            |k| !k.needs_party(),
-                        );
-                        ui.checkbox(&mut row.remember, "Remember")
-                            .on_hover_text("Use this category for this payee next time");
-                    });
-                } else {
-                    ui.label("");
-                }
+                            ui.checkbox(&mut row.remember, "Remember")
+                                .on_hover_text("Use this category for this payee next time");
+                        });
+                    }
+                });
                 ui.end_row();
             }
         });
@@ -480,6 +473,28 @@ mod tests {
         // Check 1001 and the February deposit are already in the books.
         assert_eq!(rows.iter().filter(|r| r.choice == Choice::Match).count(), 2);
         assert_eq!(rows.iter().filter(|r| r.choice == Choice::Add).count(), 3);
+    }
+
+    #[test]
+    fn the_page_draws_in_a_narrow_window() {
+        let c = ledgercraft_engine::sample_company().unwrap();
+        let checking = c.account_by_name("Checking").unwrap().id;
+        let text = include_str!("../../../docs/samples/pine-ridge-checking.ofx");
+        let statement = read_statement(text).unwrap();
+        let mut s = ImportState {
+            account: Some(checking),
+            rows: build_rows(&c, checking, &statement),
+            statement: Some(statement),
+            ..ImportState::default()
+        };
+        let ctx = egui::Context::default();
+        crate::theme::apply(&ctx);
+        let mut out = Vec::new();
+        crate::theme::test_frame_sized(&ctx, egui::vec2(480.0, 600.0), |ui| {
+            page(ui, &c, &mut s, &mut out);
+        });
+        assert!(out.is_empty());
+        assert_eq!(s.rows.len(), 5);
     }
 
     #[test]

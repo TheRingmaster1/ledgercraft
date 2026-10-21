@@ -471,6 +471,21 @@ pub(crate) fn test_frame(ctx: &egui::Context, add_contents: impl FnMut(&mut egui
     output.textures_delta.clear();
 }
 
+/// [`test_frame`] in a window of the given size, for checking narrow layouts.
+#[cfg(test)]
+pub(crate) fn test_frame_sized(
+    ctx: &egui::Context,
+    size: egui::Vec2,
+    add_contents: impl FnMut(&mut egui::Ui),
+) {
+    let input = egui::RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+        ..egui::RawInput::default()
+    };
+    let mut output = ctx.run_ui(input, add_contents);
+    output.textures_delta.clear();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

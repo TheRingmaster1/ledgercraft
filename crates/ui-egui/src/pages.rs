@@ -213,14 +213,14 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
         ui.label(RichText::new("Workflow").strong().underline());
         ui.add_space(4.0);
         ui.label(RichText::new("Vendors").color(theme::MUTED));
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             flow_button(ui, "Enter Bills", Page::Form(FormKind::Bill), out);
             arrow(ui);
             flow_button(ui, "Pay Bills", Page::Form(FormKind::PayBills), out);
         });
         ui.add_space(10.0);
         ui.label(RichText::new("Customers").color(theme::MUTED));
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             flow_button(ui, "Create Invoices", Page::Form(FormKind::Invoice), out);
             arrow(ui);
             flow_button(
@@ -234,7 +234,7 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
         });
         ui.add_space(10.0);
         ui.label(RichText::new("Banking and company").color(theme::MUTED));
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             flow_button(ui, "Write Checks", Page::Form(FormKind::Check), out);
             flow_button(ui, "Journal Entry", Page::Form(FormKind::Journal), out);
             flow_button(ui, "Chart of Accounts", Page::Accounts, out);
@@ -321,7 +321,7 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
         .default_open(false)
         .show(ui, |ui| {
             let n = &mut s.new_account;
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 field(ui, &mut n.number, 60.0, "Number");
                 field(ui, &mut n.name, 200.0, "Name");
                 egui::ComboBox::from_id_salt("new_acct_kind")
@@ -348,7 +348,7 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
     ui.checkbox(&mut s.show_inactive, "Show inactive accounts");
     ui.add_space(6.0);
     let balances = widgets::balances(c);
-    egui::ScrollArea::vertical().id_salt("accounts_scroll").show(ui, |ui| {
+    egui::ScrollArea::both().id_salt("accounts_scroll").show(ui, |ui| {
         egui::Grid::new("accounts").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
             for h in ["Number", "Name", "Type", "Balance", ""] {
                 widgets::column_header(ui, h);
@@ -384,7 +384,7 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
 }
 
 pub(crate) fn register(ui: &mut Ui, c: &Company, account: AccountId, out: &mut Vec<Action>) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if ui.link("< Back to Chart of Accounts").clicked() {
             out.push(Action::Go(Page::Accounts));
         }
@@ -453,7 +453,7 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
             }
         });
     ui.add_space(6.0);
-    egui::ScrollArea::vertical()
+    egui::ScrollArea::both()
         .id_salt("customers_scroll")
         .show(ui, |ui| {
             egui::Grid::new("customers")
@@ -499,7 +499,7 @@ pub(crate) fn vendors(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
             }
         });
     ui.add_space(6.0);
-    egui::ScrollArea::vertical()
+    egui::ScrollArea::both()
         .id_salt("vendors_scroll")
         .show(ui, |ui| {
             egui::Grid::new("vendors")
@@ -617,7 +617,7 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
     title(ui, "Transactions");
     let mut txns: Vec<_> = c.transactions.iter().collect();
     txns.sort_by_key(|t| std::cmp::Reverse((t.date, t.id)));
-    egui::ScrollArea::vertical()
+    egui::ScrollArea::both()
         .id_salt("txn_scroll")
         .show(ui, |ui| {
             egui::Grid::new("txns")
@@ -690,7 +690,7 @@ pub(crate) fn reports(ui: &mut Ui, c: &Company, s: &mut ReportState, out: &mut V
             ui.selectable_value(&mut s.kind, k, k.label());
         }
     });
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if s.kind.uses_period() {
             widgets::hint_label(ui, "From");
             field(ui, &mut s.from, 110.0, "YYYY-MM-DD");
@@ -720,7 +720,7 @@ pub(crate) fn reports(ui: &mut Ui, c: &Company, s: &mut ReportState, out: &mut V
         }
     };
     let report = s.kind.build(c, from, to);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         let excel = ui.button("Export to Excel…").on_hover_text(
             "A formatted Excel workbook (.xlsx): money formats, bold totals and sized columns.",
         );
