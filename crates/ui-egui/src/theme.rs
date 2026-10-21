@@ -367,6 +367,15 @@ pub(crate) fn apply(ctx: &egui::Context) {
     set_text(ctx, Font::default(), TextSize::default());
 }
 
+/// Runs one headless frame for a test. A real app hands the frame's font
+/// texture updates to the GPU; a test has none, so it clears them (egui 0.36+
+/// stops on updates that are dropped unhandled).
+#[cfg(test)]
+pub(crate) fn test_frame(ctx: &egui::Context, add_contents: impl FnMut(&mut egui::Ui)) {
+    let mut output = ctx.run_ui(egui::RawInput::default(), add_contents);
+    output.textures_delta.clear();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387,7 +396,7 @@ mod tests {
                 let ctx = egui::Context::default();
                 apply(&ctx);
                 set_text(&ctx, font, size);
-                let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+                test_frame(&ctx, |ui| {
                     ui.label("Accounts Receivable $1,234.56 • € £ …");
                 });
                 let style = ctx.global_style();
@@ -401,7 +410,7 @@ mod tests {
     fn every_offered_font_has_a_family_to_show_its_name_in() {
         let ctx = egui::Context::default();
         apply(&ctx);
-        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+        test_frame(&ctx, |ui| {
             for font in Font::BUNDLED.iter().chain(installed()) {
                 ui.label(egui::RichText::new(font.label()).family(font.family()));
             }
@@ -443,7 +452,7 @@ mod tests {
             );
             let ctx = egui::Context::default();
             set_text(&ctx, *font, TextSize::Standard);
-            let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            test_frame(&ctx, |ui| {
                 ui.label("Accounts Receivable $1,234.56");
             });
         }

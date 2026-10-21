@@ -650,7 +650,7 @@ mod tests {
             ctx.data_mut(|d| d.insert_temp(egui::Id::NULL.with(PAGE_ID), page));
             let mut open = true;
             let mut prefs = Prefs::default();
-            let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            theme::test_frame(&ctx, |ui| {
                 window(ui.ctx(), &mut open, &mut prefs);
             });
             assert!(open);
