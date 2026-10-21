@@ -1,5 +1,5 @@
 use ledgercraft_core::Money;
-use ledgercraft_ledger::AccountId;
+use ledgercraft_ledger::{AccountId, TxnId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowKind {
@@ -42,6 +42,8 @@ pub struct Row {
     pub cells: Vec<Cell>,
     /// The account behind the row, so a UI can drill down to its register.
     pub account: Option<AccountId>,
+    /// The transaction behind the row, so a UI can open it.
+    pub txn: Option<TxnId>,
 }
 
 /// A finished report: a label column plus value columns.
@@ -74,6 +76,7 @@ impl Report {
             indent,
             cells: Vec::new(),
             account: None,
+            txn: None,
         });
     }
 
@@ -91,6 +94,19 @@ impl Report {
             indent,
             cells,
             account,
+            txn: None,
+        });
+    }
+
+    /// A detail row for one transaction.
+    pub(crate) fn txn_line(&mut self, label: &str, cells: Vec<Cell>, txn: TxnId) {
+        self.rows.push(Row {
+            kind: RowKind::Detail,
+            label: label.to_string(),
+            indent: 0,
+            cells,
+            account: None,
+            txn: Some(txn),
         });
     }
 

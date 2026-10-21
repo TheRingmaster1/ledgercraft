@@ -624,22 +624,38 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
                                 RichText::new(s)
                             }
                         };
-                        ui.label(muted(t.date.to_string()));
-                        ui.label(muted(c.txn_type_label(t).to_string()));
-                        ui.label(muted(t.number.clone()));
-                        ui.label(muted(
-                            t.body.party().map(|p| c.party_name(p)).unwrap_or_default(),
-                        ));
-                        ui.label(muted(t.memo.clone()));
+                        // Double-click any part of a row to open it.
+                        let open = t.id;
+                        widgets::txn_cell(ui, muted(t.date.to_string()), open, out);
+                        widgets::txn_cell(ui, muted(c.txn_type_label(t).to_string()), open, out);
+                        widgets::txn_cell(ui, muted(t.number.clone()), open, out);
+                        widgets::txn_cell(
+                            ui,
+                            muted(t.body.party().map(|p| c.party_name(p)).unwrap_or_default()),
+                            open,
+                            out,
+                        );
+                        widgets::txn_cell(ui, muted(t.memo.clone()), open, out);
                         money_label(ui, t.body.total().unwrap_or(Money::ZERO), false);
                         if t.voided {
                             ui.label(RichText::new("VOID").color(theme::NEGATIVE));
-                        } else if ui
-                            .small_button("Void")
-                            .on_hover_text("Void keeps the record but removes its effect")
-                            .clicked()
-                        {
-                            out.push(void(t.id));
+                        } else {
+                            ui.horizontal(|ui| {
+                                if ui
+                                    .small_button("Edit")
+                                    .on_hover_text("Open this transaction to change it")
+                                    .clicked()
+                                {
+                                    out.push(Action::Open(t.id));
+                                }
+                                if ui
+                                    .small_button("Void")
+                                    .on_hover_text("Void keeps the record but removes its effect")
+                                    .clicked()
+                                {
+                                    out.push(void(t.id));
+                                }
+                            });
                         }
                         ui.end_row();
                     }

@@ -308,6 +308,29 @@ mod tests {
     }
 
     #[test]
+    fn editing_a_transaction_can_be_undone() {
+        let mut s = Session::new(crate::sample_company().unwrap());
+        let t = s
+            .company()
+            .transactions
+            .iter()
+            .find(|t| !t.voided && matches!(t.body, ledgercraft_ledger::TxnBody::Invoice(_)))
+            .unwrap()
+            .clone();
+        s.execute(crate::Command::TxnUpdate {
+            id: t.id,
+            date: t.date,
+            number: t.number.clone(),
+            memo: "Edited".into(),
+            body: t.body.clone(),
+        })
+        .unwrap();
+        assert_eq!(s.company().txn(t.id).unwrap().memo, "Edited");
+        assert_eq!(s.undo().as_deref(), Some("Edit Invoice"));
+        assert_eq!(s.company().txn(t.id).unwrap().memo, t.memo);
+    }
+
+    #[test]
     fn sample_company_is_valid() {
         let c = crate::sample_company().unwrap();
         assert!(c.transactions.len() > 10);

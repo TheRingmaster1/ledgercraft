@@ -387,6 +387,21 @@ const LESSONS: &[Lesson] = &[
                  back. The Edit menu names what it will undo. While you are typing in a \
                  field, Ctrl+Z undoes your typing instead.",
             ),
+            Heading("Changing a transaction"),
+            Text(
+                "To fix a transaction that is already recorded, open it: click Edit beside it \
+                 on the Transactions page, double-click its row, or click its date in an \
+                 account register or the Transaction List report. It opens in its own form, \
+                 titled Edit, with what was entered filled in.",
+            ),
+            Bullets(&[
+                "Change what you need and click Save Changes. The transaction keeps its \
+                 place, and payments applied to it stay applied. Cancel leaves it as it was.",
+                "Edits are checked like new entries. An invoice or bill cannot drop below \
+                 what has already been paid on it, or change customer or vendor while \
+                 payments are applied.",
+                "Changed your mind? Edit > Undo puts the original back.",
+            ]),
             Heading("Voiding a transaction"),
             Text(
                 "On the Transactions page, Void cancels a transaction: it stays on file, \
@@ -396,8 +411,7 @@ const LESSONS: &[Lesson] = &[
             Bullets(&[
                 "An invoice or bill that has payments applied cannot be voided until those \
                  payments are voided first.",
-                "Posted transactions cannot be edited yet: void the wrong one and enter it \
-                 again.",
+                "A void transaction cannot be edited.",
             ]),
             Heading("When something is refused"),
             Text(
@@ -457,7 +471,7 @@ const LESSONS: &[Lesson] = &[
             ),
             Heading("Coming later"),
             Text(
-                "Editing posted transactions, bank reconciliation, importing bank \
+                "Bank reconciliation, importing bank \
                  statements, sales tax, printable invoices and more. See ROADMAP.md in the \
                  project for the plan. Help > Licenses and Help > About explain the open- \
                  source licence.",

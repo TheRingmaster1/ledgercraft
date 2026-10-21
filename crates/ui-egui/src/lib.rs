@@ -22,7 +22,7 @@ mod widgets;
 pub use app::LedgerApp;
 
 use ledgercraft_engine::Command;
-use ledgercraft_ledger::{AccountId, CustomerId, VendorId};
+use ledgercraft_ledger::{AccountId, CustomerId, TxnId, VendorId};
 
 /// Where the main area is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -91,6 +91,10 @@ pub(crate) enum Action {
     Error(String),
     /// A form was cleared: drop any message about what was in it.
     ClearStatus,
+    /// Open a recorded transaction in its form, to change it.
+    Open(TxnId),
+    /// Cancel on a form that was editing a recorded transaction.
+    EditCancelled,
     ExportCsv {
         name: String,
         csv: String,

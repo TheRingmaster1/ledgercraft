@@ -143,6 +143,7 @@ ledgercraft-cli commands                                # every command and its 
 | Banking | Write checks / expenses (bank or credit card), deposits, journal entries with names on AR/AP lines |
 | Reports | Profit & Loss, Balance Sheet (retained earnings rolled forward by fiscal year), Trial Balance, A/R and A/P Aging, Transaction List, account registers; CSV and Excel export, currency symbol of your choice |
 | Help | Thirteen-lesson tutorial with "Try it" buttons, hover help, Preferences |
+| Editing | Open any recorded transaction from the Transactions page, a register or the Transaction List and change it in its form; payments stay applied, Undo restores the original |
 | Safety | Void instead of delete (audit trail), payments block voiding the invoices they pay, all-or-nothing commands, atomic saves |
 
 The honest picture, and what comes next, is in [ROADMAP.md](ROADMAP.md).

@@ -121,3 +121,21 @@ fn aging_buckets() {
     assert!(csv.starts_with("Vendor,Current,"));
     assert!(csv.contains("Landlord,200.00,"));
 }
+
+#[test]
+fn register_and_transaction_list_rows_point_at_their_transactions() {
+    let c = books();
+    let checking = c.account_by_name("Checking").unwrap().id;
+    let register = ledgercraft_reports::account_register(&c, checking);
+    let detail: Vec<_> = register
+        .rows
+        .iter()
+        .filter(|r| r.kind == RowKind::Detail)
+        .collect();
+    assert!(!detail.is_empty());
+    assert!(detail.iter().all(|r| r.txn.is_some()));
+    let list = ledgercraft_reports::transaction_list(&c, d("2025-01-01"), d("2026-12-31"));
+    let ids: Vec<_> = list.rows.iter().filter_map(|r| r.txn).collect();
+    assert_eq!(ids.len(), c.transactions.len());
+    assert!(ids.iter().all(|id| c.txn(*id).is_some()));
+}

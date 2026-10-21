@@ -291,10 +291,8 @@ pub fn account_register(company: &Company, account: AccountId) -> Report {
         } else {
             e.posting.memo.clone()
         };
-        r.line(
-            RowKind::Detail,
+        r.txn_line(
             &e.date.to_string(),
-            0,
             vec![
                 Cell::Text(company.txn_type_label(t).into()),
                 Cell::Text(t.number.clone()),
@@ -303,7 +301,7 @@ pub fn account_register(company: &Company, account: AccountId) -> Report {
                 Cell::Money(amount),
                 Cell::Money(balance),
             ],
-            None,
+            t.id,
         );
     }
     r
@@ -330,10 +328,8 @@ pub fn transaction_list(company: &Company, from: Date, to: Date) -> Report {
             .party()
             .map(|p| company.party_name(p))
             .unwrap_or_default();
-        r.line(
-            RowKind::Detail,
+        r.txn_line(
             &t.date.to_string(),
-            0,
             vec![
                 Cell::Text(company.txn_type_label(t).into()),
                 Cell::Text(t.number.clone()),
@@ -341,7 +337,7 @@ pub fn transaction_list(company: &Company, from: Date, to: Date) -> Report {
                 Cell::Text(t.memo.clone()),
                 t.body.total().map_or(Cell::Empty, Cell::Money),
             ],
-            None,
+            t.id,
         );
     }
     r

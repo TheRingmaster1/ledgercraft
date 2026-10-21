@@ -53,6 +53,16 @@ pub enum Command {
         memo: String,
         body: TxnBody,
     },
+    #[serde(rename = "txn.update")]
+    TxnUpdate {
+        id: TxnId,
+        date: Date,
+        #[serde(default)]
+        number: String,
+        #[serde(default)]
+        memo: String,
+        body: TxnBody,
+    },
     #[serde(rename = "txn.void")]
     TxnVoid { id: TxnId },
 }
@@ -75,6 +85,7 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "vendor.update", summary: "Edit a vendor. {id, contact}" },
     CommandInfo { id: "item.create", summary: "Add a product or service. {spec:{name, rate, income_account, kind?}}" },
     CommandInfo { id: "txn.post", summary: "Record a transaction. {date, number?, memo?, body:{type: invoice|receive_payment|bill|pay_bill|check|deposit|journal, …}}" },
+    CommandInfo { id: "txn.update", summary: "Edit a recorded transaction; it keeps its id and type. {id, date, number?, memo?, body}" },
     CommandInfo { id: "txn.void", summary: "Void a transaction (it stays on file). {id}" },
 ];
 
@@ -92,6 +103,7 @@ impl Command {
             Self::VendorUpdate { .. } => "vendor.update",
             Self::ItemCreate { .. } => "item.create",
             Self::TxnPost { .. } => "txn.post",
+            Self::TxnUpdate { .. } => "txn.update",
             Self::TxnVoid { .. } => "txn.void",
         }
     }
@@ -111,6 +123,7 @@ impl Command {
             Self::VendorUpdate { contact, .. } => format!("Edit Vendor {}", contact.name),
             Self::ItemCreate { spec } => format!("New Item {}", spec.name),
             Self::TxnPost { body, .. } => body.label().to_string(),
+            Self::TxnUpdate { body, .. } => format!("Edit {}", body.label()),
             Self::TxnVoid { id } => format!("Void {id}"),
         }
     }
@@ -174,6 +187,16 @@ impl Command {
                 memo,
                 body,
             } => Some(c.post(date, &number, &memo, body)?.to_string()),
+            Self::TxnUpdate {
+                id,
+                date,
+                number,
+                memo,
+                body,
+            } => {
+                c.update(id, date, &number, &memo, body)?;
+                None
+            }
             Self::TxnVoid { id } => {
                 c.void(id)?;
                 None

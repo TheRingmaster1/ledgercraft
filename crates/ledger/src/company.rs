@@ -503,6 +503,13 @@ impl Company {
 
     /// Validates a transaction against the books without changing anything.
     pub fn validate(&self, body: &TxnBody) -> LedgerResult<()> {
+        self.validate_for(body, None)
+    }
+
+    /// Validates `body`. `editing` is the transaction it would replace, if
+    /// any: that transaction's own payment amounts are left out when checking
+    /// what is still open, so an edited payment can apply them again.
+    fn validate_for(&self, body: &TxnBody, editing: Option<TxnId>) -> LedgerResult<()> {
         match body {
             TxnBody::Journal(j) => {
                 if j.lines.len() < 2 {
@@ -589,7 +596,7 @@ impl Company {
                     &p.applied,
                     p.amount,
                     |b| matches!(b, TxnBody::Invoice(i) if i.customer == customer),
-                    None,
+                    editing,
                 )?;
             }
             TxnBody::Bill(b) => {
@@ -621,7 +628,7 @@ impl Company {
                     &p.applied,
                     p.amount,
                     |b| matches!(b, TxnBody::Bill(bill) if bill.vendor == vendor),
-                    None,
+                    editing,
                 )?;
             }
             TxnBody::Check(c) => {
@@ -671,6 +678,78 @@ impl Company {
             voided: false,
         });
         Ok(id)
+    }
+
+    /// Replaces a posted transaction with an edited version. It keeps its id,
+    /// so payments applied to an invoice or bill stay attached, and it stays
+    /// the same type of transaction. The edit is checked like a new
+    /// transaction, and an invoice or bill cannot drop below what has already
+    /// been paid on it, or change customer or vendor while payments are applied.
+    pub fn update(
+        &mut self,
+        id: TxnId,
+        date: Date,
+        number: &str,
+        memo: &str,
+        body: TxnBody,
+    ) -> LedgerResult<()> {
+        let old = self
+            .txn(id)
+            .ok_or_else(|| LedgerError::NotFound(format!("Transaction {id}")))?;
+        if old.voided {
+            return Err(LedgerError::Invalid(format!(
+                "{id} is void; a void transaction cannot be edited"
+            )));
+        }
+        if std::mem::discriminant(&old.body) != std::mem::discriminant(&body) {
+            return Err(LedgerError::Invalid(format!(
+                "{id} is a {}; it cannot be changed into a {}",
+                old.body.label(),
+                body.label()
+            )));
+        }
+        let old_party = old.body.party();
+        self.validate_for(&body, Some(id))?;
+        let paid = self.paid_against(id);
+        if paid.is_positive() {
+            if body.party() != old_party {
+                return Err(LedgerError::InUse(format!(
+                    "{id} has payments applied to it; void those payments before changing \
+                     the customer or vendor"
+                )));
+            }
+            let total = match &body {
+                TxnBody::Invoice(i) => i.total(),
+                TxnBody::Bill(b) => b.total(),
+                _ => None,
+            }
+            .unwrap_or(Money::ZERO);
+            if total < paid {
+                return Err(LedgerError::Invalid(format!(
+                    "{id} already has {paid} paid against it, more than its new total of {total}"
+                )));
+            }
+        }
+        let t = self
+            .transactions
+            .iter_mut()
+            .find(|t| t.id == id)
+            .ok_or_else(|| LedgerError::NotFound(format!("Transaction {id}")))?;
+        t.date = date;
+        t.number = number.trim().to_string();
+        t.memo = memo.to_string();
+        t.body = body;
+        Ok(())
+    }
+
+    /// The total that live payments apply to an invoice or bill.
+    fn paid_against(&self, doc: TxnId) -> Money {
+        self.transactions
+            .iter()
+            .filter(|p| !p.voided && p.id != doc)
+            .flat_map(|p| p.body.applications().iter())
+            .filter(|a| a.txn == doc)
+            .fold(Money::ZERO, |acc, a| acc.saturating_add(a.amount))
     }
 
     /// Voids a transaction: it stays on file but no longer posts.
@@ -770,20 +849,49 @@ impl Company {
 
     /// Open invoices for a customer, oldest first: (invoice, open amount).
     pub fn open_invoices(&self, customer: CustomerId) -> Vec<(&Transaction, Money)> {
-        self.open_docs(|b| matches!(b, TxnBody::Invoice(i) if i.customer == customer))
+        self.open_invoices_for(customer, None)
     }
 
     /// Open bills for a vendor, oldest first: (bill, open amount).
     pub fn open_bills(&self, vendor: VendorId) -> Vec<(&Transaction, Money)> {
-        self.open_docs(|b| matches!(b, TxnBody::Bill(bill) if bill.vendor == vendor))
+        self.open_bills_for(vendor, None)
     }
 
-    fn open_docs(&self, pick: impl Fn(&TxnBody) -> bool) -> Vec<(&Transaction, Money)> {
+    /// Open invoices as the payment being edited (`editing`) sees them: its
+    /// own amounts are left out, so the invoices it paid show as open again.
+    pub fn open_invoices_for(
+        &self,
+        customer: CustomerId,
+        editing: Option<TxnId>,
+    ) -> Vec<(&Transaction, Money)> {
+        self.open_docs(
+            |b| matches!(b, TxnBody::Invoice(i) if i.customer == customer),
+            editing,
+        )
+    }
+
+    /// Open bills as the bill payment being edited (`editing`) sees them.
+    pub fn open_bills_for(
+        &self,
+        vendor: VendorId,
+        editing: Option<TxnId>,
+    ) -> Vec<(&Transaction, Money)> {
+        self.open_docs(
+            |b| matches!(b, TxnBody::Bill(bill) if bill.vendor == vendor),
+            editing,
+        )
+    }
+
+    fn open_docs(
+        &self,
+        pick: impl Fn(&TxnBody) -> bool,
+        ignore: Option<TxnId>,
+    ) -> Vec<(&Transaction, Money)> {
         let mut v: Vec<(&Transaction, Money)> = self
             .transactions
             .iter()
             .filter(|t| !t.voided && pick(&t.body))
-            .map(|t| (t, self.open_balance(t.id, None)))
+            .map(|t| (t, self.open_balance_excluding(t.id, None, ignore)))
             .filter(|(_, open)| open.is_positive())
             .collect();
         v.sort_by_key(|(t, _)| (t.date, t.id));
@@ -901,6 +1009,131 @@ mod tests {
         assert_eq!(c.open_balance(inv, None), Money::from_cents(100_000));
         c.void(inv).unwrap();
         assert_eq!(c.customer_balance(cust), Money::ZERO);
+    }
+
+    fn payment(c: &Company, cust: CustomerId, inv: TxnId, cents: i64) -> TxnBody {
+        TxnBody::ReceivePayment(ReceivePayment {
+            customer: cust,
+            deposit_to: acct(c, "Checking"),
+            ar_account: acct(c, "Accounts Receivable"),
+            amount: Money::from_cents(cents),
+            method: String::new(),
+            applied: vec![Applied {
+                txn: inv,
+                amount: Money::from_cents(cents),
+            }],
+        })
+    }
+
+    #[test]
+    fn editing_an_invoice_keeps_its_id_and_reposts() {
+        let (mut c, cust, _) = setup();
+        let inv = c
+            .post(d("2026-01-02"), "1001", "", invoice(&c, cust, 50_000))
+            .unwrap();
+        c.update(inv, d("2026-01-05"), "1001A", "fixed", invoice(&c, cust, 30_000))
+            .unwrap();
+        let t = c.txn(inv).unwrap();
+        assert_eq!((t.date, t.number.as_str(), t.memo.as_str()), (d("2026-01-05"), "1001A", "fixed"));
+        assert_eq!(c.transactions.len(), 1);
+        assert_eq!(
+            c.account_balance(acct(&c, "Accounts Receivable"), None),
+            Money::from_cents(60_000)
+        );
+    }
+
+    #[test]
+    fn edits_are_checked_like_new_transactions() {
+        let (mut c, cust, vend) = setup();
+        let inv = c
+            .post(d("2026-01-02"), "", "", invoice(&c, cust, 100))
+            .unwrap();
+        // Same type only.
+        let bill = TxnBody::Bill(Bill {
+            vendor: vend,
+            due_date: d("2026-02-01"),
+            ap_account: acct(&c, "Accounts Payable"),
+            lines: vec![AccountLine {
+                account: acct(&c, "Office Supplies"),
+                description: String::new(),
+                amount: Money::from_cents(100),
+            }],
+        });
+        assert!(c.update(inv, d("2026-01-02"), "", "", bill).is_err());
+        // Invalid content is refused and changes nothing.
+        let empty = TxnBody::Invoice(Invoice {
+            customer: cust,
+            due_date: d("2026-02-01"),
+            ar_account: acct(&c, "Accounts Receivable"),
+            lines: Vec::new(),
+        });
+        assert!(c.update(inv, d("2026-01-02"), "", "", empty).is_err());
+        assert_eq!(c.open_balance(inv, None), Money::from_cents(200));
+        // Void transactions stay as they are.
+        c.void(inv).unwrap();
+        assert!(c
+            .update(inv, d("2026-01-02"), "", "", invoice(&c, cust, 100))
+            .is_err());
+        assert!(c
+            .update(TxnId(9999), d("2026-01-02"), "", "", invoice(&c, cust, 100))
+            .is_err());
+    }
+
+    #[test]
+    fn a_paid_invoice_cannot_drop_below_its_payments_or_change_customer() {
+        let (mut c, cust, _) = setup();
+        let other = c
+            .add_customer(Contact {
+                name: "Other".into(),
+                ..Contact::default()
+            })
+            .unwrap();
+        let inv = c
+            .post(d("2026-01-02"), "", "", invoice(&c, cust, 50_000))
+            .unwrap();
+        c.post(d("2026-01-10"), "", "", payment(&c, cust, inv, 60_000))
+            .unwrap();
+        // Total 2 x 250.00 = 500.00 is below the 600.00 paid.
+        assert!(c
+            .update(inv, d("2026-01-02"), "", "", invoice(&c, cust, 25_000))
+            .is_err());
+        assert!(matches!(
+            c.update(inv, d("2026-01-02"), "", "", invoice(&c, other, 50_000)),
+            Err(LedgerError::InUse(_))
+        ));
+        // Raising it is fine, and the payment stays attached.
+        c.update(inv, d("2026-01-02"), "", "", invoice(&c, cust, 40_000))
+            .unwrap();
+        assert_eq!(c.open_balance(inv, None), Money::from_cents(20_000));
+    }
+
+    #[test]
+    fn an_edited_payment_can_reapply_its_own_amounts() {
+        let (mut c, cust, _) = setup();
+        let inv = c
+            .post(d("2026-01-02"), "", "", invoice(&c, cust, 50_000))
+            .unwrap();
+        // Pays the invoice in full.
+        let pay = c
+            .post(d("2026-01-10"), "", "", payment(&c, cust, inv, 100_000))
+            .unwrap();
+        assert!(c.open_invoices(cust).is_empty());
+        // As the payment sees it, the invoice is fully open again.
+        let open = c.open_invoices_for(cust, Some(pay));
+        assert_eq!(open.len(), 1);
+        assert_eq!(open[0].1, Money::from_cents(100_000));
+        // Changing only the date re-applies the same amount without tripping
+        // the overpayment check.
+        c.update(pay, d("2026-01-11"), "", "", payment(&c, cust, inv, 100_000))
+            .unwrap();
+        // Lowering it leaves the rest open.
+        c.update(pay, d("2026-01-11"), "", "", payment(&c, cust, inv, 70_000))
+            .unwrap();
+        assert_eq!(c.open_balance(inv, None), Money::from_cents(30_000));
+        // But it still cannot overpay.
+        assert!(c
+            .update(pay, d("2026-01-11"), "", "", payment(&c, cust, inv, 100_001))
+            .is_err());
     }
 
     #[test]

@@ -8,6 +8,17 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Edit recorded transactions. Open an invoice, payment, bill, bill payment,
+  check, deposit or journal entry from the Transactions page (Edit, or
+  double-click the row), an account register or the Transaction List report
+  (click the date, or double-click the row). It opens in its form titled
+  "Edit …"; Save Changes replaces it in place and returns to where it was
+  opened from, Cancel leaves it unchanged, and Edit > Undo puts the original
+  back. The transaction keeps its id, so payments stay applied. Edits are
+  checked like new entries, an invoice or bill cannot drop below what has
+  been paid on it or change customer or vendor while payments are applied,
+  the type cannot change, and void transactions cannot be edited. The CLI and
+  agents get the same as the `txn.update` command.
 - Recent companies: the start page lists the company files opened last
   (click to open, right-click to remove one), and File > Open Previous
   Company lists them too. A file that has been moved or deleted is reported

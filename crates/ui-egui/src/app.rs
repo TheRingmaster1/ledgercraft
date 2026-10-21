@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText};
-use ledgercraft_engine::{sample_company, EngineError, Session};
+use ledgercraft_engine::{sample_company, Command, EngineError, Session};
+use ledgercraft_ledger::TxnId;
 use ledgercraft_file::FileError;
 
 use crate::forms::Forms;
@@ -68,6 +69,8 @@ pub struct LedgerApp {
     state_path: Option<PathBuf>,
     /// The recent company waiting on `Pending::OpenPath`.
     open_target: Option<PathBuf>,
+    /// Where to go back to when a transaction edit is saved or cancelled.
+    edit_return: Option<Page>,
     show_nav: bool,
     title: String,
     /// Scale the window size limits were last set for (0 = not yet).
@@ -169,6 +172,7 @@ impl LedgerApp {
             saved_state: AppState::default(),
             state_path: None,
             open_target: None,
+            edit_return: None,
             show_nav: true,
             title: String::new(),
             window_scale: 0.0,
@@ -518,6 +522,7 @@ impl LedgerApp {
         match action {
             Action::Run { cmd, reset } => {
                 let label = cmd.undo_label();
+                let was_edit = matches!(cmd, Command::TxnUpdate { .. });
                 let Some(session) = self.session.as_mut() else {
                     self.error("Open or create a company first.");
                     return;
@@ -529,9 +534,16 @@ impl LedgerApp {
                             self.forms.reset(kind);
                         }
                         self.lists.reset(reset);
-                        match outcome.created {
-                            Some(id) => self.info(format!("{label} recorded ({id})")),
-                            None => self.info(format!("{label}: done")),
+                        if was_edit {
+                            self.info(format!("{label}: changes saved. Edit > Undo puts the original back."));
+                            if let Some(page) = self.edit_return.take() {
+                                self.page = page;
+                            }
+                        } else {
+                            match outcome.created {
+                                Some(id) => self.info(format!("{label} recorded ({id})")),
+                                None => self.info(format!("{label}: done")),
+                            }
                         }
                     }
                     Err(e) => self.error(e.to_string()),
@@ -573,11 +585,42 @@ impl LedgerApp {
             }
             Action::Error(e) => self.error(e),
             Action::ClearStatus => self.info("Ready"),
+            Action::Open(id) => self.open_txn(id),
+            Action::EditCancelled => {
+                self.info("Edit cancelled; nothing was changed.");
+                if let Some(page) = self.edit_return.take() {
+                    self.page = page;
+                }
+            }
             Action::ExportCsv { name, csv } => self.export_csv(&name, &csv),
             Action::ExportXlsx { name, data } => match data {
                 Ok(bytes) => self.export_xlsx(&name, &bytes),
                 Err(e) => self.error(e),
             },
+        }
+    }
+
+    /// Opens a recorded transaction in its form, ready to change.
+    fn open_txn(&mut self, id: TxnId) {
+        let Some(t) = self.session.as_ref().and_then(|s| s.company().txn(id)).cloned() else {
+            self.error(format!("Transaction {id} was not found."));
+            return;
+        };
+        match self.forms.load(&t) {
+            Ok(kind) => {
+                // Back to the list, register or report it was opened from.
+                if !matches!(self.page, Page::Form(_)) {
+                    self.edit_return = Some(self.page);
+                }
+                self.page = Page::Form(kind);
+                let number = if t.number.is_empty() {
+                    String::new()
+                } else {
+                    format!(" {}", t.number)
+                };
+                self.info(format!("Editing {}{number}.", t.body.label()));
+            }
+            Err(e) => self.error(e),
         }
     }
 

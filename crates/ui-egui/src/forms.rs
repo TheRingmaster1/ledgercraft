@@ -9,8 +9,8 @@ use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
     AccountId, AccountLine, AccountType, Applied, Bill, Check, Company, CustomerId, Deposit,
-    Invoice, ItemId, JournalEntry, JournalLine, Party, PayBill, ReceivePayment, SalesLine, TxnBody,
-    TxnId, VendorId,
+    Invoice, ItemId, JournalEntry, JournalLine, Party, PayBill, ReceivePayment, SalesLine,
+    Transaction, TxnBody, TxnId, VendorId,
 };
 
 use crate::widgets::{self, field, money_label};
@@ -45,6 +45,8 @@ impl SalesLineInput {
 }
 
 pub(crate) struct InvoiceForm {
+    /// The invoice being edited, if this is not a new one.
+    pub editing: Option<TxnId>,
     pub customer: Option<CustomerId>,
     pub date: String,
     pub due: String,
@@ -56,6 +58,7 @@ pub(crate) struct InvoiceForm {
 impl Default for InvoiceForm {
     fn default() -> Self {
         Self {
+            editing: None,
             customer: None,
             date: today(),
             due: String::new(),
@@ -68,6 +71,8 @@ impl Default for InvoiceForm {
 
 /// Receive Payment (customer side) or Pay Bills (vendor side).
 pub(crate) struct PaymentForm {
+    /// The payment being edited, if this is not a new one.
+    pub editing: Option<TxnId>,
     pub customer: Option<CustomerId>,
     pub vendor: Option<VendorId>,
     pub date: String,
@@ -81,6 +86,7 @@ pub(crate) struct PaymentForm {
 impl Default for PaymentForm {
     fn default() -> Self {
         Self {
+            editing: None,
             customer: None,
             vendor: None,
             date: today(),
@@ -102,6 +108,8 @@ pub(crate) struct AccountLineInput {
 
 /// Enter Bill, Write Check and Make Deposit share this shape.
 pub(crate) struct LinesForm {
+    /// The bill, check or deposit being edited, if this is not a new one.
+    pub editing: Option<TxnId>,
     pub vendor: Option<VendorId>,
     pub payee: Option<Party>,
     pub account: Option<AccountId>,
@@ -115,6 +123,7 @@ pub(crate) struct LinesForm {
 impl Default for LinesForm {
     fn default() -> Self {
         Self {
+            editing: None,
             vendor: None,
             payee: None,
             account: None,
@@ -137,6 +146,8 @@ pub(crate) struct JournalLineInput {
 }
 
 pub(crate) struct JournalForm {
+    /// The journal entry being edited, if this is not a new one.
+    pub editing: Option<TxnId>,
     pub date: String,
     pub number: String,
     pub memo: String,
@@ -146,6 +157,7 @@ pub(crate) struct JournalForm {
 impl Default for JournalForm {
     fn default() -> Self {
         Self {
+            editing: None,
             date: today(),
             number: String::new(),
             memo: String::new(),
@@ -177,28 +189,229 @@ impl Forms {
             FormKind::Journal => self.journal = JournalForm::default(),
         }
     }
+
+    /// Fills the matching form with a recorded transaction so it can be
+    /// edited, and says which form that is.
+    pub(crate) fn load(&mut self, t: &Transaction) -> Result<FormKind, String> {
+        if t.voided {
+            return Err(format!(
+                "{} {} is void. A void transaction cannot be edited.",
+                t.body.label(),
+                t.number
+            ));
+        }
+        let editing = Some(t.id);
+        let date = t.date.to_string();
+        let number = t.number.clone();
+        let memo = t.memo.clone();
+        Ok(match &t.body {
+            TxnBody::Invoice(inv) => {
+                self.invoice = InvoiceForm {
+                    editing,
+                    customer: Some(inv.customer),
+                    date,
+                    due: inv.due_date.to_string(),
+                    number,
+                    memo,
+                    lines: inv
+                        .lines
+                        .iter()
+                        .map(|l| SalesLineInput {
+                            item: l.item,
+                            description: l.description.clone(),
+                            qty: l.qty.to_string(),
+                            rate: l.rate.to_plain_string(),
+                            account: Some(l.account),
+                        })
+                        .collect(),
+                };
+                FormKind::Invoice
+            }
+            TxnBody::ReceivePayment(p) => {
+                self.receive = PaymentForm {
+                    editing,
+                    customer: Some(p.customer),
+                    vendor: None,
+                    date,
+                    number,
+                    memo,
+                    method: p.method.clone(),
+                    account: Some(p.deposit_to),
+                    amounts: applied_amounts(&p.applied),
+                };
+                FormKind::ReceivePayment
+            }
+            TxnBody::PayBill(p) => {
+                self.pay_bills = PaymentForm {
+                    editing,
+                    customer: None,
+                    vendor: Some(p.vendor),
+                    date,
+                    number,
+                    memo,
+                    method: String::new(),
+                    account: Some(p.pay_from),
+                    amounts: applied_amounts(&p.applied),
+                };
+                FormKind::PayBills
+            }
+            TxnBody::Bill(b) => {
+                self.bill = LinesForm {
+                    editing,
+                    vendor: Some(b.vendor),
+                    payee: None,
+                    account: None,
+                    date,
+                    due: b.due_date.to_string(),
+                    number,
+                    memo,
+                    lines: account_line_inputs(&b.lines),
+                };
+                FormKind::Bill
+            }
+            TxnBody::Check(ch) => {
+                self.check = LinesForm {
+                    editing,
+                    vendor: None,
+                    payee: ch.payee,
+                    account: Some(ch.pay_from),
+                    date,
+                    due: String::new(),
+                    number,
+                    memo,
+                    lines: account_line_inputs(&ch.lines),
+                };
+                FormKind::Check
+            }
+            TxnBody::Deposit(d) => {
+                self.deposit = LinesForm {
+                    editing,
+                    vendor: None,
+                    payee: None,
+                    account: Some(d.deposit_to),
+                    date,
+                    due: String::new(),
+                    number,
+                    memo,
+                    lines: account_line_inputs(&d.lines),
+                };
+                FormKind::Deposit
+            }
+            TxnBody::Journal(j) => {
+                let blank_if_zero = |m: Money| {
+                    if m.is_zero() {
+                        String::new()
+                    } else {
+                        m.to_plain_string()
+                    }
+                };
+                self.journal = JournalForm {
+                    editing,
+                    date,
+                    number,
+                    memo,
+                    lines: j
+                        .lines
+                        .iter()
+                        .map(|l| JournalLineInput {
+                            account: Some(l.account),
+                            debit: blank_if_zero(l.debit),
+                            credit: blank_if_zero(l.credit),
+                            memo: l.memo.clone(),
+                            party: l.party,
+                        })
+                        .collect(),
+                };
+                FormKind::Journal
+            }
+        })
+    }
+}
+
+fn applied_amounts(applied: &[Applied]) -> BTreeMap<TxnId, String> {
+    applied
+        .iter()
+        .map(|a| (a.txn, a.amount.to_plain_string()))
+        .collect()
+}
+
+fn account_line_inputs(lines: &[AccountLine]) -> Vec<AccountLineInput> {
+    lines
+        .iter()
+        .map(|l| AccountLineInput {
+            account: Some(l.account),
+            description: l.description.clone(),
+            amount: l.amount.to_plain_string(),
+        })
+        .collect()
 }
 
 // ----- shared pieces ----------------------------------------------------------
 
-fn header(ui: &mut Ui, kind: FormKind) {
-    ui.label(RichText::new(kind.title()).heading().color(theme::ACCENT));
+fn header(ui: &mut Ui, kind: FormKind, editing: Option<TxnId>) {
+    if editing.is_some() {
+        ui.label(
+            RichText::new(format!("Edit {}", kind.title()))
+                .heading()
+                .color(theme::ACCENT),
+        );
+        ui.label(
+            RichText::new(
+                "You are changing a transaction that is already recorded. Save Changes \
+                 replaces it; Edit > Undo puts the original back.",
+            )
+            .color(theme::MUTED),
+        );
+    } else {
+        ui.label(RichText::new(kind.title()).heading().color(theme::ACCENT));
+    }
     ui.add_space(6.0);
 }
 
-/// The Save / Clear buttons. Returns (save, clear).
-fn footer(ui: &mut Ui) -> (bool, bool) {
+/// The Save / Clear buttons, or Save Changes / Cancel while editing.
+/// Returns (save, clear or cancel).
+fn footer(ui: &mut Ui, editing: Option<TxnId>) -> (bool, bool) {
     ui.add_space(10.0);
     let mut save = false;
     let mut clear = false;
+    let (save_label, clear_label) = if editing.is_some() {
+        ("Save Changes", "Cancel")
+    } else {
+        ("Save & New", "Clear")
+    };
     ui.horizontal(|ui| {
-        save = ui.button(RichText::new("Save & New").strong()).clicked();
-        clear = ui.button("Clear").clicked();
+        save = ui.button(RichText::new(save_label).strong()).clicked();
+        clear = ui.button(clear_label).clicked();
     });
     (save, clear)
 }
 
-fn finish(out: &mut Vec<Action>, kind: FormKind, built: Result<Command, String>) {
+/// Runs what the form built: a new transaction, or, while editing, the
+/// changes to the one being edited.
+fn finish(
+    out: &mut Vec<Action>,
+    kind: FormKind,
+    editing: Option<TxnId>,
+    built: Result<Command, String>,
+) {
+    let built = built.map(|cmd| match (editing, cmd) {
+        (
+            Some(id),
+            Command::TxnPost {
+                date,
+                number,
+                memo,
+                body,
+            },
+        ) => Command::TxnUpdate {
+            id,
+            date,
+            number,
+            memo,
+            body,
+        },
+        (_, cmd) => cmd,
+    });
     match built {
         Ok(cmd) => out.push(Action::Run {
             cmd,
@@ -206,6 +419,15 @@ fn finish(out: &mut Vec<Action>, kind: FormKind, built: Result<Command, String>)
         }),
         Err(e) => out.push(Action::Error(e)),
     }
+}
+
+/// Clear on a new form; Cancel on a form editing a recorded transaction.
+fn cleared(out: &mut Vec<Action>, editing: Option<TxnId>) {
+    out.push(if editing.is_some() {
+        Action::EditCancelled
+    } else {
+        Action::ClearStatus
+    });
 }
 
 fn total_row(ui: &mut Ui, label: &str, total: Money) {
@@ -218,7 +440,7 @@ fn total_row(ui: &mut Ui, label: &str, total: Money) {
 // ----- invoice ------------------------------------------------------------------
 
 pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut Vec<Action>) {
-    header(ui, FormKind::Invoice);
+    header(ui, FormKind::Invoice, f.editing);
     egui::Grid::new("inv_head")
         .num_columns(4)
         .spacing([12.0, 6.0])
@@ -317,13 +539,14 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Total", total);
-    let (save, clear) = footer(ui);
+    let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::Invoice, build_invoice(c, f));
+        finish(out, FormKind::Invoice, f.editing, build_invoice(c, f));
     }
     if clear {
+        let editing = f.editing;
         *f = InvoiceForm::default();
-        out.push(Action::ClearStatus);
+        cleared(out, editing);
     }
 }
 
@@ -394,7 +617,7 @@ pub(crate) fn receive_payment(
     f: &mut PaymentForm,
     out: &mut Vec<Action>,
 ) {
-    header(ui, FormKind::ReceivePayment);
+    header(ui, FormKind::ReceivePayment, f.editing);
     if f.account.is_none() {
         f.account = c
             .account_by_name("Undeposited Funds")
@@ -423,7 +646,7 @@ pub(crate) fn receive_payment(
         });
     let docs: Vec<OpenDoc> = match f.customer {
         Some(id) => c
-            .open_invoices(id)
+            .open_invoices_for(id, f.editing)
             .into_iter()
             .map(|(t, open)| {
                 let (due, total) = match &t.body {
@@ -448,18 +671,19 @@ pub(crate) fn receive_payment(
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Amount received", total);
-    let (save, clear) = footer(ui);
+    let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::ReceivePayment, build_receive(c, f, total));
+        finish(out, FormKind::ReceivePayment, f.editing, build_receive(c, f, total));
     }
     if clear {
+        let editing = f.editing;
         *f = PaymentForm::default();
-        out.push(Action::ClearStatus);
+        cleared(out, editing);
     }
 }
 
 pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut Vec<Action>) {
-    header(ui, FormKind::PayBills);
+    header(ui, FormKind::PayBills, f.editing);
     if f.account.is_none() {
         f.account = c.first_account_of(AccountType::Bank);
     }
@@ -487,7 +711,7 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
         });
     let docs: Vec<OpenDoc> = match f.vendor {
         Some(id) => c
-            .open_bills(id)
+            .open_bills_for(id, f.editing)
             .into_iter()
             .map(|(t, open)| {
                 let (due, total) = match &t.body {
@@ -512,13 +736,14 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Payment total", total);
-    let (save, clear) = footer(ui);
+    let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::PayBills, build_pay_bills(c, f, total));
+        finish(out, FormKind::PayBills, f.editing, build_pay_bills(c, f, total));
     }
     if clear {
+        let editing = f.editing;
         *f = PaymentForm::default();
-        out.push(Action::ClearStatus);
+        cleared(out, editing);
     }
 }
 
@@ -703,7 +928,7 @@ fn build_lines(lines: &[AccountLineInput]) -> Result<Vec<AccountLine>, String> {
 }
 
 pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Action>) {
-    header(ui, FormKind::Bill);
+    header(ui, FormKind::Bill, f.editing);
     egui::Grid::new("bill_head")
         .num_columns(4)
         .spacing([12.0, 6.0])
@@ -735,13 +960,14 @@ pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Ac
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Amount due", total);
-    let (save, clear) = footer(ui);
+    let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::Bill, build_bill(c, f));
+        finish(out, FormKind::Bill, f.editing, build_bill(c, f));
     }
     if clear {
+        let editing = f.editing;
         *f = LinesForm::default();
-        out.push(Action::ClearStatus);
+        cleared(out, editing);
     }
 }
 
@@ -770,7 +996,7 @@ fn build_bill(c: &Company, f: &LinesForm) -> Result<Command, String> {
 }
 
 pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Action>) {
-    header(ui, FormKind::Check);
+    header(ui, FormKind::Check, f.editing);
     if f.account.is_none() {
         f.account = c.first_account_of(AccountType::Bank);
     }
@@ -801,13 +1027,14 @@ pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<A
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Amount", total);
-    let (save, clear) = footer(ui);
+    let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::Check, build_check(c, f));
+        finish(out, FormKind::Check, f.editing, build_check(c, f));
     }
     if clear {
+        let editing = f.editing;
         *f = LinesForm::default();
-        out.push(Action::ClearStatus);
+        cleared(out, editing);
     }
 }
 
@@ -836,7 +1063,7 @@ fn build_check(c: &Company, f: &LinesForm) -> Result<Command, String> {
 }
 
 pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Action>) {
-    header(ui, FormKind::Deposit);
+    header(ui, FormKind::Deposit, f.editing);
     if f.account.is_none() {
         f.account = c.first_account_of(AccountType::Bank);
     }
@@ -878,13 +1105,14 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Deposit total", total);
-    let (save, clear) = footer(ui);
+    let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::Deposit, build_deposit(f));
+        finish(out, FormKind::Deposit, f.editing, build_deposit(f));
     }
     if clear {
+        let editing = f.editing;
         *f = LinesForm::default();
-        out.push(Action::ClearStatus);
+        cleared(out, editing);
     }
 }
 
@@ -904,7 +1132,7 @@ fn build_deposit(f: &LinesForm) -> Result<Command, String> {
 // ----- journal entry ------------------------------------------------------------------
 
 pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut Vec<Action>) {
-    header(ui, FormKind::Journal);
+    header(ui, FormKind::Journal, f.editing);
     ui.horizontal(|ui| {
         widgets::hint_label(ui, "Date");
         field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
@@ -968,13 +1196,14 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
             ui.label(RichText::new(off).color(theme::NEGATIVE));
         }
     });
-    let (save, clear) = footer(ui);
+    let (save, clear) = footer(ui, f.editing);
     if save {
-        finish(out, FormKind::Journal, build_journal(f));
+        finish(out, FormKind::Journal, f.editing, build_journal(f));
     }
     if clear {
+        let editing = f.editing;
         *f = JournalForm::default();
-        out.push(Action::ClearStatus);
+        cleared(out, editing);
     }
 }
 
@@ -1004,4 +1233,112 @@ fn build_journal(f: &JournalForm) -> Result<Command, String> {
         memo: f.memo.clone(),
         body: TxnBody::Journal(JournalEntry { lines }),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// What Save Changes builds from the form `kind` as it stands.
+    fn rebuild(c: &Company, f: &Forms, kind: FormKind) -> Result<Command, String> {
+        let paid = |amounts: &BTreeMap<TxnId, String>| {
+            amounts
+                .values()
+                .filter_map(|a| Money::parse(a).ok())
+                .fold(Money::ZERO, Money::saturating_add)
+        };
+        let (editing, built) = match kind {
+            FormKind::Invoice => (f.invoice.editing, build_invoice(c, &f.invoice)),
+            FormKind::ReceivePayment => (
+                f.receive.editing,
+                build_receive(c, &f.receive, paid(&f.receive.amounts)),
+            ),
+            FormKind::Bill => (f.bill.editing, build_bill(c, &f.bill)),
+            FormKind::PayBills => (
+                f.pay_bills.editing,
+                build_pay_bills(c, &f.pay_bills, paid(&f.pay_bills.amounts)),
+            ),
+            FormKind::Check => (f.check.editing, build_check(c, &f.check)),
+            FormKind::Deposit => (f.deposit.editing, build_deposit(&f.deposit)),
+            FormKind::Journal => (f.journal.editing, build_journal(&f.journal)),
+        };
+        let mut out = Vec::new();
+        finish(&mut out, kind, editing, built);
+        match out.pop() {
+            Some(Action::Run { cmd, .. }) => Ok(cmd),
+            Some(Action::Error(e)) => Err(e),
+            _ => Err("nothing was built".into()),
+        }
+    }
+
+    // Every kind of transaction in the sample company loads into its form and
+    // comes back out unchanged, as an edit of the same transaction.
+    #[test]
+    fn every_transaction_round_trips_through_its_form() {
+        let c = ledgercraft_engine::sample_company().unwrap();
+        let mut kinds = std::collections::BTreeSet::new();
+        for t in c.transactions.iter().filter(|t| !t.voided) {
+            let mut forms = Forms::default();
+            let kind = forms.load(t).unwrap();
+            kinds.insert(format!("{kind:?}"));
+            let built = rebuild(&c, &forms, kind).unwrap();
+            assert_eq!(built.id(), "txn.update", "{}", t.id);
+            let Command::TxnUpdate {
+                id,
+                date,
+                number,
+                memo,
+                body,
+            } = built
+            else {
+                continue;
+            };
+            assert_eq!(id, t.id);
+            assert_eq!(date, t.date, "{}", t.id);
+            assert_eq!(memo, t.memo, "{}", t.id);
+            if !t.number.is_empty() {
+                assert_eq!(number, t.number, "{}", t.id);
+            }
+            // A payment's amount is what the form applies; compare the whole
+            // body when the original applied all of it.
+            let fully_applied = |amount: Money, applied: &[Applied]| {
+                Money::checked_sum(applied.iter().map(|a| a.amount)) == Some(amount)
+            };
+            let comparable = match &t.body {
+                TxnBody::ReceivePayment(p) => fully_applied(p.amount, &p.applied),
+                TxnBody::PayBill(p) => fully_applied(p.amount, &p.applied),
+                _ => true,
+            };
+            if comparable {
+                assert_eq!(body, t.body, "{}", t.id);
+            } else {
+                assert_eq!(body.label(), t.body.label());
+            }
+        }
+        // The sample has every kind of form in it.
+        assert!(kinds.len() >= 6, "only {kinds:?}");
+    }
+
+    #[test]
+    fn void_transactions_do_not_open() {
+        let mut c = ledgercraft_engine::sample_company().unwrap();
+        let id = c
+            .transactions
+            .iter()
+            .find(|t| matches!(t.body, TxnBody::Check(_)))
+            .map(|t| t.id)
+            .unwrap();
+        c.void(id).unwrap();
+        let t = c.txn(id).unwrap();
+        assert!(Forms::default().load(t).is_err());
+    }
+
+    #[test]
+    fn cancel_while_editing_says_so_and_clear_does_not() {
+        let mut out = Vec::new();
+        cleared(&mut out, Some(TxnId(1)));
+        cleared(&mut out, None);
+        assert!(matches!(out[0], Action::EditCancelled));
+        assert!(matches!(out[1], Action::ClearStatus));
+    }
 }

@@ -6,7 +6,8 @@ use std::hash::Hash;
 use eframe::egui::{self, Align, Layout, RichText, Ui};
 use ledgercraft_core::Money;
 use ledgercraft_ledger::{
-    Account, AccountId, AccountType, Company, CustomerId, ItemId, Party, TxnBody, VendorId,
+    Account, AccountId, AccountType, Company, CustomerId, ItemId, Party, TxnBody, TxnId,
+    VendorId,
 };
 use ledgercraft_reports::{Cell, Report, RowKind};
 
@@ -221,22 +222,36 @@ pub(crate) fn report_view(ui: &mut Ui, r: &Report, out: &mut Vec<Action>) {
                         if strong {
                             text = text.strong();
                         }
-                        match row.account {
-                            Some(acct) => {
+                        match (row.account, row.txn) {
+                            (Some(acct), _) => {
                                 if ui.link(text).clicked() {
                                     out.push(Action::Go(Page::Register(acct)));
                                 }
                             }
-                            None => {
+                            (None, Some(txn)) => {
+                                if ui
+                                    .link(text)
+                                    .on_hover_text("Open this transaction to see or change it")
+                                    .clicked()
+                                {
+                                    out.push(Action::Open(txn));
+                                }
+                            }
+                            (None, None) => {
                                 ui.label(text);
                             }
                         }
                         for i in 0..r.columns.len() {
                             match row.cells.get(i) {
                                 Some(Cell::Money(m)) => money_label(ui, *m, strong),
-                                Some(Cell::Text(t)) => {
-                                    ui.label(t.as_str());
-                                }
+                                Some(Cell::Text(t)) => match row.txn {
+                                    Some(txn) => {
+                                        txn_cell(ui, RichText::new(t.as_str()), txn, out);
+                                    }
+                                    None => {
+                                        ui.label(t.as_str());
+                                    }
+                                },
                                 _ => {
                                     ui.label("");
                                 }
@@ -246,6 +261,14 @@ pub(crate) fn report_view(ui: &mut Ui, r: &Report, out: &mut Vec<Action>) {
                     }
                 });
         });
+}
+
+/// A cell in a row that stands for one transaction: double-click opens it.
+pub(crate) fn txn_cell(ui: &mut Ui, text: RichText, txn: TxnId, out: &mut Vec<Action>) {
+    let cell = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
+    if cell.double_clicked() {
+        out.push(Action::Open(txn));
+    }
 }
 
 /// A label with hover help when `hints::field` has some for its text.
