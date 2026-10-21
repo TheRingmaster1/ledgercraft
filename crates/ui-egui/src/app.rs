@@ -944,56 +944,56 @@ impl LedgerApp {
 
     fn status_row(&self, ui: &mut egui::Ui) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let (text, full_path) = match &self.session {
-                    None => ("No company open".to_string(), None),
-                    Some(session) => {
-                        let file = session
-                            .path()
-                            .map(file_name)
-                            .unwrap_or_else(|| "Not saved yet".into());
-                        let dirty = if session.is_dirty() {
-                            "  • unsaved changes"
-                        } else {
-                            ""
-                        };
-                        let lock = if session.is_protected() {
-                            "  • password protected"
-                        } else {
-                            "  • not password protected"
-                        };
-                        let full = session.path().map(|p| p.display().to_string());
-                        (format!("{file}{lock}{dirty}"), full)
-                    }
-                };
-                let height = ui.available_height();
-                let right_width = (ui.available_width() * 0.5).max(0.0);
-                ui.allocate_ui_with_layout(
-                    egui::vec2(right_width, height),
-                    egui::Layout::right_to_left(egui::Align::Center),
-                    |ui| {
-                        let label = ui.add(
-                            egui::Label::new(RichText::new(text).color(theme::MUTED))
-                                .wrap_mode(egui::TextWrapMode::Truncate),
-                        );
-                        if let Some(full) = full_path {
-                            label.on_hover_text(full);
-                        }
-                    },
-                );
-                ui.add_space(12.0);
-                // The message takes whatever is left, from the left edge.
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    let color = if self.status_is_error {
-                        theme::NEGATIVE
+            let (text, full_path) = match &self.session {
+                None => ("No company open".to_string(), None),
+                Some(session) => {
+                    let file = session
+                        .path()
+                        .map(file_name)
+                        .unwrap_or_else(|| "Not saved yet".into());
+                    let dirty = if session.is_dirty() {
+                        "  • unsaved changes"
                     } else {
-                        theme::MUTED
+                        ""
                     };
-                    ui.add(
-                        egui::Label::new(RichText::new(self.status.as_str()).color(color))
+                    let lock = if session.is_protected() {
+                        "  • password protected"
+                    } else {
+                        "  • not password protected"
+                    };
+                    let full = session.path().map(|p| p.display().to_string());
+                    (format!("{file}{lock}{dirty}"), full)
+                }
+            };
+            let height = ui.available_height();
+            let right_width = (ui.available_width() * 0.5).max(0.0);
+            ui.allocate_ui_with_layout(
+                egui::vec2(right_width, height),
+                egui::Layout::right_to_left(egui::Align::Center),
+                |ui| {
+                    let label = ui.add(
+                        egui::Label::new(RichText::new(text).color(theme::MUTED))
                             .wrap_mode(egui::TextWrapMode::Truncate),
-                    )
-                    .on_hover_text(self.status.as_str());
-                });
+                    );
+                    if let Some(full) = full_path {
+                        label.on_hover_text(full);
+                    }
+                },
+            );
+            ui.add_space(12.0);
+            // The message takes whatever is left, from the left edge.
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                let color = if self.status_is_error {
+                    theme::NEGATIVE
+                } else {
+                    theme::MUTED
+                };
+                ui.add(
+                    egui::Label::new(RichText::new(self.status.as_str()).color(color))
+                        .wrap_mode(egui::TextWrapMode::Truncate),
+                )
+                .on_hover_text(self.status.as_str());
+            });
         });
     }
 
