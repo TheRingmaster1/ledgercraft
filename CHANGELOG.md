@@ -89,9 +89,10 @@ fixes to a release. See docs/releasing.md.
   Calibri, Calibri Light, Verdana, Tahoma and Arial on Windows; DejaVu Sans,
   Noto Sans, Liberation Sans, Ubuntu and Cantarell on Linux. A font that
   cannot be found or read falls back to Classic instead of stopping the app.
-  Fonts with embedded bitmap or colour glyphs (such as Windows' regular
-  Calibri) are not offered: egui 0.37 draws those glyphs in their own colour,
-  so their letters came out white or missing.
+  Fonts with embedded bitmap or colour glyphs (such as Windows' Calibri) have
+  those glyphs removed when loaded, so egui draws their outlines in the text
+  colour: egui 0.37 drew the embedded glyphs in their own colour, so letters
+  came out white or missing.
   Each font's name in the list is shown in that font. A Darkness slider
   (Darker to Softer, with Default) softens ordinary text from black towards
   dark grey, which makes heavy fonts such as Verdana, Tahoma and Arial look
