@@ -41,6 +41,9 @@ impl ReconcileState {
     }
 }
 
+/// Width of the summary's amount column.
+const SUMMARY_AMOUNT_WIDTH: f32 = 140.0;
+
 fn is_reconcilable(kind: AccountType) -> bool {
     matches!(kind, AccountType::Bank | AccountType::CreditCard)
 }
@@ -179,61 +182,71 @@ fn body(
     let (n_up, up) = picked(true);
     let (n_down, down) = picked(false);
     let cleared_balance = beginning.saturating_add(up).saturating_add(down);
-    let ending = Money::parse_or_zero(&s.ending_balance);
+    // Nothing typed yet: no ending balance, so no difference to show.
+    let ending = if s.ending_balance.trim().is_empty() {
+        None
+    } else {
+        Some(Money::parse(&s.ending_balance))
+    };
     ui.add_space(8.0);
+    // Amounts in one right-aligned column of fixed width.
+    let amount = |ui: &mut Ui, text: RichText| {
+        let height = ui.spacing().interact_size.y;
+        ui.allocate_ui_with_layout(
+            egui::vec2(SUMMARY_AMOUNT_WIDTH, height),
+            egui::Layout::right_to_left(egui::Align::Center),
+            |ui| {
+                ui.label(text);
+            },
+        );
+    };
+    let money = |m: Money| RichText::new(currency::format(m));
     egui::Grid::new("rec_summary")
         .num_columns(2)
         .spacing([24.0, 4.0])
         .show(ui, |ui| {
             ui.label("Beginning balance");
-            money_label(ui, beginning, false);
+            amount(ui, money(beginning));
             ui.end_row();
             ui.label(format!("{n_up} {}", up_title.to_lowercase()));
-            money_label(ui, up, false);
+            amount(ui, money(up));
             ui.end_row();
             ui.label(format!("{n_down} {}", down_title.to_lowercase()));
-            money_label(ui, down, false);
+            amount(ui, money(down));
             ui.end_row();
             ui.label(RichText::new("Cleared balance").strong());
-            money_label(ui, cleared_balance, true);
+            amount(ui, money(cleared_balance).strong());
             ui.end_row();
             ui.label("Ending balance");
             match &ending {
-                Ok(e) => money_label(ui, *e, false),
-                Err(_) => {
-                    ui.label(RichText::new("not a number").color(theme::NEGATIVE));
-                }
+                Some(Ok(e)) => amount(ui, money(*e)),
+                Some(Err(_)) => amount(ui, RichText::new("not a number").color(theme::NEGATIVE)),
+                None => amount(ui, RichText::new("type it above").color(theme::MUTED)),
             }
             ui.end_row();
             ui.label(RichText::new("Difference").strong());
             match &ending {
-                Ok(e) => {
+                Some(Ok(e)) => {
                     let difference = e.saturating_sub(cleared_balance);
                     let colour = if difference.is_zero() {
                         theme::POSITIVE
                     } else {
                         theme::NEGATIVE
                     };
-                    ui.label(
-                        RichText::new(currency::format(difference))
-                            .strong()
-                            .color(colour),
-                    );
+                    amount(ui, money(difference).strong().color(colour));
                 }
-                Err(_) => {
-                    ui.label("");
-                }
+                _ => amount(ui, RichText::new("")),
             }
             ui.end_row();
         });
     ui.add_space(6.0);
-    let balances = ending.as_ref().is_ok_and(|e| *e == cleared_balance);
+    let balances = matches!(&ending, Some(Ok(e)) if *e == cleared_balance);
     ui.horizontal(|ui| {
         let now = ui
             .add_enabled(balances, egui::Button::new(RichText::new("Reconcile Now").strong()))
             .on_disabled_hover_text("Tick items until the difference is $0.00.");
         if now.clicked() {
-            if let Ok(ending_balance) = ending {
+            if let Some(Ok(ending_balance)) = ending {
                 out.push(Action::Run {
                     cmd: Command::AccountReconcile {
                         account,
