@@ -81,7 +81,8 @@ pub(crate) fn strength(password: &str, context: &[&str]) -> Option<Strength> {
 pub(crate) fn check_new(password: &str, confirm: &str, context: &[&str]) -> Result<(), String> {
     check_new_password(password)?;
     if !strength(password, context).is_some_and(Strength::acceptable) {
-        return Err("That password is too easy to guess. Try four or more unrelated words, \
+        return Err(
+            "That password is too easy to guess. Try four or more unrelated words, \
                     or make it longer and less predictable."
                 .into(),
         );
@@ -462,7 +463,10 @@ mod tests {
         ] {
             assert!(check_new(weak, weak, &[]).is_err(), "{weak} was accepted");
             let rated = strength(weak, &[]);
-            assert!(!rated.is_some_and(Strength::acceptable), "{weak}: {rated:?}");
+            assert!(
+                !rated.is_some_and(Strength::acceptable),
+                "{weak}: {rated:?}"
+            );
         }
     }
 
