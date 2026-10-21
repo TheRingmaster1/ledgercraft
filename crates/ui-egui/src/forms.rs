@@ -882,28 +882,26 @@ fn build_pay_bills(c: &Company, f: &PaymentForm, amount: Money) -> Result<Comman
 fn account_lines(ui: &mut Ui, salt: &str, c: &Company, lines: &mut Vec<AccountLineInput>) -> Money {
     let mut remove = None;
     let mut total = Money::ZERO;
-    egui::Grid::new(salt)
-        .spacing([8.0, 4.0])
-        .show(ui, |ui| {
-            for h in ["Account", "Description", "Amount", ""] {
-                widgets::column_header(ui, h);
+    egui::Grid::new(salt).spacing([8.0, 4.0]).show(ui, |ui| {
+        for h in ["Account", "Description", "Amount", ""] {
+            widgets::column_header(ui, h);
+        }
+        ui.end_row();
+        for (i, line) in lines.iter_mut().enumerate() {
+            widgets::account_combo(ui, (salt, "acct", i), c, &mut line.account, |k| {
+                !k.needs_party()
+            });
+            field(ui, &mut line.description, 260.0, "");
+            field(ui, &mut line.amount, 90.0, "0.00");
+            if let Ok(m) = Money::parse(&line.amount) {
+                total = total.saturating_add(m);
+            }
+            if widgets::remove_button(ui) {
+                remove = Some(i);
             }
             ui.end_row();
-            for (i, line) in lines.iter_mut().enumerate() {
-                widgets::account_combo(ui, (salt, "acct", i), c, &mut line.account, |k| {
-                    !k.needs_party()
-                });
-                field(ui, &mut line.description, 260.0, "");
-                field(ui, &mut line.amount, 90.0, "0.00");
-                if let Ok(m) = Money::parse(&line.amount) {
-                    total = total.saturating_add(m);
-                }
-                if widgets::remove_button(ui) {
-                    remove = Some(i);
-                }
-                ui.end_row();
-            }
-        });
+        }
+    });
     if let Some(i) = remove {
         if i < lines.len() {
             lines.remove(i);
