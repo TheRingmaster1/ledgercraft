@@ -46,7 +46,7 @@ pub(crate) fn money_label(ui: &mut Ui, m: Money, strong: bool) {
 
 pub(crate) fn account_combo(
     ui: &mut Ui,
-    salt: impl Hash,
+    salt: impl Hash + std::fmt::Debug,
     c: &Company,
     value: &mut Option<AccountId>,
     allow: impl Fn(AccountType) -> bool,
@@ -71,7 +71,7 @@ pub(crate) fn account_combo(
 /// Returns true when the choice changed.
 pub(crate) fn customer_combo(
     ui: &mut Ui,
-    salt: impl Hash,
+    salt: impl Hash + std::fmt::Debug,
     c: &Company,
     value: &mut Option<CustomerId>,
 ) -> bool {
@@ -93,7 +93,7 @@ pub(crate) fn customer_combo(
 
 pub(crate) fn vendor_combo(
     ui: &mut Ui,
-    salt: impl Hash,
+    salt: impl Hash + std::fmt::Debug,
     c: &Company,
     value: &mut Option<VendorId>,
 ) -> bool {
@@ -114,7 +114,12 @@ pub(crate) fn vendor_combo(
 }
 
 /// A customer-or-vendor picker with an empty choice.
-pub(crate) fn party_combo(ui: &mut Ui, salt: impl Hash, c: &Company, value: &mut Option<Party>) {
+pub(crate) fn party_combo(
+    ui: &mut Ui,
+    salt: impl Hash + std::fmt::Debug,
+    c: &Company,
+    value: &mut Option<Party>,
+) {
     let text = (*value).map(|p| c.party_name(p)).unwrap_or_default();
     egui::ComboBox::from_id_salt(salt)
         .selected_text(text)
@@ -135,7 +140,7 @@ pub(crate) fn party_combo(ui: &mut Ui, salt: impl Hash, c: &Company, value: &mut
 /// Returns true when the choice changed.
 pub(crate) fn item_combo(
     ui: &mut Ui,
-    salt: impl Hash,
+    salt: impl Hash + std::fmt::Debug,
     c: &Company,
     value: &mut Option<ItemId>,
 ) -> bool {

@@ -940,10 +940,11 @@ impl LedgerApp {
                             .color(theme::NAV_TEXT),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let hide = egui::Button::new(RichText::new("<").color(theme::NAV_TEXT))
-                            .frame(false);
+                        let hide_button =
+                            egui::Button::new(RichText::new("<").color(theme::NAV_TEXT))
+                                .frame(false);
                         if ui
-                            .add(hide)
+                            .add(hide_button)
                             .on_hover_text("Hide side bar (Ctrl+B)")
                             .clicked()
                         {
