@@ -165,9 +165,9 @@ impl Company {
             if self.is_reconciled(*id, account) {
                 return Err(LedgerError::Invalid(format!("{id} is already reconciled")));
             }
-            let amount = self.amount_in(&t.body, account).ok_or_else(|| {
-                LedgerError::Invalid(format!("{id} does not touch this account"))
-            })?;
+            let amount = self
+                .amount_in(&t.body, account)
+                .ok_or_else(|| LedgerError::Invalid(format!("{id} does not touch this account")))?;
             balance = balance.checked_add(amount).ok_or(LedgerError::Overflow)?;
         }
         if balance != ending_balance {
@@ -297,7 +297,10 @@ mod tests {
         c.reconcile(checking, d("2026-02-28"), dollars(750), vec![later])
             .unwrap();
         assert_eq!(c.reconciliations_for(checking).len(), 2);
-        assert_eq!(c.last_reconciliation(checking).unwrap().beginning_balance, dollars(800));
+        assert_eq!(
+            c.last_reconciliation(checking).unwrap().beginning_balance,
+            dollars(800)
+        );
     }
 
     #[test]
@@ -317,7 +320,9 @@ mod tests {
             .is_err());
         // Not a bank or credit card account.
         let rent = c.account_by_name("Rent").unwrap().id;
-        assert!(c.reconcile(rent, d("2026-01-31"), dollars(200), vec![chk]).is_err());
+        assert!(c
+            .reconcile(rent, d("2026-01-31"), dollars(200), vec![chk])
+            .is_err());
         assert!(c.reconciliations.is_empty());
     }
 
@@ -333,7 +338,9 @@ mod tests {
         if let TxnBody::Check(ch) = &mut bigger {
             ch.lines[0].amount = dollars(250);
         }
-        assert!(c.update(chk, d("2026-01-05"), "101", "", bigger.clone()).is_err());
+        assert!(c
+            .update(chk, d("2026-01-05"), "101", "", bigger.clone())
+            .is_err());
         // ...but the memo can change.
         c.update(chk, d("2026-01-05"), "101", "January rent", body)
             .unwrap();

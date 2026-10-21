@@ -396,7 +396,13 @@ pub fn reconciliation_report(company: &Company, account: AccountId, index: usize
             .and_then(|t| company.amount_in(&t.body, account))
             .unwrap_or(Money::ZERO)
     };
-    r.money(RowKind::Detail, "Beginning balance", 0, &[rec.beginning_balance], None);
+    r.money(
+        RowKind::Detail,
+        "Beginning balance",
+        0,
+        &[rec.beginning_balance],
+        None,
+    );
     let mut cleared: Vec<_> = rec.cleared.iter().map(|id| (*id, amount_of(*id))).collect();
     cleared.sort_by_key(|(id, _)| (company.txn(*id).map(|t| t.date), *id));
     for (title, increases) in [("Cleared increases", true), ("Cleared decreases", false)] {
@@ -412,10 +418,28 @@ pub fn reconciliation_report(company: &Company, account: AccountId, index: usize
             row(&mut r, *id, *amount);
         }
         let total = sum(items.iter().map(|(_, a)| *a));
-        r.money(RowKind::Subtotal, &format!("Total {}", title.to_lowercase()), 0, &[total], None);
+        r.money(
+            RowKind::Subtotal,
+            &format!("Total {}", title.to_lowercase()),
+            0,
+            &[total],
+            None,
+        );
     }
-    r.money(RowKind::Total, "Cleared balance", 0, &[rec.ending_balance], None);
-    r.money(RowKind::Detail, "Statement ending balance", 0, &[rec.ending_balance], None);
+    r.money(
+        RowKind::Total,
+        "Cleared balance",
+        0,
+        &[rec.ending_balance],
+        None,
+    );
+    r.money(
+        RowKind::Detail,
+        "Statement ending balance",
+        0,
+        &[rec.ending_balance],
+        None,
+    );
     // What had not cleared by the statement date (and is still not reconciled).
     let uncleared = company.unreconciled(account, rec.statement_date);
     if !uncleared.is_empty() {

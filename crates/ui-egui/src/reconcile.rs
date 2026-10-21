@@ -63,13 +63,7 @@ pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut ReconcileState, out: &mut V
         .show(ui, |ui| body(ui, c, s, out, list_height));
 }
 
-fn body(
-    ui: &mut Ui,
-    c: &Company,
-    s: &mut ReconcileState,
-    out: &mut Vec<Action>,
-    list_height: f32,
-) {
+fn body(ui: &mut Ui, c: &Company, s: &mut ReconcileState, out: &mut Vec<Action>, list_height: f32) {
     ui.label(RichText::new("Reconcile").heading().color(theme::ACCENT));
     ui.label(
         RichText::new(
@@ -162,8 +156,24 @@ fn body(
         items.iter().partition(|i| !i.amount.is_negative());
     ui.columns(2, |cols| {
         if let [left, right] = cols {
-            item_list(left, "rec_up", up_title, c, &ups, &mut s.cleared, list_height);
-            item_list(right, "rec_down", down_title, c, &downs, &mut s.cleared, list_height);
+            item_list(
+                left,
+                "rec_up",
+                up_title,
+                c,
+                &ups,
+                &mut s.cleared,
+                list_height,
+            );
+            item_list(
+                right,
+                "rec_down",
+                down_title,
+                c,
+                &downs,
+                &mut s.cleared,
+                list_height,
+            );
         }
     });
 
@@ -230,7 +240,10 @@ fn body(
     let balances = ending.as_ref().is_ok_and(|e| *e == cleared_balance);
     ui.horizontal(|ui| {
         let now = ui
-            .add_enabled(balances, egui::Button::new(RichText::new("Reconcile Now").strong()))
+            .add_enabled(
+                balances,
+                egui::Button::new(RichText::new("Reconcile Now").strong()),
+            )
             .on_disabled_hover_text("Tick items until the difference is $0.00.");
         if now.clicked() {
             if let Ok(ending_balance) = ending {
@@ -326,7 +339,13 @@ fn item_list(
 }
 
 /// Earlier reconciliations, and the report of the chosen (or just saved) one.
-fn history(ui: &mut Ui, c: &Company, account: AccountId, s: &mut ReconcileState, out: &mut Vec<Action>) {
+fn history(
+    ui: &mut Ui,
+    c: &Company,
+    account: AccountId,
+    s: &mut ReconcileState,
+    out: &mut Vec<Action>,
+) {
     let recs = c.reconciliations_for(account);
     if recs.is_empty() {
         return;
@@ -385,12 +404,21 @@ mod tests {
         // Nothing ticked and a difference: nothing is reconciled.
         assert!(out.is_empty());
         assert_eq!(s.known, Some((checking, 0)));
-        assert!(!s.statement_date.is_empty(), "the statement date defaults to today");
+        assert!(
+            !s.statement_date.is_empty(),
+            "the statement date defaults to today"
+        );
     }
 
     #[test]
     fn credit_cards_get_their_own_list_titles() {
-        assert_eq!(list_titles(Some(AccountType::CreditCard)).0, "Charges and cash advances");
-        assert_eq!(list_titles(Some(AccountType::Bank)).1, "Checks and payments");
+        assert_eq!(
+            list_titles(Some(AccountType::CreditCard)).0,
+            "Charges and cash advances"
+        );
+        assert_eq!(
+            list_titles(Some(AccountType::Bank)).1,
+            "Checks and payments"
+        );
     }
 }
