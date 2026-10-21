@@ -73,6 +73,8 @@ pub struct LedgerApp {
     edit_return: Option<Page>,
     show_nav: bool,
     title: String,
+    /// The font and size last applied, so fonts are rebuilt only on a change.
+    applied_text: Option<(theme::Font, theme::TextSize)>,
     /// Scale the window size limits were last set for (0 = not yet).
     window_scale: f32,
 }
@@ -176,6 +178,7 @@ impl LedgerApp {
             show_nav: true,
             title: String::new(),
             window_scale: 0.0,
+            applied_text: None,
         }
     }
 
@@ -212,8 +215,13 @@ impl LedgerApp {
 
     /// Row Shading applies to every striped list in the app: egui's striped
     /// grids take their colour from `faint_bg_color` (and nothing else does).
-    fn apply_prefs(&self, ctx: &egui::Context) {
+    fn apply_prefs(&mut self, ctx: &egui::Context) {
         crate::currency::set(self.prefs.currency);
+        let text = (self.prefs.font, self.prefs.text_size);
+        if self.applied_text != Some(text) {
+            theme::set_text(ctx, text.0, text.1);
+            self.applied_text = Some(text);
+        }
         let stripe = self.prefs.stripe();
         if ctx.style().visuals.faint_bg_color != stripe {
             ctx.style_mut(|s| s.visuals.faint_bg_color = stripe);
