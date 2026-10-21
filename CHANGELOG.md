@@ -61,6 +61,12 @@ fixes to a release. See docs/releasing.md.
   taskbar and dock match it to the menu entry and icon (including Wayland).
 
 ### Fixed
+- Entry boxes are easy to see: white with a thin grey outline (the accent
+  outline when focused), instead of near-white boxes with no edge that all
+  but vanished on unshaded rows. Buttons and drop-downs get the same outline.
+- Form lines you type into (invoice, bill, check, deposit and journal entry
+  lines) are no longer shaded in alternating grey bars; Row Shading still
+  applies to lists, registers and reports, where it helps reading.
 - The status bar no longer overlaps itself in a narrow window. Messages on
   the left clear themselves after a few seconds (errors after 20), the right
   side shows the company's file name rather than its whole path (hover for
