@@ -40,26 +40,48 @@ pub(crate) const MIN_STRENGTH: u8 = 3;
 /// strong anyway, and the estimate's work grows with the length.
 const STRENGTH_MAX_CHARS: usize = 64;
 
-/// How hard `password` is to guess, 0 (trivial) to 4 (very hard), or `None`
-/// when nothing has been typed. Common passwords, names, dictionary words,
+/// What the meter shows for a new password.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Strength {
+    /// Shorter than the minimum, however unusual it is.
+    TooShort { chars: usize },
+    /// Long enough; how hard it is to guess, 0 (trivial) to 4 (very hard).
+    Score(u8),
+}
+
+impl Strength {
+    /// Whether a new password with this strength is accepted.
+    pub(crate) fn acceptable(self) -> bool {
+        matches!(self, Self::Score(score) if score >= MIN_STRENGTH)
+    }
+}
+
+/// How strong `password` is, or `None` when nothing has been typed. The
+/// length rule comes first, so the meter never calls a password good that
+/// Create would refuse. Then common passwords, names, dictionary words,
 /// dates, keyboard runs and the `context` words (such as the company name)
 /// all count against it.
-pub(crate) fn strength(password: &str, context: &[&str]) -> Option<u8> {
+pub(crate) fn strength(password: &str, context: &[&str]) -> Option<Strength> {
     if password.is_empty() {
         return None;
     }
+    let chars = password.chars().count();
+    if chars < MIN_PASSWORD_CHARS {
+        return Some(Strength::TooShort { chars });
+    }
     let head: Zeroizing<String> =
         Zeroizing::new(password.chars().take(STRENGTH_MAX_CHARS).collect());
-    Some(u8::from(zxcvbn::zxcvbn(&head, context).score()))
+    Some(Strength::Score(u8::from(
+        zxcvbn::zxcvbn(&head, context).score(),
+    )))
 }
 
 /// Checks a new password and its confirmation. `context` is words the
 /// password should not lean on, such as the company name.
 pub(crate) fn check_new(password: &str, confirm: &str, context: &[&str]) -> Result<(), String> {
     check_new_password(password)?;
-    if strength(password, context).unwrap_or(0) < MIN_STRENGTH {
-        return Err(
-            "That password is too easy to guess. Try four or more unrelated words, \
+    if !strength(password, context).is_some_and(Strength::acceptable) {
+        return Err("That password is too easy to guess. Try four or more unrelated words, \
                     or make it longer and less predictable."
                 .into(),
         );
@@ -72,15 +94,20 @@ pub(crate) fn check_new(password: &str, confirm: &str, context: &[&str]) -> Resu
 
 /// A four-part bar and a word for how strong the new password is. Nothing
 /// is shown until something has been typed.
-pub(crate) fn strength_meter(ui: &mut egui::Ui, strength: Option<u8>) {
-    let Some(score) = strength else {
+pub(crate) fn strength_meter(ui: &mut egui::Ui, strength: Option<Strength>) {
+    let Some(strength) = strength else {
         return;
     };
-    let (word, colour) = match score {
-        0 | 1 => ("Too easy to guess", theme::NEGATIVE),
-        2 => ("Weak", theme::WARNING),
-        3 => ("Good", theme::POSITIVE),
-        _ => ("Strong", theme::POSITIVE),
+    let (score, word, colour) = match strength {
+        Strength::TooShort { chars } => (
+            0,
+            format!("Too short: {chars} of {MIN_PASSWORD_CHARS} characters"),
+            theme::NEGATIVE,
+        ),
+        Strength::Score(score @ (0 | 1)) => (score, "Too easy to guess".into(), theme::NEGATIVE),
+        Strength::Score(2) => (2, "Weak".into(), theme::WARNING),
+        Strength::Score(3) => (3, "Good".into(), theme::POSITIVE),
+        Strength::Score(score) => (score, "Strong".into(), theme::POSITIVE),
     };
     ui.horizontal(|ui| {
         let (rect, _) = ui.allocate_exact_size(egui::vec2(160.0, 8.0), egui::Sense::hover());
@@ -224,7 +251,7 @@ pub(crate) struct PasswordForm {
     remove: bool,
     error: Option<String>,
     /// How strong `new` is, worked out when it changes.
-    strength: Option<u8>,
+    strength: Option<Strength>,
 }
 
 impl Drop for PasswordForm {
@@ -434,16 +461,27 @@ mod tests {
             "123456789012",
         ] {
             assert!(check_new(weak, weak, &[]).is_err(), "{weak} was accepted");
-            assert!(strength(weak, &[]).unwrap_or(0) < MIN_STRENGTH, "{weak}");
+            let rated = strength(weak, &[]);
+            assert!(!rated.is_some_and(Strength::acceptable), "{weak}: {rated:?}");
         }
+    }
+
+    // Regression: "beautiful" (9 characters) showed "Good" on the meter, but
+    // Create refused it for being shorter than 12. Short is never good.
+    #[test]
+    fn the_meter_applies_the_length_rule_first() {
+        let rated = strength("beautiful", &[]);
+        assert_eq!(rated, Some(Strength::TooShort { chars: 9 }));
+        assert!(!rated.is_some_and(Strength::acceptable));
+        assert!(check_new("beautiful", "beautiful", &[]).is_err());
     }
 
     #[test]
     fn strength_is_none_until_typed_and_high_for_random_passwords() {
         assert_eq!(strength("", &[]), None);
-        assert_eq!(strength(STRONG, &[]), Some(4));
+        assert_eq!(strength(STRONG, &[]), Some(Strength::Score(4)));
         // Very long input is fine and still strong.
         let long = STRONG.repeat(20);
-        assert!(strength(&long, &[]).unwrap_or(0) >= MIN_STRENGTH);
+        assert!(strength(&long, &[]).is_some_and(Strength::acceptable));
     }
 }

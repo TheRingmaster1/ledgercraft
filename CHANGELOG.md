@@ -34,6 +34,9 @@ fixes to a release. See docs/releasing.md.
   taskbar and dock match it to the menu entry and icon (including Wayland).
 
 ### Fixed
+- The password meter applies the 12-character minimum first: a short
+  password shows "Too short: 9 of 12 characters" instead of "Good" (it
+  showed "Good" for "beautiful", which Create then refused).
 - Create a Company no longer runs off the bottom of a small LedgerCraft
   window. The company details are on the left and the password and imports on
   the right; if the window is still too short, the fields scroll while the
