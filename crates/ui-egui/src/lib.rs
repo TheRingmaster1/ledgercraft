@@ -10,6 +10,7 @@ mod hints;
 mod licenses;
 mod pages;
 mod prefs;
+mod start;
 mod theme;
 mod tutorial;
 mod widgets;

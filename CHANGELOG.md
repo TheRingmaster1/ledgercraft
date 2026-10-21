@@ -27,6 +27,16 @@ fixes to a release. See docs/releasing.md.
   and Open Menus On Hover); it no longer turns the tutorial back on.
 
 ### Added
+- Start page: with no company open, LedgerCraft shows its icon and three
+  choices (Create a New Company, Open a Company File, Explore the Sample
+  Company) plus a link to the tutorial. The app now starts here instead of
+  creating an unnamed "My Company".
+- Create a Company window: company name (required), legal name, fiscal year
+  start month, email, phone and address, and a standard or empty chart of
+  accounts; then asks where to save the file. File > New Company opens it.
+- File > Close Company returns to the start page, asking first if there are
+  unsaved changes. Menus and shortcuts that need a company are greyed out
+  until one is open.
 - App icon: an open ledger book on navy, shown in the title bar and taskbar,
   and embedded in ledgercraft.exe for Explorer, the Start menu and shortcuts.
 - Tutorial: thirteen lessons covering the whole app as it stands (getting

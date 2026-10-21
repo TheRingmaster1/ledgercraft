@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText};
 use ledgercraft_engine::{sample_company, Session};
-use ledgercraft_ledger::Company;
 
 use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
+use crate::start::{self, NewCompanyForm, StartChoice, StartPage};
 use crate::{forms, theme, tutorial, Action, FormKind, Page, Reset};
 
 /// Something waiting for the user to decide what to do with unsaved changes.
@@ -16,11 +16,16 @@ enum Pending {
     New,
     Open,
     Sample,
+    Close,
     Quit,
 }
 
 pub struct LedgerApp {
-    session: Session,
+    /// The open company; `None` shows the start page.
+    session: Option<Session>,
+    /// The Create a Company window, while it is open.
+    create: Option<NewCompanyForm>,
+    start: StartPage,
     page: Page,
     forms: Forms,
     lists: ListState,
@@ -56,20 +61,28 @@ const CHECK: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::W
 const SIDE_BAR: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::B);
 
 impl LedgerApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, session: Session) -> Self {
+    /// `None` starts with no company open, on the start page.
+    pub fn new(cc: &eframe::CreationContext<'_>, session: Option<Session>) -> Self {
         theme::apply(&cc.egui_ctx);
         let prefs = Prefs::load();
         Self {
             show_tutorial: prefs.show_tutorial,
             prefs,
             saved_prefs: prefs,
-            ..Self::with_session(session)
+            ..Self::blank(session)
         }
     }
 
+    #[cfg(test)]
     fn with_session(session: Session) -> Self {
+        Self::blank(Some(session))
+    }
+
+    fn blank(session: Option<Session>) -> Self {
         Self {
             session,
+            create: None,
+            start: StartPage::default(),
             page: Page::Home,
             forms: Forms::default(),
             lists: ListState::default(),
@@ -155,8 +168,13 @@ impl LedgerApp {
 
     // ----- files -----------------------------------------------------------
 
+    /// True when the open company has unsaved changes.
+    fn is_dirty(&self) -> bool {
+        self.session.as_ref().is_some_and(Session::is_dirty)
+    }
+
     fn request(&mut self, what: Pending, ctx: &egui::Context) {
-        if self.session.is_dirty() {
+        if self.is_dirty() {
             self.pending = Some(what);
         } else {
             self.carry_out(what, ctx);
@@ -165,10 +183,9 @@ impl LedgerApp {
 
     fn carry_out(&mut self, what: Pending, ctx: &egui::Context) {
         match what {
-            Pending::New => {
-                self.replace_session(Session::new(Company::with_default_accounts("My Company")));
-                self.info("New company created with a starter chart of accounts.");
-            }
+            // Opens Create a Company; the open company stays until one is created.
+            Pending::New => self.create = Some(NewCompanyForm::default()),
+            Pending::Close => self.close_company(),
             Pending::Sample => match sample_company() {
                 Ok(c) => {
                     self.replace_session(Session::new(c));
@@ -201,8 +218,19 @@ impl LedgerApp {
         }
     }
 
+    /// Back to the start page with no company open.
+    fn close_company(&mut self) {
+        if self.session.take().is_some() {
+            self.info("Company closed.");
+        }
+        self.forms = Forms::default();
+        self.lists = ListState::default();
+        self.page = Page::Home;
+    }
+
     fn replace_session(&mut self, s: Session) {
-        self.session = s;
+        self.session = Some(s);
+        self.create = None;
         self.forms = Forms::default();
         self.lists = ListState::default();
         self.page = Page::Home;
@@ -210,10 +238,14 @@ impl LedgerApp {
 
     /// Saves; returns true when the books are safely on disk.
     fn save(&mut self) -> bool {
-        if self.session.path().is_none() {
+        let Some(session) = self.session.as_mut() else {
+            return false;
+        };
+        if session.path().is_none() {
             return self.save_as();
         }
-        match self.session.save() {
+        let result = session.save();
+        match result {
             Ok(()) => {
                 self.info("Saved");
                 true
@@ -226,7 +258,10 @@ impl LedgerApp {
     }
 
     fn save_as(&mut self) -> bool {
-        let name = format!("{}.{}", self.session.company().info.name, ledgercraft_file::EXTENSION);
+        let Some(session) = self.session.as_ref() else {
+            return false;
+        };
+        let name = format!("{}.{}", session.company().info.name, ledgercraft_file::EXTENSION);
         let Some(path) = rfd::FileDialog::new()
             .add_filter("LedgerCraft company", &[ledgercraft_file::EXTENSION])
             .set_file_name(name)
@@ -234,7 +269,11 @@ impl LedgerApp {
         else {
             return false;
         };
-        match self.session.save_as(&path) {
+        let Some(session) = self.session.as_mut() else {
+            return false;
+        };
+        let result = session.save_as(&path);
+        match result {
             Ok(()) => {
                 self.info(format!("Saved to {}", path.display()));
                 true
@@ -275,14 +314,14 @@ impl LedgerApp {
     }
 
     fn undo(&mut self) {
-        match self.session.undo() {
+        match self.session.as_mut().and_then(Session::undo) {
             Some(label) => self.info(format!("Undid {label}")),
             None => self.info("Nothing to undo"),
         }
     }
 
     fn redo(&mut self) {
-        match self.session.redo() {
+        match self.session.as_mut().and_then(Session::redo) {
             Some(label) => self.info(format!("Redid {label}")),
             None => self.info("Nothing to redo"),
         }
@@ -294,7 +333,12 @@ impl LedgerApp {
         match action {
             Action::Run { cmd, reset } => {
                 let label = cmd.undo_label();
-                match self.session.execute(cmd) {
+                let Some(session) = self.session.as_mut() else {
+                    self.error("Open or create a company first.");
+                    return;
+                };
+                let result = session.execute(cmd);
+                match result {
                     Ok(outcome) => {
                         if let Reset::Form(kind) = reset {
                             self.forms.reset(kind);
@@ -311,7 +355,11 @@ impl LedgerApp {
             Action::Go(page) => self.page = page,
             Action::InvoiceFor(id) => {
                 self.forms.invoice.customer = Some(id);
-                let terms = self.session.company().customer(id).map(|c| c.contact.terms_days);
+                let terms = self
+                    .session
+                    .as_ref()
+                    .and_then(|s| s.company().customer(id))
+                    .map(|c| c.contact.terms_days);
                 if let (Some(t), Ok(d)) = (terms, ledgercraft_core::Date::parse(&self.forms.invoice.date)) {
                     self.forms.invoice.due = d.add_days(i64::from(t)).to_string();
                 }
@@ -350,7 +398,8 @@ impl LedgerApp {
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
         let pressed = |s: &KeyboardShortcut| ctx.input_mut(|i| i.consume_shortcut(s));
-        if pressed(&SAVE) {
+        let has_company = self.session.is_some();
+        if has_company && pressed(&SAVE) {
             self.save();
         }
         if pressed(&OPEN) {
@@ -361,19 +410,19 @@ impl LedgerApp {
         }
         // While typing, Ctrl+Z / Ctrl+Y belong to the text field.
         let typing = ctx.memory(|m| m.focused().is_some());
-        if !typing && pressed(&UNDO) {
+        if !typing && has_company && pressed(&UNDO) {
             self.undo();
         }
-        if !typing && pressed(&REDO) {
+        if !typing && has_company && pressed(&REDO) {
             self.redo();
         }
-        if pressed(&INVOICE) {
+        if has_company && pressed(&INVOICE) {
             self.page = Page::Form(FormKind::Invoice);
         }
-        if pressed(&CHECK) {
+        if has_company && pressed(&CHECK) {
             self.page = Page::Form(FormKind::Check);
         }
-        if pressed(&SIDE_BAR) {
+        if has_company && pressed(&SIDE_BAR) {
             self.show_nav = !self.show_nav;
         }
     }
@@ -382,11 +431,12 @@ impl LedgerApp {
         egui::TopBottomPanel::top("menu").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 let mut tops = Vec::new();
-                if !self.show_nav && ui.button(">").on_hover_text("Show side bar (Ctrl+B)").clicked() {
+                let has_company = self.session.is_some();
+                if has_company && !self.show_nav && ui.button(">").on_hover_text("Show side bar (Ctrl+B)").clicked() {
                     self.show_nav = true;
                 }
                 tops.push(ui.menu_button("File", |ui| {
-                    if ui.button("New Company").clicked() {
+                    if ui.button("New Company…").clicked() {
                         ui.close_menu();
                         self.request(Pending::New, ctx);
                     }
@@ -399,13 +449,20 @@ impl LedgerApp {
                         self.request(Pending::Sample, ctx);
                     }
                     ui.separator();
-                    if ui.button("Save").clicked() {
+                    if ui.add_enabled(has_company, egui::Button::new("Save")).clicked() {
                         ui.close_menu();
                         self.save();
                     }
-                    if ui.button("Save As…").clicked() {
+                    if ui.add_enabled(has_company, egui::Button::new("Save As…")).clicked() {
                         ui.close_menu();
                         self.save_as();
+                    }
+                    let close = ui
+                        .add_enabled(has_company, egui::Button::new("Close Company"))
+                        .on_hover_text("Close the books and go back to the start page.");
+                    if close.clicked() {
+                        ui.close_menu();
+                        self.request(Pending::Close, ctx);
                     }
                     ui.separator();
                     if ui.button("Exit").clicked() {
@@ -414,23 +471,31 @@ impl LedgerApp {
                     }
                 }).response);
                 tops.push(ui.menu_button("Edit", |ui| {
-                    let undo = self.session.undo_label().map(|l| format!("Undo {l}"));
+                    let undo = self.session.as_ref().and_then(Session::undo_label).map(|l| format!("Undo {l}"));
                     if ui.add_enabled(undo.is_some(), egui::Button::new(undo.unwrap_or_else(|| "Undo".into()))).clicked() {
                         ui.close_menu();
                         self.undo();
                     }
-                    let redo = self.session.redo_label().map(|l| format!("Redo {l}"));
+                    let redo = self.session.as_ref().and_then(Session::redo_label).map(|l| format!("Redo {l}"));
                     if ui.add_enabled(redo.is_some(), egui::Button::new(redo.unwrap_or_else(|| "Redo".into()))).clicked() {
                         ui.close_menu();
                         self.redo();
                     }
                 }).response);
                 tops.push(ui.menu_button("View", |ui| {
-                    if ui.checkbox(&mut self.show_nav, "Side Bar    Ctrl+B").clicked() {
+                    let side_bar = egui::Checkbox::new(&mut self.show_nav, "Side Bar    Ctrl+B");
+                    if ui.add_enabled(has_company, side_bar).clicked() {
                         ui.close_menu();
                     }
                 }).response);
+                // Lists, Customers, Vendors, Banking and Reports work on a
+                // company, so their items are greyed out until one is open.
+                // (Disabled inside each menu rather than around the bar, so
+                // the menus stay part of the same bar for Open Menus On Hover.)
                 tops.push(ui.menu_button("Lists", |ui| {
+                    if !has_company {
+                        ui.disable();
+                    }
                     for (label, page) in [
                         ("Chart of Accounts", Page::Accounts),
                         ("Customers", Page::Customers),
@@ -444,6 +509,9 @@ impl LedgerApp {
                     }
                 }).response);
                 tops.push(ui.menu_button("Customers", |ui| {
+                    if !has_company {
+                        ui.disable();
+                    }
                     for kind in [FormKind::Invoice, FormKind::ReceivePayment, FormKind::Deposit] {
                         if ui.button(kind.title()).clicked() {
                             ui.close_menu();
@@ -452,6 +520,9 @@ impl LedgerApp {
                     }
                 }).response);
                 tops.push(ui.menu_button("Vendors", |ui| {
+                    if !has_company {
+                        ui.disable();
+                    }
                     for kind in [FormKind::Bill, FormKind::PayBills] {
                         if ui.button(kind.title()).clicked() {
                             ui.close_menu();
@@ -460,6 +531,9 @@ impl LedgerApp {
                     }
                 }).response);
                 tops.push(ui.menu_button("Banking", |ui| {
+                    if !has_company {
+                        ui.disable();
+                    }
                     for kind in [FormKind::Check, FormKind::Deposit, FormKind::Journal] {
                         if ui.button(kind.title()).clicked() {
                             ui.close_menu();
@@ -470,6 +544,9 @@ impl LedgerApp {
                 // A real menu: each report opens directly, rather than
                 // duplicating the side bar's "Reports" link.
                 tops.push(ui.menu_button("Reports", |ui| {
+                    if !has_company {
+                        ui.disable();
+                    }
                     for kind in ledgercraft_reports::ReportKind::ALL {
                         if ui.button(kind.label()).clicked() {
                             ui.close_menu();
@@ -515,7 +592,7 @@ impl LedgerApp {
             .resizable(false)
             .exact_width(190.0)
             .frame(egui::Frame::none().fill(theme::NAV_BG).inner_margin(10.0))
-            .show_animated(ctx, self.show_nav, |ui| {
+            .show_animated(ctx, self.show_nav && self.session.is_some(), |ui| {
                 theme::nav_visuals(ui);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("LedgerCraft").size(20.0).strong().color(theme::NAV_TEXT));
@@ -562,13 +639,18 @@ impl LedgerApp {
                 let color = if self.status_is_error { theme::NEGATIVE } else { theme::MUTED };
                 ui.label(RichText::new(self.status.as_str()).color(color));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let file = self
-                        .session
-                        .path()
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_else(|| "Not saved yet".into());
-                    let dirty = if self.session.is_dirty() { "  • unsaved changes" } else { "" };
-                    ui.label(RichText::new(format!("{file}{dirty}")).color(theme::MUTED));
+                    let text = match &self.session {
+                        None => "No company open".to_string(),
+                        Some(session) => {
+                            let file = session
+                                .path()
+                                .map(|p| p.display().to_string())
+                                .unwrap_or_else(|| "Not saved yet".into());
+                            let dirty = if session.is_dirty() { "  • unsaved changes" } else { "" };
+                            format!("{file}{dirty}")
+                        }
+                    };
+                    ui.label(RichText::new(text).color(theme::MUTED));
                 });
             });
         });
@@ -611,6 +693,25 @@ impl LedgerApp {
                 None => {}
             }
         }
+        let created = match self.create.as_mut() {
+            Some(form) => start::new_company_window(ctx, form),
+            None => None,
+        };
+        match created {
+            Some(start::CreateOutcome::Create(company)) => {
+                let name = company.info.name.clone();
+                self.replace_session(Session::new(company));
+                self.info(format!("Created {name}."));
+                // Ask where it lives straight away, as desktop apps do.
+                if !self.save_as() && !self.status_is_error {
+                    self.info(format!(
+                        "Created {name}. It is not saved yet: use File > Save As to choose where it lives."
+                    ));
+                }
+            }
+            Some(start::CreateOutcome::Cancel) => self.create = None,
+            None => {}
+        }
         let mut open = self.show_about;
         let mut view_licenses = false;
         egui::Window::new("About LedgerCraft").open(&mut open).collapsible(false).show(ctx, |ui| {
@@ -638,7 +739,10 @@ impl LedgerApp {
         prefs::window(ctx, &mut self.show_prefs, &mut self.prefs);
         let target = tutorial::window(ctx, &mut self.show_tutorial, &mut self.prefs, &mut self.tutorial);
         match target {
-            Some(tutorial::Target::Page(page)) => self.page = page,
+            Some(tutorial::Target::Page(page)) if self.session.is_some() => self.page = page,
+            Some(tutorial::Target::Page(_)) => {
+                self.info("Open or create a company first, or explore the sample company.");
+            }
             Some(tutorial::Target::Sample) => self.request(Pending::Sample, ctx),
             None => {}
         }
@@ -685,11 +789,14 @@ fn open_menus_on_hover(ui: &egui::Ui, tops: &[egui::Response]) {
 impl eframe::App for LedgerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Never lose work on close.
-        if ctx.input(|i| i.viewport().close_requested()) && self.session.is_dirty() && !self.allow_close {
+        if ctx.input(|i| i.viewport().close_requested()) && self.is_dirty() && !self.allow_close {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.pending = Some(Pending::Quit);
         }
-        let title = format!("LedgerCraft — {}", self.session.title());
+        let title = match &self.session {
+            Some(session) => format!("LedgerCraft — {}", session.title()),
+            None => "LedgerCraft".to_string(),
+        };
         if title != self.title {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.title = title;
@@ -705,8 +812,13 @@ impl eframe::App for LedgerApp {
 
         let mut actions: Vec<Action> = Vec::new();
         let page = self.page;
+        let mut start_choice = None;
         egui::CentralPanel::default().show(ctx, |ui| {
-            let company = self.session.company();
+            let Some(session) = self.session.as_ref() else {
+                start_choice = self.start.ui(ui);
+                return;
+            };
+            let company = session.company();
             match page {
                 // Pages with their own scroll areas.
                 Page::Accounts => pages::accounts(ui, company, &mut self.lists, &mut actions),
@@ -750,6 +862,13 @@ impl eframe::App for LedgerApp {
         for action in actions {
             self.apply(action);
         }
+        match start_choice {
+            Some(StartChoice::Create) => self.request(Pending::New, ctx),
+            Some(StartChoice::Open) => self.request(Pending::Open, ctx),
+            Some(StartChoice::Sample) => self.request(Pending::Sample, ctx),
+            Some(StartChoice::Tutorial) => self.show_tutorial = true,
+            None => {}
+        }
         self.dialogs(ctx);
     }
 }
@@ -757,7 +876,16 @@ impl eframe::App for LedgerApp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ledgercraft_engine::new_company;
+    use ledgercraft_engine::{new_company, Command};
+
+    impl LedgerApp {
+        fn title_for_test(&self) -> String {
+            match &self.session {
+                Some(session) => format!("LedgerCraft — {}", session.title()),
+                None => "LedgerCraft".to_string(),
+            }
+        }
+    }
 
     // Regression: Clear on a form sent ClearStatus, which hit a `panic!` and
     // closed the app.
@@ -768,6 +896,52 @@ mod tests {
         app.apply(Action::ClearStatus);
         assert_eq!(app.status, "Ready");
         assert!(!app.status_is_error);
+    }
+
+    #[test]
+    fn close_company_returns_to_the_start_page() {
+        let ctx = egui::Context::default();
+        let mut app = LedgerApp::with_session(Session::new(new_company("Close Co")));
+        app.page = Page::Customers;
+        app.request(Pending::Close, &ctx);
+        assert!(app.session.is_none());
+        assert_eq!(app.page, Page::Home);
+        assert_eq!(app.title_for_test(), "LedgerCraft");
+    }
+
+    #[test]
+    fn closing_with_unsaved_changes_asks_first() {
+        let ctx = egui::Context::default();
+        let mut app = LedgerApp::with_session(Session::new(new_company("Dirty Co")));
+        let renamed = app
+            .session
+            .as_mut()
+            .map(|s| s.execute(Command::CompanyRename { name: "Dirty Co 2".into() }).is_ok());
+        assert_eq!(renamed, Some(true));
+        app.request(Pending::Close, &ctx);
+        assert!(app.session.is_some(), "closed without asking");
+        assert!(app.pending == Some(Pending::Close));
+    }
+
+    #[test]
+    fn new_company_opens_the_create_window_and_keeps_the_open_books() {
+        let ctx = egui::Context::default();
+        let mut app = LedgerApp::with_session(Session::new(new_company("Keep Co")));
+        app.request(Pending::New, &ctx);
+        assert!(app.create.is_some());
+        assert!(app.session.is_some());
+    }
+
+    #[test]
+    fn with_no_company_the_books_cannot_change() {
+        let mut app = LedgerApp::blank(None);
+        app.apply(Action::Run {
+            cmd: Command::CompanyRename { name: "Nobody".into() },
+            reset: Reset::Nothing,
+        });
+        assert!(app.status_is_error);
+        app.undo();
+        assert!(!app.save());
     }
 
     #[test]

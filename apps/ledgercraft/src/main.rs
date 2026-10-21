@@ -1,7 +1,7 @@
 //! LedgerCraft desktop app.
 //!
 //! ```text
-//! ledgercraft                  # start with a new company
+//! ledgercraft                  # start page: create, open or explore the sample
 //! ledgercraft books.lcbooks    # open a company file
 //! ledgercraft --sample         # open the sample company
 //! ```
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use eframe::egui;
-use ledgercraft_engine::{new_company, sample_company, Session};
+use ledgercraft_engine::{sample_company, Session};
 use ledgercraft_ui_egui::LedgerApp;
 
 /// The app icon, 256 x 256. Original artwork; see ATTRIBUTION.md.
@@ -38,7 +38,7 @@ fn main() -> ExitCode {
 
     let session = if let Some(p) = &path {
         match Session::open(p) {
-            Ok(s) => s,
+            Ok(s) => Some(s),
             Err(e) => {
                 eprintln!("ledgercraft: could not open {}: {e}", p.display());
                 return ExitCode::FAILURE;
@@ -46,14 +46,15 @@ fn main() -> ExitCode {
         }
     } else if sample {
         match sample_company() {
-            Ok(c) => Session::new(c),
+            Ok(c) => Some(Session::new(c)),
             Err(e) => {
                 eprintln!("ledgercraft: could not build the sample company: {e}");
                 return ExitCode::FAILURE;
             }
         }
     } else {
-        Session::new(new_company("My Company"))
+        // No company yet: the app opens on its start page.
+        None
     };
 
     let mut viewport = egui::ViewportBuilder::default()

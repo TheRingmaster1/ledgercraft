@@ -106,10 +106,20 @@ const LESSONS: &[Lesson] = &[
                  as many companies as you like, one file each.",
             ),
             Heading("Starting out"),
+            Text(
+                "When no company is open, LedgerCraft shows its start page with three \
+                 choices: create a new company, open a company file, or explore the sample \
+                 company. The same choices are on the File menu.",
+            ),
             Bullets(&[
-                "File > New Company starts a company with a ready-made chart of accounts.",
-                "File > Open Sample Company loads Pine Ridge Woodworks to practise on.",
+                "File > New Company opens Create a Company: enter the name (the only \
+                 required field), when your fiscal year starts, and contact details, and \
+                 choose a standard chart of accounts or an empty one. LedgerCraft then asks \
+                 where to save the file.",
                 "File > Open Company opens a .lcbooks file you saved earlier.",
+                "File > Open Sample Company loads Pine Ridge Woodworks to practise on.",
+                "File > Close Company puts the books away and returns to the start page. \
+                 If there are unsaved changes, it asks first.",
             ]),
             Heading("Saving"),
             Text(
