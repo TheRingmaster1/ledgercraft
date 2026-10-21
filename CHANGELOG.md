@@ -7,6 +7,14 @@ fixes to a release. See docs/releasing.md.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-21
+
+Highlights: password-protected, encrypted company files (with an upgrade path
+for older files); a start page and Create a Company window with list import
+from IIF and CSV; Close Company; a full in-app tutorial; currency symbols and
+a Currency preference; Export to Excel; the app icon; Preferences; and many
+Windows fixes. Building now needs Rust 1.88.
+
 ### Changed
 - Building LedgerCraft now needs Rust 1.88 or newer (was 1.82). README lists
   the Windows requirements.

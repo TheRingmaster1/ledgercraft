@@ -8,7 +8,7 @@ double-entry ledger; the Profit & Loss, Balance Sheet, Trial Balance and aging
 reports read straight from it. Your books live in one open, documented file you
 own. No subscription, no licence server, no telemetry.
 
-> **Status: pre-alpha (0.1), Windows first.** Builds and releases currently
+> **Status: pre-alpha (0.2), Windows first.** Builds and releases currently
 > target Windows 10/11 (x64). The code stays portable, but macOS and Linux are
 > not tested or shipped until the Windows build is solid.
 >

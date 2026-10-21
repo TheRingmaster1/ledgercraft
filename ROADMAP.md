@@ -1,10 +1,10 @@
 # LedgerCraft roadmap
 
-Stage: **pre-alpha 0.1** (version 0.1.0; releases go 0.1 → 0.2 → 0.3 …, see docs/releasing.md) — the double-entry core, the everyday customer,
+Stage: **pre-alpha 0.2** (version 0.2.0; releases go 0.1 → 0.2 → 0.3 …, see docs/releasing.md) — the double-entry core, the everyday customer,
 vendor and banking forms, and the core reports. Last updated 2026-10-21.
 
 Estimates are for what a typical small business uses QuickBooks Desktop for
-day to day; weighted by depth, LedgerCraft 0.1 covers roughly 20% of it.
+day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 
 ## Done (M0–M1)
 
@@ -55,7 +55,7 @@ Platform focus: **Windows 10/11 x64 only** until this list is done.
 * IIF import/export, CSV list import, QuickBooks Online CSV export import
 * Multi-currency
 * Agent interfaces: JSON control channel and MCP server over the command catalog
-* ~~Encryption at rest~~ (done in 0.1: password-protected, encrypted company files); next: lock after inactivity, multi-user via a local server
+* ~~Encryption at rest~~ (done in 0.2: password-protected, encrypted company files); next: lock after inactivity, multi-user via a local server
 * Performance: copy-on-write company state, cached balances
 
 ## Out of scope for now
