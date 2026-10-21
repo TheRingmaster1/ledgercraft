@@ -57,7 +57,10 @@ fn sync(c: &Company, s: &mut ImportState) {
     if let Some(before) = s.sent.take() {
         if let (true, Some(account)) = (now > before, s.account) {
             let count = now - before;
-            s.done = Some(format!("{count} lines imported into {}.", c.account_name(account)));
+            s.done = Some(format!(
+                "{count} lines imported into {}.",
+                c.account_name(account)
+            ));
             s.rows.clear();
         }
     } else if now != s.links_seen {
