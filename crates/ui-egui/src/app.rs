@@ -1372,7 +1372,7 @@ impl eframe::App for LedgerApp {
                 _ => {
                     let stripe = self.prefs.stripe();
                     let salt = ("page", format!("{page:?}"));
-                    egui::ScrollArea::vertical()
+                    egui::ScrollArea::both()
                         .id_salt(salt)
                         .show(ui, |ui| match page {
                             Page::Home => pages::home(ui, company, stripe, &mut actions),
