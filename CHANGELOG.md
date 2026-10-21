@@ -61,6 +61,10 @@ fixes to a release. See docs/releasing.md.
   taskbar and dock match it to the menu entry and icon (including Wayland).
 
 ### Fixed
+- The app no longer stops at start-up on Windows with "wgpu-hal WGL Instance
+  Thread has overflowed its stack": wgpu's OpenGL fallback is not started;
+  LedgerCraft draws with DirectX 12, Vulkan or Metal (WGPU_BACKEND=gl still
+  selects OpenGL where needed).
 - Entry boxes are easy to see: white with a thin grey outline (the accent
   outline when focused), instead of near-white boxes with no edge that all
   but vanished on unshaded rows. Buttons and drop-downs get the same outline.
