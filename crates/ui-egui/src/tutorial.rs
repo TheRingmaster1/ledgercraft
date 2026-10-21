@@ -451,7 +451,8 @@ const LESSONS: &[Lesson] = &[
                  printed on the statement.",
                 "Tick each item that appears on the statement, in the two lists: money in, \
                  and money out. Mark All and Unmark All help with long lists.",
-                "Watch the Difference. When it reaches $0.00, click Reconcile Now. The \
+                "Watch the Difference (the line under the summary always says what to \
+                 do next). When it reaches $0.00, click Reconcile Now. The \
                  reconciliation report opens in its own window, with Export to Excel and \
                  Export CSV.",
             ]),
