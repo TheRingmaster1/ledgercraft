@@ -516,7 +516,11 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
                         money_label(ui, amount, false);
                     }
                     _ => {
-                        ui.label(RichText::new("check qty / rate").small().color(theme::NEGATIVE));
+                        ui.label(
+                            RichText::new("check qty / rate")
+                                .small()
+                                .color(theme::NEGATIVE),
+                        );
                     }
                 }
                 if widgets::remove_button(ui) {
