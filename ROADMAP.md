@@ -97,6 +97,18 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 1. ~~M2.1 Edit a posted transaction; open a transaction from any list or report~~ (done: Transactions page, registers and the Transaction List report; `txn.update`)
 2. ~~M2.2 Bank reconciliation with cleared status and reconciliation reports~~ (done: Banking > Reconcile, `account.reconcile`)
 3. M2.3 Bank feed import: OFX/QFX/QBO and CSV, with matching and rules
+   - M2.3b Live bank connections (after M2.3, which they build on): download
+     transactions straight from the bank instead of a file.
+     - Sign in through the web browser (OAuth with a local callback), so
+       LedgerCraft never sees the bank password; connection tokens encrypted
+       in the company file (or the system keychain).
+     - Providers that suit an open-source desktop app: SimpleFIN Bridge (the
+       user pays and pastes a setup token; no shared secret in LedgerCraft),
+       GoCardless Bank Account Data (EU/UK open banking), and "bring your own
+       key" for Plaid, MX, Finicity or similar aggregators, which need a
+       business agreement and API keys that cannot be shipped in public code.
+     - Downloaded transactions go through the same matching and rules as
+       file import, then reconcile as usual.
 4. M2.4 Sales tax: tax items, rates, groups, Sales Tax Payable and liability report
 5. M2.5 Printable and PDF invoices and statements (original templates)
 6. M2.6 Credit memos, refunds, customer credits; sales receipts
