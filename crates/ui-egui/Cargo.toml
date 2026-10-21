@@ -21,9 +21,9 @@ serde_json.workspace = true
 zeroize = "1"
 # Password strength estimate (Dropbox's zxcvbn, ported to Rust). MIT.
 zxcvbn = "3"
-# Checks an installed font file is readable before egui is given it (egui
-# itself uses this crate to read fonts). MIT OR Apache-2.0.
-ab_glyph = "0.2"
+# Checks an installed font file is readable before egui is given it. egui
+# reads fonts with skrifa 0.44, so this is the same copy. MIT OR Apache-2.0.
+skrifa = { version = "0.44", default-features = false, features = ["std"] }
 
 [lints]
 workspace = true

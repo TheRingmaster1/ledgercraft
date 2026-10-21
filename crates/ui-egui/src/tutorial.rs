@@ -480,7 +480,8 @@ const LESSONS: &[Lesson] = &[
                  app and in Excel exports. It changes how amounts look, not their value.",
                 "Text: the font and size (Standard, Larger or Largest) for the whole app, \
                  with a preview. Each font's name in the list is shown in that font. \
-                 Darkness softens the text colour, which makes heavy fonts look lighter. Inter Light, Inter and Classic come with LedgerCraft; \
+                 Darkness softens the text colour, which makes heavy fonts look lighter, \
+                 and Hinting sharpens letters (turn it off for smoother text). Inter Light, Inter and Classic come with LedgerCraft; \
                  fonts already on your computer (such as Segoe UI or Calibri on Windows, \
                  DejaVu Sans or Noto Sans on Linux) are listed under \"On this computer\".",
                 "Files (Windows): make double-clicking a .lcbooks file open it in \
@@ -545,7 +546,7 @@ pub(crate) fn window(
     let mut go = None;
     let last = LESSONS.len().saturating_sub(1);
     state.lesson = state.lesson.min(last);
-    let screen = ctx.screen_rect();
+    let screen = ctx.content_rect();
     let size = window_size(screen.size());
     let body_height = (size.y - FOOTER_HEIGHT).max(80.0);
     egui::Window::new("Tutorial")
@@ -648,9 +649,9 @@ fn lesson_body(ui: &mut egui::Ui, lesson: &Lesson) -> Option<Target> {
             }
             Tip(t) => {
                 ui.add_space(2.0);
-                egui::Frame::none()
+                egui::Frame::NONE
                     .fill(theme::ACCENT_SOFT)
-                    .rounding(4.0)
+                    .corner_radius(4.0)
                     .inner_margin(8.0)
                     .show(ui, |ui| {
                         ui.label(RichText::new(*t).italics());

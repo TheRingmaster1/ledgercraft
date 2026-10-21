@@ -1,5 +1,7 @@
 //! LedgerCraft's own palette. Colours are defined here and nowhere else.
 
+use std::sync::Arc;
+
 use eframe::egui::{self, Color32};
 use serde::{Deserialize, Serialize};
 
@@ -185,14 +187,14 @@ impl Font {
 
     /// The font to hand egui; `None` for Classic (egui's own) or a font that
     /// cannot be found or read here.
-    fn data(self) -> Option<egui::FontData> {
+    fn data(self) -> Option<Arc<egui::FontData>> {
         match self {
             Self::Classic => None,
-            Self::Inter => Some(egui::FontData::from_static(INTER)),
-            Self::InterLight => Some(egui::FontData::from_static(INTER_LIGHT)),
+            Self::Inter => Some(Arc::new(egui::FontData::from_static(INTER))),
+            Self::InterLight => Some(Arc::new(egui::FontData::from_static(INTER_LIGHT))),
             _ => {
                 let bytes = read_font(&self.installed_file()?)?;
-                Some(egui::FontData::from_owned(bytes))
+                Some(Arc::new(egui::FontData::from_owned(bytes)))
             }
         }
     }
@@ -232,9 +234,9 @@ fn read_font(path: &std::path::Path) -> Option<Vec<u8>> {
     usable(&bytes).then_some(bytes)
 }
 
-/// Whether egui's font reader accepts these bytes.
+/// Whether egui's font reader (skrifa) accepts these bytes.
 fn usable(bytes: &[u8]) -> bool {
-    ab_glyph::FontRef::try_from_slice(bytes).is_ok()
+    skrifa::FontRef::new(bytes).is_ok()
 }
 
 /// Text darkness, as a grey level for ordinary text: 0 is black (as in
@@ -319,7 +321,7 @@ pub(crate) fn set_text(ctx: &egui::Context, font: Font, size: TextSize) {
     }
     ctx.set_fonts(fonts);
     let body = size.body();
-    ctx.style_mut(|style| text_styles(style, body));
+    ctx.global_style_mut(|style| text_styles(style, body));
 }
 
 /// Text sizes from the body size. At Standard these are egui's defaults
@@ -337,7 +339,7 @@ fn text_styles(style: &mut egui::Style, body: f32) {
 }
 
 pub(crate) fn apply(ctx: &egui::Context) {
-    let mut style = (*ctx.style()).clone();
+    let mut style = (*ctx.global_style()).clone();
     let mut v = egui::Visuals::light();
     v.selection.bg_fill = ACCENT_SOFT;
     v.selection.stroke.color = ACCENT;
@@ -348,7 +350,7 @@ pub(crate) fn apply(ctx: &egui::Context) {
     style.visuals = v;
     style.spacing.item_spacing = egui::vec2(8.0, 6.0);
     style.spacing.button_padding = egui::vec2(10.0, 4.0);
-    ctx.set_style(style);
+    ctx.set_global_style(style);
     // The default text, and every font's own family, before the first frame.
     set_text(ctx, Font::default(), TextSize::default());
 }
@@ -373,12 +375,10 @@ mod tests {
                 let ctx = egui::Context::default();
                 apply(&ctx);
                 set_text(&ctx, font, size);
-                let _ = ctx.run(egui::RawInput::default(), |ctx| {
-                    egui::CentralPanel::default().show(ctx, |ui| {
-                        ui.label("Accounts Receivable $1,234.56 • € £ …");
-                    });
+                let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+                    ui.label("Accounts Receivable $1,234.56 • € £ …");
                 });
-                let style = ctx.style();
+                let style = ctx.global_style();
                 let body = style.text_styles.get(&egui::TextStyle::Body);
                 assert_eq!(body.map(|f| f.size), Some(size.body()), "{font:?} {size:?}");
             }
@@ -389,12 +389,10 @@ mod tests {
     fn every_offered_font_has_a_family_to_show_its_name_in() {
         let ctx = egui::Context::default();
         apply(&ctx);
-        let _ = ctx.run(egui::RawInput::default(), |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                for font in Font::BUNDLED.iter().chain(installed()) {
-                    ui.label(egui::RichText::new(font.label()).family(font.family()));
-                }
-            });
+        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            for font in Font::BUNDLED.iter().chain(installed()) {
+                ui.label(egui::RichText::new(font.label()).family(font.family()));
+            }
         });
     }
 
@@ -430,10 +428,8 @@ mod tests {
             assert!(font.data().is_some(), "{font:?} was listed but cannot be read");
             let ctx = egui::Context::default();
             set_text(&ctx, *font, TextSize::Standard);
-            let _ = ctx.run(egui::RawInput::default(), |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.label("Accounts Receivable $1,234.56");
-                });
+            let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+                ui.label("Accounts Receivable $1,234.56");
             });
         }
     }

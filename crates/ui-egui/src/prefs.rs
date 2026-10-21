@@ -45,6 +45,8 @@ pub(crate) struct Prefs {
     pub(crate) text_size: TextSize,
     /// How dark ordinary text is: a grey level, 0 = black.
     pub(crate) text_grey: u8,
+    /// Snap letters to the pixel grid (sharper); off is smoother.
+    pub(crate) hinting: bool,
 }
 
 impl Default for Prefs {
@@ -58,6 +60,7 @@ impl Default for Prefs {
             font: Font::default(),
             text_size: TextSize::Standard,
             text_grey: 0,
+            hinting: true,
         }
     }
 }
@@ -212,7 +215,7 @@ const PAGE_ID: &str = "prefs_page";
 /// settings on the right (scrolling if they ever need to). Changes apply
 /// straight away; the app saves them.
 pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
-    let id = egui::Id::new(PAGE_ID);
+    let id = egui::Id::NULL.with(PAGE_ID);
     let mut page = ctx.data(|d| d.get_temp::<PrefsPage>(id)).unwrap_or_default();
     egui::Window::new("Preferences")
         .open(open)
@@ -249,9 +252,9 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
 fn page_list(ui: &mut egui::Ui, page: &mut PrefsPage) {
     let margin = 8.0;
     let inner = egui::vec2(LIST_WIDTH - 2.0 * margin, WINDOW_SIZE.y - 2.0 * margin);
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(theme::NAV_BG)
-        .rounding(4.0)
+        .corner_radius(4.0)
         .inner_margin(margin)
         .show(ui, |ui| {
             ui.allocate_ui_with_layout(
@@ -265,7 +268,7 @@ fn page_list(ui: &mut egui::Ui, page: &mut PrefsPage) {
                         let text = RichText::new(p.label()).size(15.0).color(theme::NAV_TEXT);
                         let item = ui.add_sized(
                             [inner.x, 34.0],
-                            egui::SelectableLabel::new(*page == p, text),
+                            egui::Button::selectable(*page == p, text),
                         );
                         if item.clicked() {
                             *page = p;
@@ -344,9 +347,15 @@ fn text_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
                 }
             });
             ui.end_row();
+            ui.label("Hinting").on_hover_text(
+                "Hinting fits each letter to the screen's pixels: sharper, especially at \
+                 small sizes. Turn it off for smoother, more print-like letters.",
+            );
+            ui.checkbox(&mut prefs.hinting, "Sharpen letters (font hinting)");
+            ui.end_row();
         });
     ui.add_space(4.0);
-    egui::Frame::none()
+    egui::Frame::NONE
         .stroke(egui::Stroke::new(1.0_f32, theme::MUTED))
         .inner_margin(6.0)
         .show(ui, |ui| {
@@ -405,7 +414,7 @@ fn general_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     });
     ui.add_space(4.0);
     // A preview of how the shaded rows will look, in a 2 pt black box.
-    egui::Frame::none()
+    egui::Frame::NONE
         .stroke(egui::Stroke::new(2.0_f32, Color32::BLACK))
         .inner_margin(6.0)
         .show(ui, |ui| {
@@ -473,7 +482,12 @@ fn grey_picker(ui: &mut egui::Ui, grey: &mut u8) {
             .rect_filled(cell, 0.0, Color32::from_gray(level));
     }
     ui.painter()
-        .rect_stroke(rect, 2.0, egui::Stroke::new(1.0_f32, theme::MUTED));
+        .rect_stroke(
+            rect,
+            2.0,
+            egui::Stroke::new(1.0_f32, theme::MUTED),
+            egui::StrokeKind::Inside,
+        );
     // Marker at the current level.
     let t = (hi as f32 - (*grey).clamp(lo, hi) as f32) / (hi - lo) as f32;
     let x = rect.left() + t * rect.width();
@@ -504,6 +518,7 @@ mod tests {
             font: Font::InterLight,
             text_size: TextSize::Larger,
             text_grey: 60,
+            hinting: false,
         };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
@@ -583,6 +598,7 @@ mod tests {
             font: Font::Inter,
             text_size: TextSize::Largest,
             text_grey: 90,
+            hinting: false,
         };
         prefs.reset_global();
         // The currency is not a General setting, so Reset leaves it.
@@ -602,6 +618,7 @@ mod tests {
         assert_eq!(loaded.font, Font::InterLight);
         assert_eq!(loaded.text_size, TextSize::Standard);
         assert_eq!(loaded.text_grey, 0, "older files keep black text");
+        assert!(loaded.hinting, "hinting is on unless turned off");
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 
@@ -623,11 +640,11 @@ mod tests {
             let ctx = egui::Context::default();
             // As the app does at start: fonts (and each font's family) first.
             theme::apply(&ctx);
-            ctx.data_mut(|d| d.insert_temp(egui::Id::new(PAGE_ID), page));
+            ctx.data_mut(|d| d.insert_temp(egui::Id::NULL.with(PAGE_ID), page));
             let mut open = true;
             let mut prefs = Prefs::default();
-            let _ = ctx.run(egui::RawInput::default(), |ctx| {
-                window(ctx, &mut open, &mut prefs);
+            let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+                window(ui.ctx(), &mut open, &mut prefs);
             });
             assert!(open);
             assert_eq!(prefs, Prefs::default(), "{page:?} changed a setting by drawing");

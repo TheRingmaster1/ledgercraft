@@ -43,7 +43,7 @@ mod windows {
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     pub(super) fn section(ui: &mut egui::Ui) {
-        let id = egui::Id::new("prefs_files_result");
+        let id = egui::Id::NULL.with("prefs_files_result");
         ui.label("Open .lcbooks company files in LedgerCraft when you double-click them.");
         ui.add_space(4.0);
         ui.horizontal(|ui| {

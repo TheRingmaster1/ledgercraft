@@ -183,7 +183,7 @@ impl LedgerApp {
     }
 
     /// Set the minimum window size, and on the first frame fit the window to
-    /// its monitor. egui-winit 0.29 converts `ViewportBuilder` sizes with the
+    /// its monitor. egui-winit (since 0.29) converts `ViewportBuilder` sizes with the
     /// primary monitor's scale, so with a Retina main display and a 1x
     /// external one the window opened at double size and could not shrink.
     /// Viewport commands use the window's own scale, so set the limits here
@@ -223,12 +223,16 @@ impl LedgerApp {
             self.applied_text = Some(text);
         }
         let ink = theme::text_colour(self.prefs.text_grey);
-        if ctx.style().visuals.override_text_color != Some(ink) {
-            ctx.style_mut(|s| s.visuals.override_text_color = Some(ink));
+        if ctx.global_style().visuals.override_text_color != Some(ink) {
+            ctx.global_style_mut(|s| s.visuals.override_text_color = Some(ink));
+        }
+        let hinting = self.prefs.hinting;
+        if ctx.global_style().visuals.text_options.font_hinting != hinting {
+            ctx.global_style_mut(|s| s.visuals.text_options.font_hinting = hinting);
         }
         let stripe = self.prefs.stripe();
-        if ctx.style().visuals.faint_bg_color != stripe {
-            ctx.style_mut(|s| s.visuals.faint_bg_color = stripe);
+        if ctx.global_style().visuals.faint_bg_color != stripe {
+            ctx.global_style_mut(|s| s.visuals.faint_bg_color = stripe);
         }
     }
 
@@ -669,9 +673,10 @@ impl LedgerApp {
         }
     }
 
-    fn menu_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("menu").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+    fn menu_bar(&mut self, ui: &mut egui::Ui) {
+        let ctx = &ui.ctx().clone();
+        egui::Panel::top("menu").show(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 let mut tops = Vec::new();
                 let has_company = self.session.is_some();
                 if has_company
@@ -686,11 +691,11 @@ impl LedgerApp {
                 tops.push(
                     ui.menu_button("File", |ui| {
                         if ui.button("New Company…").clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.request(Pending::New, ctx);
                         }
                         if ui.button("Open Company…").clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.request(Pending::Open, ctx);
                         }
                         let recent = self.state.recent.clone();
@@ -701,7 +706,7 @@ impl LedgerApp {
                                 for path in recent {
                                     let (name, folder) = crate::recent::describe(&path);
                                     if ui.button(name).on_hover_text(folder).clicked() {
-                                        ui.close_menu();
+                                        ui.close();
                                         self.open_target = Some(path);
                                         self.request(Pending::OpenPath, ctx);
                                     }
@@ -709,7 +714,7 @@ impl LedgerApp {
                             });
                         }
                         if ui.button("Open Sample Company").clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.request(Pending::Sample, ctx);
                         }
                         ui.separator();
@@ -717,14 +722,14 @@ impl LedgerApp {
                             .add_enabled(has_company, egui::Button::new("Save"))
                             .clicked()
                         {
-                            ui.close_menu();
+                            ui.close();
                             self.save();
                         }
                         if ui
                             .add_enabled(has_company, egui::Button::new("Save As…"))
                             .clicked()
                         {
-                            ui.close_menu();
+                            ui.close();
                             self.save_as();
                         }
                         let password = ui
@@ -733,19 +738,19 @@ impl LedgerApp {
                             "Set, change or remove the password that encrypts this company file.",
                         );
                         if password.clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.password = Some(PasswordForm::default());
                         }
                         let close = ui
                             .add_enabled(has_company, egui::Button::new("Close Company"))
                             .on_hover_text("Close the books and go back to the start page.");
                         if close.clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.request(Pending::Close, ctx);
                         }
                         ui.separator();
                         if ui.button("Exit").clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.request(Pending::Quit, ctx);
                         }
                     })
@@ -765,7 +770,7 @@ impl LedgerApp {
                             )
                             .clicked()
                         {
-                            ui.close_menu();
+                            ui.close();
                             self.undo();
                         }
                         let redo = self
@@ -780,7 +785,7 @@ impl LedgerApp {
                             )
                             .clicked()
                         {
-                            ui.close_menu();
+                            ui.close();
                             self.redo();
                         }
                     })
@@ -791,7 +796,7 @@ impl LedgerApp {
                         let side_bar =
                             egui::Checkbox::new(&mut self.show_nav, "Side Bar    Ctrl+B");
                         if ui.add_enabled(has_company, side_bar).clicked() {
-                            ui.close_menu();
+                            ui.close();
                         }
                     })
                     .response,
@@ -812,7 +817,7 @@ impl LedgerApp {
                             ("Products and Services", Page::Items),
                         ] {
                             if ui.button(label).clicked() {
-                                ui.close_menu();
+                                ui.close();
                                 self.page = page;
                             }
                         }
@@ -830,7 +835,7 @@ impl LedgerApp {
                             FormKind::Deposit,
                         ] {
                             if ui.button(kind.title()).clicked() {
-                                ui.close_menu();
+                                ui.close();
                                 self.page = Page::Form(kind);
                             }
                         }
@@ -844,7 +849,7 @@ impl LedgerApp {
                         }
                         for kind in [FormKind::Bill, FormKind::PayBills] {
                             if ui.button(kind.title()).clicked() {
-                                ui.close_menu();
+                                ui.close();
                                 self.page = Page::Form(kind);
                             }
                         }
@@ -858,7 +863,7 @@ impl LedgerApp {
                         }
                         for kind in [FormKind::Check, FormKind::Deposit, FormKind::Journal] {
                             if ui.button(kind.title()).clicked() {
-                                ui.close_menu();
+                                ui.close();
                                 self.page = Page::Form(kind);
                             }
                         }
@@ -874,7 +879,7 @@ impl LedgerApp {
                         }
                         for kind in ledgercraft_reports::ReportKind::ALL {
                             if ui.button(kind.label()).clicked() {
-                                ui.close_menu();
+                                ui.close();
                                 self.reports.kind = kind;
                                 self.page = Page::Reports;
                             }
@@ -885,26 +890,26 @@ impl LedgerApp {
                 tops.push(
                     ui.menu_button("Help", |ui| {
                         if ui.button("Preferences…").clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.show_prefs = true;
                         }
                         ui.menu_button("Tutorial", |ui| {
                             if ui.button("Show Tutorial").clicked() {
-                                ui.close_menu();
+                                ui.close();
                                 self.show_tutorial = true;
                             }
                             if ui.button("Show at Next Launch").clicked() {
-                                ui.close_menu();
+                                ui.close();
                                 self.tutorial_at_next_launch();
                             }
                         });
                         if ui.button("Licenses").clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.licenses.show_tab(LicenseTab::Summary);
                         }
                         ui.separator();
                         if ui.button("About LedgerCraft").clicked() {
-                            ui.close_menu();
+                            ui.close();
                             self.show_about = true;
                         }
                     })
@@ -917,12 +922,15 @@ impl LedgerApp {
         });
     }
 
-    fn nav(&mut self, ctx: &egui::Context) {
-        egui::SidePanel::left("nav")
+    fn nav(&mut self, ui: &mut egui::Ui) {
+        let has_company = self.session.is_some();
+        let mut open = self.show_nav && has_company;
+        let mut hide = false;
+        egui::Panel::left("nav")
             .resizable(false)
-            .exact_width(190.0)
-            .frame(egui::Frame::none().fill(theme::NAV_BG).inner_margin(10.0))
-            .show_animated(ctx, self.show_nav && self.session.is_some(), |ui| {
+            .exact_size(190.0)
+            .frame(egui::Frame::NONE.fill(theme::NAV_BG).inner_margin(10.0))
+            .show_collapsible(ui, &mut open, |ui| {
                 theme::nav_visuals(ui);
                 ui.horizontal(|ui| {
                     ui.label(
@@ -939,7 +947,7 @@ impl LedgerApp {
                             .on_hover_text("Hide side bar (Ctrl+B)")
                             .clicked()
                         {
-                            self.show_nav = false;
+                            hide = true;
                         }
                     });
                 });
@@ -986,13 +994,17 @@ impl LedgerApp {
                     }
                 }
             });
+        // The panel can be dragged open or shut; keep the setting in step.
+        if has_company {
+            self.show_nav = open && !hide;
+        }
     }
 
     /// The status message on the left, the company file on the right. The
     /// file side gets at most half the bar; both shorten with "…" rather than
     /// overlap when the window is narrow, and hovering shows them in full.
-    fn status_bar(&self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
+    fn status_bar(&self, ui: &mut egui::Ui) {
+        egui::Panel::bottom("status").show(ui, |ui| {
             ui.horizontal(|ui| self.status_row(ui));
         });
     }
@@ -1253,45 +1265,24 @@ fn file_name(path: &Path) -> String {
         .unwrap_or_else(|| path.display().to_string())
 }
 
-/// Help > Preferences > Open Menus On Hover. egui opens a top-level menu on a
-/// click, or on hover only once another menu is open; this opens the hovered
-/// one straight away (where a click would) and closes the open menu when the
-/// pointer leaves both the menu bar and the menu.
+/// Help > Preferences > Open Menus On Hover. egui opens a top-level menu on
+/// a click, or on hover once another menu is open; this opens the hovered one
+/// straight away, as a click would (opening one closes any other). It closes
+/// like any menu: by choosing an item or clicking elsewhere.
 fn open_menus_on_hover(ui: &egui::Ui, tops: &[egui::Response]) {
-    use egui::menu::{BarState, MenuResponse, MenuRoot};
-    let Some(pointer) = ui.ctx().pointer_hover_pos() else {
+    let Some(button) = tops.iter().find(|b| b.hovered()) else {
         return;
     };
-    let bar_id = ui.id();
-    let mut bar = BarState::load(ui.ctx(), bar_id);
-    let response = match bar.as_ref() {
-        None => match tops.iter().find(|b| b.hovered()) {
-            Some(button) => {
-                let margin = egui::Frame::menu(ui.style()).total_margin().left;
-                let gap = ui.style().spacing.menu_spacing;
-                MenuResponse::Create(
-                    button.rect.left_bottom() + egui::vec2(-margin, gap),
-                    button.id,
-                )
-            }
-            None => return,
-        },
-        Some(open) => {
-            // A little slack so crossing the gap under the bar does not close it.
-            let over_bar = ui.min_rect().expand(6.0).contains(pointer);
-            if over_bar || open.menu_state.read().area_contains(pointer) {
-                return;
-            }
-            MenuResponse::Close
-        }
-    };
-    MenuRoot::handle_menu_response(&mut bar, response);
-    bar.store(ui.ctx(), bar_id);
-    ui.ctx().request_repaint();
+    let popup = egui::Popup::default_response_id(button);
+    if !egui::Popup::is_id_open(ui.ctx(), popup) {
+        egui::Popup::open_id(ui.ctx(), popup);
+        ui.ctx().request_repaint();
+    }
 }
 
 impl eframe::App for LedgerApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = &ui.ctx().clone();
         // Never lose work on close.
         let close_requested = ctx.input(|i| i.viewport().close_requested());
         if close_requested && self.is_dirty() && !self.allow_close {
@@ -1319,14 +1310,15 @@ impl eframe::App for LedgerApp {
         self.save_prefs(ctx);
 
         self.shortcuts(ctx);
-        self.menu_bar(ctx);
-        self.status_bar(ctx);
-        self.nav(ctx);
+        // Panels first, the central page last.
+        self.menu_bar(ui);
+        self.status_bar(ui);
+        self.nav(ui);
 
         let mut actions: Vec<Action> = Vec::new();
         let page = self.page;
         let mut start_choice = None;
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             let Some(session) = self.session.as_ref() else {
                 start_choice = self.start.ui(ui, &self.state.recent);
                 return;

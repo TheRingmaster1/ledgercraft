@@ -166,7 +166,7 @@ impl StartPage {
 fn recent_list(ui: &mut egui::Ui, recent: &[PathBuf]) -> Option<StartChoice> {
     let mut choice = None;
     egui::Frame::group(ui.style())
-        .inner_margin(egui::Margin::symmetric(20.0, 12.0))
+        .inner_margin(egui::Margin::symmetric(20, 12))
         .show(ui, |ui| {
             ui.set_width(360.0);
             ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
@@ -187,7 +187,7 @@ fn recent_list(ui: &mut egui::Ui, recent: &[PathBuf]) -> Option<StartChoice> {
                     }
                     link.context_menu(|ui| {
                         if ui.button("Remove From This List").clicked() {
-                            ui.close_menu();
+                            ui.close();
                             choice = Some(StartChoice::Forget(path.clone()));
                         }
                     });
@@ -365,7 +365,7 @@ pub(crate) fn new_company_window(
     // Two columns side by side when the app window is wide enough, one
     // otherwise; either way the fields scroll if the window is short, so the
     // buttons always stay in view.
-    let screen = ctx.screen_rect();
+    let screen = ctx.content_rect();
     let wide = screen.width() >= 2.0 * COLUMN_WIDTH + COLUMN_GAP + 60.0;
     let scroll_height = (screen.height() - CREATE_CHROME).max(120.0);
     egui::Window::new("Create a Company")

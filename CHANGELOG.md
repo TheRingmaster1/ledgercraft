@@ -7,7 +7,18 @@ fixes to a release. See docs/releasing.md.
 
 ## [Unreleased]
 
+### Changed
+- The user interface library is upgraded from egui/eframe 0.29 to 0.37. Text
+  is now drawn with font hinting (letters fitted to the screen's pixels), so
+  it is noticeably sharper in every font, and many egui fixes come with it.
+  Building now needs Rust 1.95 or newer (was 1.88). Menus close when an item
+  is chosen; Open Menus On Hover opens the hovered menu and closes it like
+  any menu, by choosing an item or clicking elsewhere. The side bar can also
+  be dragged open or shut.
+
 ### Added
+- Help > Preferences > Text > Hinting: sharpen letters (on, the default) or
+  turn it off for smoother, more print-like text.
 - Edit recorded transactions. Open an invoice, payment, bill, bill payment,
   check, deposit or journal entry from the Transactions page (Edit, or
   double-click the row), an account register or the Transaction List report
