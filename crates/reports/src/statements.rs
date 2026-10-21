@@ -390,19 +390,23 @@ pub fn reconciliation_report(company: &Company, account: AccountId, index: usize
             id,
         );
     };
+    // Totals go in the Amount column (the fourth), like the items above them.
+    let total = |r: &mut Report, kind: RowKind, label: &str, m: Money| {
+        r.line(
+            kind,
+            label,
+            0,
+            vec![Cell::Empty, Cell::Empty, Cell::Empty, Cell::Money(m)],
+            None,
+        );
+    };
     let amount_of = |id: ledgercraft_ledger::TxnId| {
         company
             .txn(id)
             .and_then(|t| company.amount_in(&t.body, account))
             .unwrap_or(Money::ZERO)
     };
-    r.money(
-        RowKind::Detail,
-        "Beginning balance",
-        0,
-        &[rec.beginning_balance],
-        None,
-    );
+    total(&mut r, RowKind::Detail, "Beginning balance", rec.beginning_balance);
     let mut cleared: Vec<_> = rec.cleared.iter().map(|id| (*id, amount_of(*id))).collect();
     cleared.sort_by_key(|(id, _)| (company.txn(*id).map(|t| t.date), *id));
     for (title, increases) in [("Cleared increases", true), ("Cleared decreases", false)] {
@@ -417,29 +421,16 @@ pub fn reconciliation_report(company: &Company, account: AccountId, index: usize
         for (id, amount) in &items {
             row(&mut r, *id, *amount);
         }
-        let total = sum(items.iter().map(|(_, a)| *a));
-        r.money(
+        let subtotal = sum(items.iter().map(|(_, a)| *a));
+        total(
+            &mut r,
             RowKind::Subtotal,
             &format!("Total {}", title.to_lowercase()),
-            0,
-            &[total],
-            None,
+            subtotal,
         );
     }
-    r.money(
-        RowKind::Total,
-        "Cleared balance",
-        0,
-        &[rec.ending_balance],
-        None,
-    );
-    r.money(
-        RowKind::Detail,
-        "Statement ending balance",
-        0,
-        &[rec.ending_balance],
-        None,
-    );
+    total(&mut r, RowKind::Total, "Cleared balance", rec.ending_balance);
+    total(&mut r, RowKind::Detail, "Statement ending balance", rec.ending_balance);
     // What had not cleared by the statement date (and is still not reconciled).
     let uncleared = company.unreconciled(account, rec.statement_date);
     if !uncleared.is_empty() {
@@ -447,8 +438,8 @@ pub fn reconciliation_report(company: &Company, account: AccountId, index: usize
         for item in &uncleared {
             row(&mut r, item.txn, item.amount);
         }
-        let total = sum(uncleared.iter().map(|i| i.amount));
-        r.money(RowKind::Subtotal, "Total uncleared", 0, &[total], None);
+        let uncleared_total = sum(uncleared.iter().map(|i| i.amount));
+        total(&mut r, RowKind::Subtotal, "Total uncleared", uncleared_total);
     }
     r
 }
