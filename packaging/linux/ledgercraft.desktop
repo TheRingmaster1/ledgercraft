@@ -9,3 +9,4 @@ Terminal=false
 Categories=Office;Finance;
 Keywords=accounting;bookkeeping;invoices;ledger;
 StartupWMClass=ledgercraft
+MimeType=application/x-ledgercraft;

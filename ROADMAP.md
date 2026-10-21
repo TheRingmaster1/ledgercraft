@@ -50,6 +50,11 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 
 * Linux tested and supported: CI runs on Linux, releases include a Linux
   package with a desktop entry and icon
+* Recent companies (start page and File > Open Previous Company), reopen the
+  last company at startup, remembered window size and side bar
+* Password strength meter (zxcvbn) and a 12-character minimum
+* Double-click a `.lcbooks` file to open it (Windows: Preferences > Files;
+  Linux: install.sh)
 
 ## Now (M1.5: solid on Windows, Linux and macOS)
 
@@ -64,9 +69,9 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
    - ~~Import lists (IIF, CSV) when creating a company~~ (done); next: File > Import
      for an open company, opening balances, transactions
    - ~~Password protection and encryption at rest~~ (done, with upgrade of older files)
-   - File association for `.lcbooks` (double-click to open; Windows registry, Linux MIME type)
-   - Remembered window size, side bar and last company
-   - Recent companies on the start page
+   - ~~File association for `.lcbooks`~~ (done: Windows from Preferences, Linux from install.sh)
+   - ~~Remembered window size, side bar and last company~~ (done)
+   - ~~Recent companies on the start page~~ (done, also File > Open Previous Company)
    - A clear message when the system file dialog cannot open (Linux without an
      xdg-desktop-portal backend)
 5. M1.5.5 Packaging: Windows installer (MSI) and portable zip; Linux AppImage and
@@ -76,9 +81,9 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 
 ## Security hardening (from the 0.2 review)
 
-1. Password strength meter on every password field; refuse common and easily
-   guessed passwords, not only short ones (`zxcvbn`, MIT)
-2. Raise the minimum password length from 8 to 12 and suggest passphrases in the hints
+1. ~~Password strength meter on every password field; refuse common and easily
+   guessed passwords, not only short ones (`zxcvbn`, MIT)~~ (done)
+2. ~~Raise the minimum password length from 8 to 12 and suggest passphrases in the hints~~ (done)
 3. Stronger Argon2id settings for new and re-saved files (e.g. 64 MiB, 3 passes);
    existing files keep the settings stored in their header and still open
 4. Lock the open company after a period of inactivity (re-enter the password)

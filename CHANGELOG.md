@@ -8,6 +8,23 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Recent companies: the start page lists the company files opened last
+  (click to open, right-click to remove one), and File > Open Previous
+  Company lists them too. A file that has been moved or deleted is reported
+  and dropped from the list.
+- LedgerCraft reopens the company that was open last when it starts (asking
+  for its password if it has one). Help > Preferences > Open The Last Company
+  At Startup turns this off.
+- The window size, maximized state and side bar are remembered between
+  launches.
+- Password strength meter on every new password (Create a Company and File >
+  Password…), using zxcvbn. Passwords that are easy to guess (common
+  passwords, names, dates, keyboard runs, repeated characters, or the
+  company's own name) are refused, with a passphrase tip.
+- Double-clicking a .lcbooks file opens it in LedgerCraft. Windows: Help >
+  Preferences > Files registers the file type for your account (no
+  administrator rights needed). Linux: install.sh registers it, with the
+  LedgerCraft icon on company files.
 - Linux is tested and supported (x86_64; first run on Arch Linux with XFCE).
   CI now runs every gate on Linux as well as Windows, and releases include
   `ledgercraft-<version>-x86_64-unknown-linux-gnu.tar.gz` with an `install.sh`
@@ -17,6 +34,8 @@ fixes to a release. See docs/releasing.md.
   taskbar and dock match it to the menu entry and icon (including Wayland).
 
 ### Changed
+- New passwords need at least 12 characters (was 8). Files protected with an
+  older, shorter password still open; only new passwords are checked.
 - README: requirements for Linux (Arch, Debian/Ubuntu and Fedora packages)
   and macOS (in testing), how to install a release, and an updated "What works
   today" table. ROADMAP updated for 0.2 and the new platforms, with a

@@ -24,7 +24,7 @@ use crate::FileError;
 pub const CIPHER: &str = "xchacha20poly1305";
 pub const KDF: &str = "argon2id";
 /// Shortest password accepted for a new company file.
-pub const MIN_PASSWORD_CHARS: usize = 8;
+pub const MIN_PASSWORD_CHARS: usize = 12;
 
 /// Argon2id cost settings. The defaults follow OWASP's current guidance
 /// (19 MiB of memory, 2 passes, 1 lane): fast enough to open a file in well

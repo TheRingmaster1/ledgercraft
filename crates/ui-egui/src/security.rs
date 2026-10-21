@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use eframe::egui::{self, RichText};
 use ledgercraft_engine::{EngineError, Session};
 use ledgercraft_file::{check_new_password, FileError, MIN_PASSWORD_CHARS};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::theme;
 
@@ -31,13 +31,87 @@ pub(crate) fn password_field(ui: &mut egui::Ui, text: &mut String, hint: &str) -
     )
 }
 
-/// Checks a new password and its confirmation.
-pub(crate) fn check_new(password: &str, confirm: &str) -> Result<(), String> {
+/// The lowest strength accepted for a new password, on zxcvbn's 0 to 4
+/// scale: 3 means "safely unguessable" (more than 10^8 guesses), which, with
+/// Argon2id slowing every guess down, makes guessing the password impractical.
+pub(crate) const MIN_STRENGTH: u8 = 3;
+
+/// Longest prefix the strength estimate looks at: past this, a password is
+/// strong anyway, and the estimate's work grows with the length.
+const STRENGTH_MAX_CHARS: usize = 64;
+
+/// How hard `password` is to guess, 0 (trivial) to 4 (very hard), or `None`
+/// when nothing has been typed. Common passwords, names, dictionary words,
+/// dates, keyboard runs and the `context` words (such as the company name)
+/// all count against it.
+pub(crate) fn strength(password: &str, context: &[&str]) -> Option<u8> {
+    if password.is_empty() {
+        return None;
+    }
+    let head: Zeroizing<String> =
+        Zeroizing::new(password.chars().take(STRENGTH_MAX_CHARS).collect());
+    Some(u8::from(zxcvbn::zxcvbn(&head, context).score()))
+}
+
+/// Checks a new password and its confirmation. `context` is words the
+/// password should not lean on, such as the company name.
+pub(crate) fn check_new(password: &str, confirm: &str, context: &[&str]) -> Result<(), String> {
     check_new_password(password)?;
+    if strength(password, context).unwrap_or(0) < MIN_STRENGTH {
+        return Err("That password is too easy to guess. Try four or more unrelated words, \
+                    or make it longer and less predictable."
+            .into());
+    }
     if password != confirm {
         return Err("The two passwords do not match.".into());
     }
     Ok(())
+}
+
+/// A four-part bar and a word for how strong the new password is. Nothing
+/// is shown until something has been typed.
+pub(crate) fn strength_meter(ui: &mut egui::Ui, strength: Option<u8>) {
+    let Some(score) = strength else {
+        return;
+    };
+    let (word, colour) = match score {
+        0 | 1 => ("Too easy to guess", theme::NEGATIVE),
+        2 => ("Weak", theme::WARNING),
+        3 => ("Good", theme::POSITIVE),
+        _ => ("Strong", theme::POSITIVE),
+    };
+    ui.horizontal(|ui| {
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(160.0, 8.0), egui::Sense::hover());
+        let gap = 3.0;
+        let part = (rect.width() - 3.0 * gap) / 4.0;
+        for i in 0..4_u8 {
+            let left = rect.left() + f32::from(i) * (part + gap);
+            let piece = egui::Rect::from_min_size(
+                egui::pos2(left, rect.top()),
+                egui::vec2(part, rect.height()),
+            );
+            // Even the weakest shows one red part, so the bar never looks empty.
+            let fill = if i < score.max(1) {
+                colour
+            } else {
+                theme::TRACK
+            };
+            ui.painter().rect_filled(piece, 2.0, fill);
+        }
+        ui.label(RichText::new(word).small().color(colour));
+    });
+}
+
+/// The passphrase tip shown wherever a password is set.
+pub(crate) fn passphrase_tip(ui: &mut egui::Ui) {
+    ui.label(
+        RichText::new(format!(
+            "At least {MIN_PASSWORD_CHARS} characters. Tip: four or more unrelated words \
+             (\"maple trumpet orbit gravel\") are strong and easy to remember."
+        ))
+        .small()
+        .color(theme::MUTED),
+    );
 }
 
 /// The note shown wherever a password is set.
@@ -147,6 +221,8 @@ pub(crate) struct PasswordForm {
     confirm: String,
     remove: bool,
     error: Option<String>,
+    /// How strong `new` is, worked out when it changes.
+    strength: Option<u8>,
 }
 
 impl Drop for PasswordForm {
@@ -179,6 +255,7 @@ pub(crate) fn password_window(
     let mut outcome = None;
     let mut open = true;
     let protected = session.is_protected();
+    let company_name = session.company().info.name.as_str();
     let title = if protected {
         "Change Password"
     } else {
@@ -210,11 +287,17 @@ pub(crate) fn password_window(
                     }
                     if !form.remove {
                         ui.label("New password");
-                        password_field(
+                        let typed = password_field(
                             ui,
                             &mut form.new,
                             &format!("at least {MIN_PASSWORD_CHARS} characters"),
                         );
+                        if typed.changed() {
+                            form.strength = strength(&form.new, &[company_name]);
+                        }
+                        ui.end_row();
+                        ui.label("");
+                        strength_meter(ui, form.strength);
                         ui.end_row();
                         ui.label("Confirm");
                         password_field(ui, &mut form.confirm, "type it again");
@@ -229,6 +312,7 @@ pub(crate) fn password_window(
             }
             ui.add_space(4.0);
             if !form.remove {
+                passphrase_tip(ui);
                 forgotten_password_note(ui);
             }
             if let Some(error) = &form.error {
@@ -248,7 +332,7 @@ pub(crate) fn password_window(
                     } else if form.remove {
                         outcome = Some(PasswordOutcome::Apply(None));
                     } else {
-                        match check_new(&form.new, &form.confirm) {
+                        match check_new(&form.new, &form.confirm, &[company_name]) {
                             Ok(()) => {
                                 outcome = Some(PasswordOutcome::Apply(Some(form.new.clone())))
                             }
@@ -324,10 +408,29 @@ pub(crate) fn upgrade_window(ctx: &egui::Context, file_name: &str) -> Option<Upg
 mod tests {
     use super::*;
 
+    const STRONG: &str = "Tq7#vL9!pWz2@kR4";
+
     #[test]
     fn new_passwords_must_be_long_enough_and_match() {
-        assert!(check_new("short", "short").is_err());
-        assert!(check_new("long enough one", "long enough two").is_err());
-        assert!(check_new("long enough", "long enough").is_ok());
+        assert!(check_new("Tq7#vL9!pW", "Tq7#vL9!pW", &[]).is_err(), "too short");
+        assert!(check_new(STRONG, "Tq7#vL9!pWz2@kR5", &[]).is_err(), "mismatch");
+        assert!(check_new(STRONG, STRONG, &[]).is_ok());
+    }
+
+    #[test]
+    fn common_and_patterned_passwords_are_refused() {
+        for weak in ["password1234", "aaaaaaaaaaaa", "qwertyuiop12", "123456789012"] {
+            assert!(check_new(weak, weak, &[]).is_err(), "{weak} was accepted");
+            assert!(strength(weak, &[]).unwrap_or(0) < MIN_STRENGTH, "{weak}");
+        }
+    }
+
+    #[test]
+    fn strength_is_none_until_typed_and_high_for_random_passwords() {
+        assert_eq!(strength("", &[]), None);
+        assert_eq!(strength(STRONG, &[]), Some(4));
+        // Very long input is fine and still strong.
+        let long = STRONG.repeat(20);
+        assert!(strength(&long, &[]).unwrap_or(0) >= MIN_STRENGTH);
     }
 }

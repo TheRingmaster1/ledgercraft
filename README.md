@@ -111,10 +111,12 @@ Download the package for your system from
 
 * **Windows:** `ledgercraft-<version>-x86_64-pc-windows-msvc.zip`. Unzip it and
   run `ledgercraft.exe`. The app is not code-signed yet, so SmartScreen may ask
-  you to confirm (More info → Run anyway).
+  you to confirm (More info → Run anyway). To open company files by
+  double-clicking them, use Help > Preferences > Files.
 * **Linux:** `ledgercraft-<version>-x86_64-unknown-linux-gnu.tar.gz`. Unpack it
   and run `./install.sh` to add LedgerCraft to your Applications menu for your
-  user (no root needed; `./install.sh --uninstall` removes it), or run
+  user, and makes double-clicking a `.lcbooks` file open it (no root
+  needed; `./install.sh --uninstall` removes it), or run
   `./ledgercraft` directly. It needs the graphics and file dialog packages
   listed above.
 
@@ -132,8 +134,8 @@ ledgercraft-cli commands                                # every command and its 
 
 | Area | Highlights |
 |------|-----------|
-| Company | Start page, Create a Company window (standard or empty chart of accounts), sample company, fiscal year start, open/save/save as/close, unsaved-changes guard, undo/redo (200 steps) |
-| Security | Password-protected, encrypted company files; older files upgrade in place |
+| Company | Start page with recent companies, Create a Company window (standard or empty chart of accounts), sample company, fiscal year start, open/save/save as/close, reopens the last company, double-click a .lcbooks file to open it, unsaved-changes guard, undo/redo (200 steps) |
+| Security | Password-protected, encrypted company files with a password strength meter; older files upgrade in place |
 | Import | Accounts, customers, vendors and products/services from IIF or CSV when creating a company |
 | Lists | Chart of accounts (15 account types, active/inactive), customers, vendors (contact, address, terms), products and services |
 | Customers | Create invoices (items, qty × rate, per-line income account, due date from terms, auto-numbering), receive payments applied to open invoices, Undeposited Funds, make deposits |
@@ -153,7 +155,9 @@ Company files hold sensitive financial data, so every new company is
 protected by a password and **encrypted on disk** with Argon2id and
 XChaCha20-Poly1305 (details in [docs/file-format.md](docs/file-format.md)).
 Copies and backups stay encrypted; a wrong password or a modified file is
-detected. While a company is open its books are decrypted in the app's memory
+detected. New passwords need at least 12 characters and must pass a strength
+check (zxcvbn) that refuses common passwords, names, dates and keyboard runs;
+a passphrase of four or more unrelated words is the easy way to a strong one. While a company is open its books are decrypted in the app's memory
 only. There is no password recovery, so keep the password in a password
 manager.
 

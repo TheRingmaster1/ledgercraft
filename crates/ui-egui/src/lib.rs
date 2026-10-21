@@ -5,12 +5,14 @@
 //! frame is drawn. Nothing below this crate knows egui exists.
 
 mod app;
+mod assoc;
 mod currency;
 mod forms;
 mod hints;
 mod licenses;
 mod pages;
 mod prefs;
+mod recent;
 mod security;
 mod start;
 mod theme;

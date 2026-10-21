@@ -6,6 +6,10 @@ pub(crate) const ACCENT: Color32 = Color32::from_rgb(0x1f, 0x6f, 0x8b);
 pub(crate) const ACCENT_SOFT: Color32 = Color32::from_rgb(0xd6, 0xea, 0xf1);
 pub(crate) const NEGATIVE: Color32 = Color32::from_rgb(0xb0, 0x30, 0x30);
 pub(crate) const POSITIVE: Color32 = Color32::from_rgb(0x2e, 0x7d, 0x4f);
+/// Cautions that are not errors, such as a weak password.
+pub(crate) const WARNING: Color32 = Color32::from_rgb(0xb9, 0x6a, 0x00);
+/// The empty part of a meter.
+pub(crate) const TRACK: Color32 = Color32::from_rgb(0xdd, 0xe1, 0xe6);
 pub(crate) const MUTED: Color32 = Color32::from_rgb(0x6b, 0x72, 0x80);
 pub(crate) const NAV_BG: Color32 = Color32::from_rgb(0x1d, 0x2b, 0x36);
 pub(crate) const NAV_TEXT: Color32 = Color32::from_rgb(0xe8, 0xee, 0xf2);

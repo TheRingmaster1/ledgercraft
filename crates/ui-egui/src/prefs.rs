@@ -8,6 +8,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{self, Color32, RichText};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::currency::Currency;
@@ -37,6 +38,8 @@ pub(crate) struct Prefs {
     pub(crate) hover_menus: bool,
     /// How amounts are shown ($, €, £, …). Display only; nothing is converted.
     pub(crate) currency: Currency,
+    /// Open the company that was open last when the app starts.
+    pub(crate) reopen_last: bool,
 }
 
 impl Default for Prefs {
@@ -46,6 +49,7 @@ impl Default for Prefs {
             show_tutorial: true,
             hover_menus: false,
             currency: Currency::Usd,
+            reopen_last: true,
         }
     }
 }
@@ -58,12 +62,14 @@ impl Prefs {
         Color32::from_gray(grey)
     }
 
-    /// Global's Reset To Default: the row shading and Open Menus On Hover go
-    /// back to their defaults; the tutorial setting is left as it is.
+    /// Global's Reset To Default: the row shading, Open Menus On Hover and
+    /// Open The Last Company go back to their defaults; the tutorial setting
+    /// is left as it is.
     pub(crate) fn reset_global(&mut self) {
         let defaults = Self::default();
         self.stripe_grey = defaults.stripe_grey;
         self.hover_menus = defaults.hover_menus;
+        self.reopen_last = defaults.reopen_last;
     }
 
     /// The saved preferences, or the defaults if there are none or they
@@ -81,6 +87,12 @@ impl Prefs {
 /// `$LEDGERCRAFT_CONFIG_DIR/preferences.json`, else the platform's usual
 /// per-user config folder.
 fn path() -> Option<PathBuf> {
+    Some(config_dir()?.join(FILE_NAME))
+}
+
+/// `$LEDGERCRAFT_CONFIG_DIR`, else the platform's usual per-user config
+/// folder: where LedgerCraft keeps its small per-user files.
+pub(crate) fn config_dir() -> Option<PathBuf> {
     let var = |name: &str| {
         std::env::var_os(name)
             .filter(|v| !v.is_empty())
@@ -97,15 +109,25 @@ fn path() -> Option<PathBuf> {
             .or_else(|| var("HOME").map(|h| h.join(".config")))?
             .join("ledgercraft")
     };
-    Some(dir.join(FILE_NAME))
+    Some(dir)
 }
 
 fn load_from(path: &Path) -> Prefs {
+    read_json(path)
+}
+
+fn save_to(path: &Path, prefs: &Prefs) -> std::io::Result<()> {
+    write_json(path, prefs)
+}
+
+/// Reads a small JSON settings file; the defaults if it is missing, too big
+/// or cannot be read.
+pub(crate) fn read_json<T: DeserializeOwned + Default>(path: &Path) -> T {
     let too_big = fs::metadata(path)
         .map(|m| m.len() > MAX_BYTES)
         .unwrap_or(true);
     if too_big {
-        return Prefs::default();
+        return T::default();
     }
     fs::read_to_string(path)
         .ok()
@@ -114,12 +136,12 @@ fn load_from(path: &Path) -> Prefs {
 }
 
 /// Writes a temporary file next to the target and renames it over, so a crash
-/// mid-write leaves the old preferences rather than half a file.
-fn save_to(path: &Path, prefs: &Prefs) -> std::io::Result<()> {
+/// mid-write leaves the old file rather than half a file.
+pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    let json = serde_json::to_string_pretty(prefs).map_err(std::io::Error::other)?;
+    let json = serde_json::to_string_pretty(value).map_err(std::io::Error::other)?;
     let tmp = path.with_extension("json.tmp");
     let written = fs::File::create(&tmp).and_then(|mut f| {
         f.write_all(json.as_bytes())?;
@@ -167,6 +189,11 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
             if section_header(ui, "prefs_currency_selected", "Currency") {
                 ui.add_space(4.0);
                 currency_section(ui, prefs);
+            }
+            ui.add_space(6.0);
+            if section_header(ui, "prefs_files_selected", "Files") {
+                ui.add_space(4.0);
+                crate::assoc::section(ui);
             }
         });
 }
@@ -263,6 +290,8 @@ fn global_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     ui.add_space(6.0);
     ui.checkbox(&mut prefs.hover_menus, "Open Menus On Hover")
         .on_hover_text("Open File, Edit, View and the other top menus when the pointer rests on them, without clicking");
+    ui.checkbox(&mut prefs.reopen_last, "Open The Last Company At Startup")
+        .on_hover_text("When LedgerCraft starts, open the company that was open last (asking for its password if it has one)");
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         if ui.button("Reset To Default").clicked() {
@@ -324,6 +353,7 @@ mod tests {
             show_tutorial: false,
             hover_menus: true,
             currency: Currency::Eur,
+            reopen_last: false,
         };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
@@ -399,13 +429,24 @@ mod tests {
             show_tutorial: false,
             hover_menus: true,
             currency: Currency::Gbp,
+            reopen_last: false,
         };
         prefs.reset_global();
         // The currency is not a Global setting, so Reset leaves it.
         assert_eq!(prefs.currency, Currency::Gbp);
         assert_eq!(prefs.stripe_grey, Prefs::default().stripe_grey);
         assert!(!prefs.hover_menus);
+        assert!(prefs.reopen_last);
         assert!(!prefs.show_tutorial);
+    }
+
+    #[test]
+    fn older_files_reopen_the_last_company() {
+        let path = temp_file("reopen");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "{\"stripe_grey\": 190}").unwrap();
+        assert!(load_from(&path).reopen_last);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]

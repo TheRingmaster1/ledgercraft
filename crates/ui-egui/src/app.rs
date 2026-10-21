@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText};
 use ledgercraft_engine::{sample_company, EngineError, Session};
@@ -8,6 +8,7 @@ use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
+use crate::recent::{AppState, WindowState};
 use crate::security::{
     self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice,
 };
@@ -19,6 +20,8 @@ use crate::{forms, theme, tutorial, Action, FormKind, Page, Reset};
 enum Pending {
     New,
     Open,
+    /// Open `LedgerApp::open_target` (a recent company).
+    OpenPath,
     Sample,
     Close,
     Quit,
@@ -54,6 +57,14 @@ pub struct LedgerApp {
     /// What is on disk, so changes are saved once rather than every frame.
     saved_prefs: Prefs,
     licenses: LicenseWindow,
+    /// Recent companies, window size and side bar, kept between launches.
+    state: AppState,
+    /// What is on disk, so the state is written only when it changes.
+    saved_state: AppState,
+    /// Where the state is kept; `None` keeps it in memory only (tests).
+    state_path: Option<PathBuf>,
+    /// The recent company waiting on `Pending::OpenPath`.
+    open_target: Option<PathBuf>,
     show_nav: bool,
     title: String,
     /// Scale the window size limits were last set for (0 = not yet).
@@ -82,13 +93,37 @@ impl LedgerApp {
     ) -> Self {
         theme::apply(&cc.egui_ctx);
         let prefs = Prefs::load();
-        Self {
+        let state_path = AppState::path();
+        let state = state_path
+            .as_deref()
+            .map(AppState::load_from)
+            .unwrap_or_default();
+        let mut app = Self {
             show_tutorial: prefs.show_tutorial,
             prefs,
             saved_prefs: prefs,
             unlock: unlock.map(UnlockForm::new),
+            show_nav: state.side_bar,
+            saved_state: state.clone(),
+            state,
+            state_path,
             ..Self::blank(session)
+        };
+        let opened = app
+            .session
+            .as_ref()
+            .and_then(|s| s.path())
+            .map(Path::to_path_buf);
+        if let Some(path) = opened {
+            // Opened from the command line or by double-clicking the file.
+            app.remember(&path);
+        } else if app.session.is_none() && app.unlock.is_none() && app.prefs.reopen_last {
+            // Nothing asked for: carry on with the company that was open last.
+            if let Some(last) = app.state.recent.first().filter(|p| p.exists()).cloned() {
+                app.open_path(last);
+            }
         }
+        app
     }
 
     #[cfg(test)]
@@ -120,6 +155,10 @@ impl LedgerApp {
             prefs: Prefs::default(),
             saved_prefs: Prefs::default(),
             licenses: LicenseWindow::default(),
+            state: AppState::default(),
+            saved_state: AppState::default(),
+            state_path: None,
+            open_target: None,
             show_nav: true,
             title: String::new(),
             window_scale: 0.0,
@@ -139,13 +178,19 @@ impl LedgerApp {
         }
         ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(MIN_WINDOW));
         if self.window_scale == 0.0 {
+            // The size the window had when the app last closed, if known.
+            let saved = self.state.window;
             let (inner, monitor) =
                 ctx.input(|i| (i.viewport().inner_rect, i.viewport().monitor_size));
             if let (Some(inner), Some(monitor)) = (inner, monitor) {
-                let fitted = inner.size().min(monitor * 0.9).max(MIN_WINDOW);
+                let wanted = saved.and_then(|w| w.size()).unwrap_or(inner.size());
+                let fitted = wanted.min(monitor * 0.9).max(MIN_WINDOW);
                 if fitted != inner.size() {
                     ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(fitted));
                 }
+            }
+            if saved.is_some_and(|w| w.maximized) {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
             }
         }
         self.window_scale = scale;
@@ -171,6 +216,67 @@ impl LedgerApp {
             self.error(format!("Could not save preferences: {e}"));
         }
         self.saved_prefs = self.prefs;
+    }
+
+    /// Puts a company file at the top of the recent list.
+    fn remember(&mut self, path: &Path) {
+        self.state.remember(path);
+    }
+
+    /// Notes the window's size, so the next launch opens at the same size.
+    fn note_window(&mut self, ctx: &egui::Context) {
+        let (inner, maximized, minimized) = ctx.input(|i| {
+            let v = i.viewport();
+            (v.inner_rect, v.maximized, v.minimized)
+        });
+        if minimized == Some(true) {
+            return;
+        }
+        let maximized = maximized == Some(true);
+        let previous = self.state.window;
+        let window = match (maximized, previous, inner) {
+            // Maximized: keep the size to restore to, just note the maximizing.
+            (true, Some(before), _) => WindowState {
+                maximized: true,
+                ..before
+            },
+            (_, _, Some(rect)) => WindowState {
+                width: rect.width(),
+                height: rect.height(),
+                maximized,
+            },
+            _ => return,
+        };
+        if window.size().is_some() || window.maximized {
+            self.state.window = Some(window);
+        }
+    }
+
+    /// Writes the recent list, window size and side bar when they change.
+    fn save_state(&mut self) {
+        self.state.side_bar = self.show_nav;
+        if self.state == self.saved_state {
+            return;
+        }
+        let written = self.state_path.as_deref().map(|p| self.state.save_to(p));
+        if let Some(Err(e)) = written {
+            self.error(format!("Could not save the recent companies list: {e}"));
+        }
+        self.saved_state = self.state.clone();
+    }
+
+    /// Opens a company from the recent list, or says it is gone.
+    fn open_recent(&mut self, path: PathBuf) {
+        if path.exists() {
+            self.open_path(path);
+        } else {
+            self.error(format!(
+                "{} was not found. It may have been moved, renamed or deleted; it is \
+                 removed from the recent list.",
+                path.display()
+            ));
+            self.state.forget(&path);
+        }
     }
 
     /// Help > Tutorial > Show at Next Launch: undo "Never show again".
@@ -216,6 +322,11 @@ impl LedgerApp {
                 }
                 Err(e) => self.error(format!("Could not build the sample: {e}")),
             },
+            Pending::OpenPath => {
+                if let Some(path) = self.open_target.take() {
+                    self.open_recent(path);
+                }
+            }
             Pending::Open => {
                 let picked = rfd::FileDialog::new()
                     .add_filter("LedgerCraft company", &[ledgercraft_file::EXTENSION])
@@ -236,6 +347,7 @@ impl LedgerApp {
             Ok(s) => {
                 let protected = s.is_protected();
                 self.replace_session(s);
+                self.remember(&path);
                 self.info(format!("Opened {}", path.display()));
                 // A file from before encryption (or with its password removed):
                 // offer to upgrade it.
@@ -311,6 +423,7 @@ impl LedgerApp {
         let result = session.save_as(&path);
         match result {
             Ok(()) => {
+                self.remember(&path);
                 self.info(format!("Saved to {}", path.display()));
                 true
             }
@@ -491,6 +604,21 @@ impl LedgerApp {
                         if ui.button("Open Company…").clicked() {
                             ui.close_menu();
                             self.request(Pending::Open, ctx);
+                        }
+                        let recent = self.state.recent.clone();
+                        if recent.is_empty() {
+                            ui.add_enabled(false, egui::Button::new("Open Previous Company"));
+                        } else {
+                            ui.menu_button("Open Previous Company", |ui| {
+                                for path in recent {
+                                    let (name, folder) = crate::recent::describe(&path);
+                                    if ui.button(name).on_hover_text(folder).clicked() {
+                                        ui.close_menu();
+                                        self.open_target = Some(path);
+                                        self.request(Pending::OpenPath, ctx);
+                                    }
+                                }
+                            });
                         }
                         if ui.button("Open Sample Company").clicked() {
                             ui.close_menu();
@@ -816,13 +944,12 @@ impl LedgerApp {
         };
         match unlocked {
             Some(UnlockOutcome::Opened(session)) => {
-                let shown = self
-                    .unlock
-                    .take()
-                    .map(|f| f.path.display().to_string())
-                    .unwrap_or_default();
+                let path = self.unlock.take().map(|f| f.path.clone());
                 self.replace_session(*session);
-                self.info(format!("Opened {shown}"));
+                if let Some(path) = path {
+                    self.remember(&path);
+                    self.info(format!("Opened {}", path.display()));
+                }
             }
             Some(UnlockOutcome::Failed(e)) => {
                 self.unlock = None;
@@ -1043,9 +1170,14 @@ fn open_menus_on_hover(ui: &egui::Ui, tops: &[egui::Response]) {
 impl eframe::App for LedgerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Never lose work on close.
-        if ctx.input(|i| i.viewport().close_requested()) && self.is_dirty() && !self.allow_close {
+        let close_requested = ctx.input(|i| i.viewport().close_requested());
+        if close_requested && self.is_dirty() && !self.allow_close {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.pending = Some(Pending::Quit);
+        } else if close_requested {
+            // Really closing: remember the window for next time.
+            self.note_window(ctx);
+            self.save_state();
         }
         let title = match &self.session {
             Some(session) => format!("LedgerCraft — {}", session.title()),
@@ -1069,7 +1201,7 @@ impl eframe::App for LedgerApp {
         let mut start_choice = None;
         egui::CentralPanel::default().show(ctx, |ui| {
             let Some(session) = self.session.as_ref() else {
-                start_choice = self.start.ui(ui);
+                start_choice = self.start.ui(ui, &self.state.recent);
                 return;
             };
             let company = session.company();
@@ -1129,9 +1261,15 @@ impl eframe::App for LedgerApp {
             Some(StartChoice::Open) => self.request(Pending::Open, ctx),
             Some(StartChoice::Sample) => self.request(Pending::Sample, ctx),
             Some(StartChoice::Tutorial) => self.show_tutorial = true,
+            Some(StartChoice::Recent(path)) => {
+                self.open_target = Some(path);
+                self.request(Pending::OpenPath, ctx);
+            }
+            Some(StartChoice::Forget(path)) => self.state.forget(&path),
             None => {}
         }
         self.dialogs(ctx);
+        self.save_state();
     }
 }
 
@@ -1233,6 +1371,56 @@ mod tests {
         assert!(app.status_is_error);
         app.undo();
         assert!(!app.save());
+    }
+
+    #[test]
+    fn opened_companies_go_to_the_top_of_the_recent_list() {
+        let dir = std::env::temp_dir().join(format!("lc-recent-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let a = dir.join("a.lcbooks");
+        let b = dir.join("b.lcbooks");
+        ledgercraft_file::save(&a, &new_company("A Co"), None).unwrap();
+        ledgercraft_file::save(&b, &new_company("B Co"), None).unwrap();
+        let mut app = LedgerApp::blank(None);
+        app.state_path = Some(dir.join("state.json"));
+        app.open_path(a.clone());
+        app.open_path(b.clone());
+        app.open_path(a.clone());
+        assert_eq!(app.state.recent, vec![a.clone(), b.clone()]);
+        app.save_state();
+        let saved = AppState::load_from(&dir.join("state.json"));
+        assert_eq!(saved.recent, vec![a, b]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_missing_recent_company_is_reported_and_forgotten() {
+        let ctx = egui::Context::default();
+        let gone = std::env::temp_dir().join(format!("lc-gone-{}.lcbooks", std::process::id()));
+        let mut app = LedgerApp::blank(None);
+        app.state.remember(&gone);
+        app.open_target = Some(gone);
+        app.request(Pending::OpenPath, &ctx);
+        assert!(app.session.is_none());
+        assert!(app.status_is_error);
+        assert!(app.state.recent.is_empty());
+    }
+
+    #[test]
+    fn opening_a_recent_company_with_unsaved_changes_asks_first() {
+        let ctx = egui::Context::default();
+        let mut app = LedgerApp::with_session(Session::new(new_company("Busy Co")));
+        let renamed = app.session.as_mut().map(|s| {
+            s.execute(Command::CompanyRename {
+                name: "Busy Co 2".into(),
+            })
+            .is_ok()
+        });
+        assert_eq!(renamed, Some(true));
+        app.open_target = Some(std::env::temp_dir().join("elsewhere.lcbooks"));
+        app.request(Pending::OpenPath, &ctx);
+        assert!(app.pending == Some(Pending::OpenPath));
+        assert!(app.session.is_some());
     }
 
     #[test]

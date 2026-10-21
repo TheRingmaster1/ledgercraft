@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The .lcbooks company file type, so file managers show it with the
+     LedgerCraft icon and open it in LedgerCraft. Installed by install.sh. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-ledgercraft">
+    <comment>LedgerCraft company file</comment>
+    <icon name="application-x-ledgercraft"/>
+    <glob pattern="*.lcbooks"/>
+  </mime-type>
+</mime-info>

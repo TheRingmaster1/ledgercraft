@@ -51,12 +51,16 @@ impl ImportFile {
 }
 
 /// A button on the start page.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StartChoice {
     Create,
     Open,
     Sample,
     Tutorial,
+    /// One of the recent companies.
+    Recent(PathBuf),
+    /// "Remove From This List" on a recent company.
+    Forget(PathBuf),
 }
 
 /// The start page. Holds the icon texture, loaded on first use.
@@ -75,11 +79,27 @@ impl StartPage {
         self.icon.clone()
     }
 
-    pub(crate) fn ui(&mut self, ui: &mut egui::Ui) -> Option<StartChoice> {
+    pub(crate) fn ui(&mut self, ui: &mut egui::Ui, recent: &[PathBuf]) -> Option<StartChoice> {
         let mut choice = None;
         let icon = self.icon(ui.ctx());
+        // Less space above when the recent list needs the room.
+        let share = if recent.is_empty() { 0.12 } else { 0.05 };
+        let top = (ui.available_height() * share).max(16.0);
+        egui::ScrollArea::vertical()
+            .auto_shrink(false)
+            .show(ui, |ui| Self::page(ui, icon, top, recent, &mut choice));
+        choice
+    }
+
+    fn page(
+        ui: &mut egui::Ui,
+        icon: Option<egui::TextureHandle>,
+        top: f32,
+        recent: &[PathBuf],
+        choice: &mut Option<StartChoice>,
+    ) {
         ui.vertical_centered(|ui| {
-            ui.add_space((ui.available_height() * 0.12).max(16.0));
+            ui.add_space(top);
             if let Some(icon) = icon {
                 ui.add(egui::Image::new(&icon).fit_to_exact_size(egui::vec2(96.0, 96.0)));
                 ui.add_space(8.0);
@@ -104,7 +124,7 @@ impl StartPage {
                         .on_hover_text("Set up a new set of books: name, fiscal year and a starting chart of accounts.")
                         .clicked()
                     {
-                        choice = Some(StartChoice::Create);
+                        *choice = Some(StartChoice::Create);
                     }
                     ui.add_space(4.0);
                     if ui
@@ -112,7 +132,7 @@ impl StartPage {
                         .on_hover_text("Open books you saved earlier (a .lcbooks file).")
                         .clicked()
                     {
-                        choice = Some(StartChoice::Open);
+                        *choice = Some(StartChoice::Open);
                     }
                     ui.add_space(4.0);
                     if ui
@@ -123,17 +143,60 @@ impl StartPage {
                         )
                         .clicked()
                     {
-                        choice = Some(StartChoice::Sample);
+                        *choice = Some(StartChoice::Sample);
                     }
                     ui.add_space(10.0);
                     if ui.link("New to LedgerCraft? Show the tutorial").clicked() {
-                        choice = Some(StartChoice::Tutorial);
+                        *choice = Some(StartChoice::Tutorial);
                     }
                 });
             });
+            if !recent.is_empty() {
+                ui.add_space(14.0);
+                if let Some(picked) = recent_list(ui, recent) {
+                    *choice = Some(picked);
+                }
+            }
+            ui.add_space(16.0);
         });
-        choice
     }
+}
+
+/// The recently opened companies, newest first. Right-click one to remove it.
+fn recent_list(ui: &mut egui::Ui, recent: &[PathBuf]) -> Option<StartChoice> {
+    let mut choice = None;
+    egui::Frame::group(ui.style())
+        .inner_margin(egui::Margin::symmetric(20.0, 12.0))
+        .show(ui, |ui| {
+            ui.set_width(360.0);
+            ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                ui.label(RichText::new("Recent companies").strong().size(15.0));
+                ui.add_space(4.0);
+                for path in recent {
+                    let (name, folder) = crate::recent::describe(path);
+                    let found = path.exists();
+                    let link = if found {
+                        ui.link(RichText::new(name).size(15.0))
+                            .on_hover_text(path.display().to_string())
+                    } else {
+                        ui.link(RichText::new(format!("{name}  (not found)")).color(theme::MUTED))
+                            .on_hover_text("This file has been moved, renamed or deleted.")
+                    };
+                    if link.clicked() {
+                        choice = Some(StartChoice::Recent(path.clone()));
+                    }
+                    link.context_menu(|ui| {
+                        if ui.button("Remove From This List").clicked() {
+                            ui.close_menu();
+                            choice = Some(StartChoice::Forget(path.clone()));
+                        }
+                    });
+                    ui.label(RichText::new(folder).small().color(theme::MUTED));
+                    ui.add_space(2.0);
+                }
+            });
+        });
+    choice
 }
 
 /// Decodes the app icon into a texture; `None` if it cannot be read.
@@ -165,6 +228,8 @@ pub(crate) struct NewCompanyForm {
     imports: Vec<ImportFile>,
     password: Secret,
     confirm: Secret,
+    /// How strong `password` is, worked out when it changes.
+    strength: Option<u8>,
     /// "I understand a forgotten password cannot be recovered."
     understood: bool,
     /// The list the next CSV file holds.
@@ -188,6 +253,7 @@ impl Default for NewCompanyForm {
             imports: Vec::new(),
             password: Secret::default(),
             confirm: Secret::default(),
+            strength: None,
             understood: false,
             csv_kind: ListKind::Customers,
             error: None,
@@ -374,7 +440,12 @@ pub(crate) fn new_company_window(
                     .clicked()
                 {
                     let password =
-                        security::check_new(&form.password.0, &form.confirm.0).and_then(|()| {
+                        security::check_new(
+                            &form.password.0,
+                            &form.confirm.0,
+                            &[form.name.trim()],
+                        )
+                        .and_then(|()| {
                             if form.understood {
                                 Ok(())
                             } else {
@@ -419,7 +490,7 @@ fn password_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
         .spacing([12.0, 6.0])
         .show(ui, |ui| {
             ui.label("Password");
-            security::password_field(
+            let typed = security::password_field(
                 ui,
                 &mut form.password.0,
                 &format!(
@@ -427,11 +498,18 @@ fn password_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
                     ledgercraft_file::MIN_PASSWORD_CHARS
                 ),
             );
+            if typed.changed() {
+                form.strength = security::strength(&form.password.0, &[form.name.trim()]);
+            }
+            ui.end_row();
+            ui.label("");
+            security::strength_meter(ui, form.strength);
             ui.end_row();
             ui.label("Confirm");
             security::password_field(ui, &mut form.confirm.0, "type it again");
             ui.end_row();
         });
+    security::passphrase_tip(ui);
     security::forgotten_password_note(ui);
     ui.checkbox(
         &mut form.understood,

@@ -329,7 +329,8 @@ mod tests {
             Protection::new("        "),
             Err(FileError::WeakPassword(_))
         ));
-        assert!(check_new_password("long enough").is_ok());
+        assert!(check_new_password("long enough now").is_ok());
+        assert!(check_new_password("eleven char").is_err());
     }
 
     #[test]

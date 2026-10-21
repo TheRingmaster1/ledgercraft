@@ -55,7 +55,7 @@ jobs:
           cp "target/${{ matrix.target }}/release/ledgercraft-cli${{ matrix.ext }}" "$name/"
           cp README.md CHANGELOG.md LICENSE-MIT LICENSE-APACHE NOTICE "$name/"
           if [ "${{ runner.os }}" = "Linux" ]; then
-            cp packaging/linux/ledgercraft.desktop packaging/linux/install.sh "$name/"
+            cp packaging/linux/ledgercraft.desktop packaging/linux/ledgercraft-mime.xml packaging/linux/install.sh "$name/"
             cp assets/app-icon/ledgercraft-256.png "$name/ledgercraft.png"
             chmod +x "$name/install.sh" "$name/ledgercraft" "$name/ledgercraft-cli"
           fi

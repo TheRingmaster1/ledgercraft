@@ -109,7 +109,14 @@ const LESSONS: &[Lesson] = &[
             Text(
                 "When no company is open, LedgerCraft shows its start page with three \
                  choices: create a new company, open a company file, or explore the sample \
-                 company. The same choices are on the File menu.",
+                 company. The same choices are on the File menu. Below them, Recent \
+                 companies lists the files you opened last: click one to open it, or \
+                 right-click it to remove it from the list.",
+            ),
+            Text(
+                "LedgerCraft also reopens the company you had open last each time it \
+                 starts (turn this off in Help > Preferences), and remembers the window \
+                 size and whether the side bar was showing.",
             ),
             Bullets(&[
                 "File > New Company opens Create a Company: enter the name (the only \
@@ -118,7 +125,11 @@ const LESSONS: &[Lesson] = &[
                  your lists (accounts, customers, vendors, items) from IIF or CSV files \
                  exported by other software. LedgerCraft then asks where to save the file.",
                 "File > Open Company opens a .lcbooks file you saved earlier. A \
-                 password-protected file asks for its password first.",
+                 password-protected file asks for its password first. File > Open \
+                 Previous Company lists the recent ones.",
+                "Double-clicking a .lcbooks file opens it in LedgerCraft once it is set \
+                 up: on Windows, Help > Preferences > Files; on Linux, the install.sh \
+                 script in the release package does it.",
                 "File > Password sets, changes or removes the password of the open \
                  company. New companies always get one.",
                 "File > Open Sample Company loads Pine Ridge Woodworks to practise on.",
@@ -141,6 +152,13 @@ const LESSONS: &[Lesson] = &[
                  recovered by anyone.",
             ),
             Text(
+                "A password needs at least 12 characters and must be hard to guess: the \
+                 meter under the password field shows how strong it is, and common \
+                 passwords, names, dates, keyboard runs and the company's own name are \
+                 refused. Four or more unrelated words make a strong password that is easy \
+                 to remember. Files with older, shorter passwords still open.",
+            ),
+            Text(
                 "Company files made before passwords existed still open. LedgerCraft \
                  offers to protect them when you open one; say yes, or use File > \
                  Password… later, and the file is upgraded to an encrypted one.",
@@ -152,8 +170,8 @@ const LESSONS: &[Lesson] = &[
                  it in, so a power cut never leaves half a file.",
             ),
             Tip(
-                "The file is plain, documented JSON (see docs/file-format.md), so your books \
-                 are never locked inside LedgerCraft.",
+                "The file format is open and documented (see docs/file-format.md): with \
+                 your password, your books are never locked inside LedgerCraft.",
             ),
         ],
         try_it: &[],
@@ -424,9 +442,13 @@ const LESSONS: &[Lesson] = &[
             Bullets(&[
                 "Row Shading: how strongly alternate rows in lists and reports are shaded.",
                 "Open Menus On Hover: open the top menus by resting the mouse on them.",
+                "Open The Last Company At Startup: reopen the company you had open when \
+                 LedgerCraft last closed.",
                 "Reset To Default puts those settings back.",
                 "Currency: the symbol shown with every amount ($, €, £ and others), in the \
                  app and in Excel exports. It changes how amounts look, not their value.",
+                "Files (Windows): make double-clicking a .lcbooks file open it in \
+                 LedgerCraft.",
             ]),
             Heading("Seeing this again"),
             Text(
