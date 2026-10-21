@@ -21,6 +21,10 @@ A company file is UTF-8 JSON:
         }
       }
     ],
+    "reconciliations": [
+      { "account": 1, "statement_date": "2026-01-31", "beginning_balance": 0,
+        "ending_balance": 240000, "cleared": [50] }
+    ],
     "next_id": 60
   }
 }
@@ -30,6 +34,10 @@ A company file is UTF-8 JSON:
 * Quantities (`qty`) are integers in **thousandths** (`1000` = 1).
 * Dates are `YYYY-MM-DD`.
 * Ids are unique across the whole file.
+* `reconciliations` lists completed bank and credit card reconciliations,
+  oldest first, with the transactions each one cleared. Files written before
+  reconciliation existed have no such field and open with none; adding it did
+  not change the version.
 * `version` increases only on incompatible changes; LedgerCraft refuses files
   from a newer version rather than misreading them.
 * Saves are atomic: the file is written to `NAME.lcbooks.tmp`, flushed, then

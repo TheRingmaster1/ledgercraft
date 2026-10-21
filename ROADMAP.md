@@ -56,6 +56,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 * Double-click a `.lcbooks` file to open it (Windows: Preferences > Files;
   Linux: install.sh)
 * Edit recorded transactions in their forms (M2.1)
+* Bank and credit card reconciliation with reports (M2.2)
 
 ## Now (M1.5: solid on Windows, Linux and macOS)
 
@@ -94,7 +95,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 ## Next (M2: usable for a real sole proprietor)
 
 1. ~~M2.1 Edit a posted transaction; open a transaction from any list or report~~ (done: Transactions page, registers and the Transaction List report; `txn.update`)
-2. M2.2 Bank reconciliation with cleared status and reconciliation reports
+2. ~~M2.2 Bank reconciliation with cleared status and reconciliation reports~~ (done: Banking > Reconcile, `account.reconcile`)
 3. M2.3 Bank feed import: OFX/QFX/QBO and CSV, with matching and rules
 4. M2.4 Sales tax: tax items, rates, groups, Sales Tax Payable and liability report
 5. M2.5 Printable and PDF invoices and statements (original templates)

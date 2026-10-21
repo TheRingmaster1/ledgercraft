@@ -437,6 +437,42 @@ const LESSONS: &[Lesson] = &[
         try_it: &[("Open Transactions", Target::Page(Page::Transactions))],
     },
     Lesson {
+        title: "Reconciling with your statement",
+        blocks: &[
+            Text(
+                "Reconciling checks your books against a bank or credit card statement, \
+                 item by item. When they agree, you know every deposit, check and charge \
+                 is recorded correctly, and nothing is missing or doubled.",
+            ),
+            Steps(&[
+                "Open Banking > Reconcile (or Reconcile in the side bar, or the Reconcile \
+                 link at the top of a bank or credit card register).",
+                "Choose the account, then enter the statement date and the ending balance \
+                 printed on the statement.",
+                "Tick each item that appears on the statement, in the two lists: money in, \
+                 and money out. Mark All and Unmark All help with long lists.",
+                "Watch the Difference. When it reaches $0.00, click Reconcile Now. A \
+                 report of the reconciliation opens below.",
+            ]),
+            Bullets(&[
+                "Items that are not on the statement yet (a check not cashed) stay \
+                 unticked; they carry over to next month.",
+                "Registers mark reconciled items with R. A reconciled transaction cannot \
+                 be voided or have its amount changed, so last month's agreed balance \
+                 stays agreed. Its memo can still change.",
+                "Made a mistake? Undo Last Reconciliation (click it twice) un-reconciles \
+                 the last statement's items so you can fix them and reconcile again.",
+                "Previous reconciliations are listed under the lists; click one to see its \
+                 report, and export it to Excel or CSV.",
+            ]),
+            Tip(
+                "If the difference will not reach $0.00, look for an amount typed wrongly, \
+                 a transaction entered twice, or a bank fee or interest not entered yet.",
+            ),
+        ],
+        try_it: &[("Open Reconcile", Target::Page(Page::Reconcile))],
+    },
+    Lesson {
         title: "Reports",
         blocks: &[
             Text("Open Reports from the side bar, or pick one straight from the Reports menu."),
@@ -495,7 +531,7 @@ const LESSONS: &[Lesson] = &[
             ),
             Heading("Coming later"),
             Text(
-                "Bank reconciliation, importing bank \
+                "Importing bank \
                  statements, sales tax, printable invoices and more. See ROADMAP.md in the \
                  project for the plan. Help > Licenses and Help > About explain the open- \
                  source licence (and the licence of Inter, the font LedgerCraft's text is \

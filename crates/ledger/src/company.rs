@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     default_chart_of_accounts, Account, AccountId, AccountLine, AccountType, Address, Applied,
     Contact, Customer, CustomerId, Item, ItemId, ItemSpec, LedgerError, LedgerResult, Party,
-    Posting, Transaction, TxnBody, TxnId, Vendor, VendorId,
+    Posting, Reconciliation, Transaction, TxnBody, TxnId, Vendor, VendorId,
 };
 
 /// Company-wide settings.
@@ -58,6 +58,9 @@ pub struct Company {
     pub items: Vec<Item>,
     #[serde(default)]
     pub transactions: Vec<Transaction>,
+    /// Completed bank and credit card reconciliations, oldest first.
+    #[serde(default)]
+    pub reconciliations: Vec<Reconciliation>,
     #[serde(default)]
     next_id: u64,
 }
@@ -80,6 +83,7 @@ impl Company {
             vendors: Vec::new(),
             items: Vec::new(),
             transactions: Vec::new(),
+            reconciliations: Vec::new(),
             next_id: 0,
         }
     }
@@ -400,7 +404,7 @@ impl Company {
         Ok(a)
     }
 
-    fn require_kind(
+    pub(crate) fn require_kind(
         &self,
         id: AccountId,
         ok: impl Fn(AccountType) -> bool,
@@ -710,6 +714,7 @@ impl Company {
         }
         let old_party = old.body.party();
         self.validate_for(&body, Some(id))?;
+        self.check_reconciled_change(id, Some(&body))?;
         let paid = self.paid_against(id);
         if paid.is_positive() {
             if body.party() != old_party {
@@ -754,6 +759,7 @@ impl Company {
 
     /// Voids a transaction: it stays on file but no longer posts.
     pub fn void(&mut self, id: TxnId) -> LedgerResult<()> {
+        self.check_reconciled_change(id, None)?;
         let in_use = self
             .transactions
             .iter()

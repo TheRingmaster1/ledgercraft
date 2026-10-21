@@ -57,6 +57,10 @@ impl Page {
                 "Every transaction, newest first. Void one to cancel it while keeping a record."
             }
             Self::Reports => "Profit & Loss, Balance Sheet, who owes what, and more.",
+            Self::Reconcile => {
+                "Check a bank or credit card account against its statement, item by item, \
+                 so you know the books match the bank."
+            }
             Self::Form(kind) => kind.hint(),
         }
     }
