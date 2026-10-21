@@ -64,6 +64,10 @@ fixes to a release. See docs/releasing.md.
 - Entry boxes are easy to see: white with a thin grey outline (the accent
   outline when focused), instead of near-white boxes with no edge that all
   but vanished on unshaded rows. Buttons and drop-downs get the same outline.
+- Create Invoice: each line's Amount (Qty x Rate) shows from the start
+  ($0.00 on a blank line) instead of staying empty until a rate was typed,
+  which made the column look missing. Text that is not a number shows
+  "check qty / rate".
 - Form lines you type into (invoice, bill, check, deposit and journal entry
   lines) are no longer shaded in alternating grey bars; Row Shading still
   applies to lists, registers and reports, where it helps reading.

@@ -508,14 +508,15 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
                 } else {
                     Qty::parse(&line.qty)
                 };
-                match (qty, Money::parse(&line.rate)) {
+                // Qty x Rate, shown from the start: a blank rate counts as 0.
+                match (qty, Money::parse_or_zero(&line.rate)) {
                     (Ok(q), Ok(r)) => {
                         let amount = r.times(q).unwrap_or(Money::ZERO);
                         total = total.saturating_add(amount);
                         money_label(ui, amount, false);
                     }
                     _ => {
-                        widgets::hint_label(ui, "");
+                        ui.label(RichText::new("check qty / rate").small().color(theme::NEGATIVE));
                     }
                 }
                 if widgets::remove_button(ui) {
