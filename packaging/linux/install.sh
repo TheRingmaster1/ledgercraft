@@ -24,7 +24,7 @@ chmod 755 "$bin/ledgercraft" "$bin/ledgercraft-cli"
 cp "$here/ledgercraft.png" "$icons/ledgercraft.png"
 sed "s|^Exec=ledgercraft|Exec=$bin/ledgercraft|" "$here/ledgercraft.desktop" > "$apps/ledgercraft.desktop"
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$apps" || true
-command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q "$data/icons/hicolor" || true
+command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "$data/icons/hicolor" 2>/dev/null || true
 
 echo "LedgerCraft installed. Find it in your Applications menu, or run: ledgercraft"
 case ":$PATH:" in

@@ -3,3 +3,5 @@
 *.lcbooks.tmp
 /plan/
 .DS_Store
+# Company files hold real books; never commit them by accident.
+*.lcbooks
