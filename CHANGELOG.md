@@ -13,8 +13,9 @@ fixes to a release. See docs/releasing.md.
   date and ending balance, tick the items on the statement in two lists
   (money in, money out; Mark All / Unmark All), and Reconcile Now becomes
   available when the Difference is $0.00. A reconciliation report (beginning
-  balance, cleared items, cleared balance, items still uncleared) opens
-  afterwards, and earlier ones can be reopened and exported to Excel or CSV.
+  balance, cleared items, cleared balance, items still uncleared) opens in
+  its own window afterwards, with Export to Excel and Export CSV; earlier ones
+  reopen in the same window from Previous reconciliations.
   Registers show R beside reconciled items. A reconciled transaction cannot be
   voided or have its amount in that account changed until Undo Last
   Reconciliation. New engine commands `account.reconcile` and
