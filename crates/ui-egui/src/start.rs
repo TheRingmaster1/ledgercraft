@@ -229,7 +229,7 @@ pub(crate) struct NewCompanyForm {
     password: Secret,
     confirm: Secret,
     /// How strong `password` is, worked out when it changes.
-    strength: Option<u8>,
+    strength: Option<security::Strength>,
     /// "I understand a forgotten password cannot be recovered."
     understood: bool,
     /// The list the next CSV file holds.
