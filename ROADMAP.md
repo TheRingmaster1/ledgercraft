@@ -114,6 +114,9 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 * Agent interfaces: JSON control channel and MCP server over the command catalog
 * ~~Encryption at rest~~ (done in 0.2); next: multi-user access through a local server
 * Performance: copy-on-write company state, cached balances
+* Dark theme: a Light / Dark / Follow the system choice in Preferences > General,
+  with dark versions of the palette in theme.rs (the side bar, lists, row
+  shading and amounts)
 
 ## Out of scope for now
 

@@ -67,7 +67,7 @@ impl Prefs {
         Color32::from_gray(grey)
     }
 
-    /// Global's Reset To Default: the row shading, Open Menus On Hover and
+    /// General's Reset To Default: the row shading, Open Menus On Hover and
     /// Open The Last Company go back to their defaults; the tutorial setting
     /// is left as it is.
     pub(crate) fn reset_global(&mut self) {
@@ -163,70 +163,103 @@ pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> std::io::Resul
 const PREVIEW_WIDTH: f32 = 280.0;
 
 /// The Preferences window. Changes apply straight away; the app saves them.
+/// A page of Help > Preferences, listed down the left of the window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum PrefsPage {
+    #[default]
+    General,
+    Currency,
+    Text,
+    Files,
+}
+
+impl PrefsPage {
+    const ALL: [Self; 4] = [Self::General, Self::Currency, Self::Text, Self::Files];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::General => "General",
+            Self::Currency => "Currency",
+            Self::Text => "Text",
+            Self::Files => "Files",
+        }
+    }
+
+    /// The line under the page title.
+    fn summary(self) -> &'static str {
+        match self {
+            Self::General => "Row shading, menus and what happens at startup.",
+            Self::Currency => "How amounts are shown.",
+            Self::Text => "The font and size of all text.",
+            Self::Files => "Opening company files by double-clicking them.",
+        }
+    }
+}
+
+/// Size of the Preferences window's content. Fixed, so new settings go on
+/// a new page instead of making the window ever taller.
+const WINDOW_SIZE: egui::Vec2 = egui::vec2(680.0, 420.0);
+/// Width of the page list on the left.
+const LIST_WIDTH: f32 = 150.0;
+/// Where the open page is remembered for the session.
+const PAGE_ID: &str = "prefs_page";
+
+/// The Preferences window: pages listed on the left, the open page's
+/// settings on the right (scrolling if they ever need to). Changes apply
+/// straight away; the app saves them.
 pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
+    let id = egui::Id::new(PAGE_ID);
+    let mut page = ctx.data(|d| d.get_temp::<PrefsPage>(id)).unwrap_or_default();
     egui::Window::new("Preferences")
         .open(open)
         .collapsible(false)
         .resizable(false)
+        .fixed_size(WINDOW_SIZE)
         .show(ctx, |ui| {
-            // Sections, styled like the selected side bar item. Only Global
-            // for now; selecting it shows its settings, clicking again hides them.
-            let id = egui::Id::new("prefs_global_selected");
-            let mut global = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(true);
-            ui.scope(|ui| {
-                ui.visuals_mut().selection.bg_fill = theme::ACCENT;
-                let text = RichText::new("Global").size(15.0);
-                let text = if global {
-                    text.color(Color32::WHITE)
-                } else {
-                    text
-                };
-                if ui.selectable_label(global, text).clicked() {
-                    global = !global;
-                    ui.data_mut(|d| d.insert_temp(id, global));
-                }
+            ui.horizontal_top(|ui| {
+                page_list(ui, &mut page);
+                ui.add_space(14.0);
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(page.label()).heading().color(theme::ACCENT));
+                    ui.label(RichText::new(page.summary()).small().color(theme::MUTED));
+                    ui.separator();
+                    egui::ScrollArea::vertical()
+                        .id_salt("prefs_scroll")
+                        .auto_shrink(false)
+                        .show(ui, |ui| match page {
+                            PrefsPage::General => general_section(ui, prefs),
+                            PrefsPage::Currency => currency_section(ui, prefs),
+                            PrefsPage::Text => text_section(ui, prefs),
+                            PrefsPage::Files => crate::assoc::section(ui),
+                        });
+                });
             });
-            if global {
-                ui.add_space(4.0);
-                global_section(ui, prefs);
-            }
-            ui.add_space(6.0);
-            if section_header(ui, "prefs_currency_selected", "Currency") {
-                ui.add_space(4.0);
-                currency_section(ui, prefs);
-            }
-            ui.add_space(6.0);
-            if section_header(ui, "prefs_text_selected", "Text") {
-                ui.add_space(4.0);
-                text_section(ui, prefs);
-            }
-            ui.add_space(6.0);
-            if section_header(ui, "prefs_files_selected", "Files") {
-                ui.add_space(4.0);
-                crate::assoc::section(ui);
-            }
         });
+    ctx.data_mut(|d| d.insert_temp(id, page));
 }
 
-/// A section heading styled like the Global one: selected shows the section,
-/// clicking again hides it. Starts open.
-fn section_header(ui: &mut egui::Ui, key: &str, label: &str) -> bool {
-    let id = egui::Id::new(key);
-    let mut open = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(true);
-    ui.scope(|ui| {
-        ui.visuals_mut().selection.bg_fill = theme::ACCENT;
-        let text = RichText::new(label).size(15.0);
-        let text = if open {
-            text.color(Color32::WHITE)
-        } else {
-            text
-        };
-        if ui.selectable_label(open, text).clicked() {
-            open = !open;
-            ui.data_mut(|d| d.insert_temp(id, open));
-        }
-    });
-    open
+/// The page list, styled like the app's side bar.
+fn page_list(ui: &mut egui::Ui, page: &mut PrefsPage) {
+    let margin = 8.0;
+    egui::Frame::none()
+        .fill(theme::NAV_BG)
+        .rounding(4.0)
+        .inner_margin(margin)
+        .show(ui, |ui| {
+            ui.set_width(LIST_WIDTH - 2.0 * margin);
+            ui.set_height(WINDOW_SIZE.y - 2.0 * margin);
+            theme::nav_visuals(ui);
+            for p in PrefsPage::ALL {
+                let text = RichText::new(p.label()).size(15.0).color(theme::NAV_TEXT);
+                let item = ui.add_sized(
+                    [LIST_WIDTH - 2.0 * margin, 34.0],
+                    egui::SelectableLabel::new(*page == p, text),
+                );
+                if item.clicked() {
+                    *page = p;
+                }
+            }
+        });
 }
 
 /// The text font and size, applied to the whole app straight away.
@@ -328,8 +361,9 @@ fn currency_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     );
 }
 
-/// Global preferences: the row shading used by every list, with a preview.
-fn global_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
+/// General preferences: the row shading used by every list (with a
+/// preview), Open Menus On Hover and Open The Last Company At Startup.
+fn general_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     ui.horizontal(|ui| {
         ui.label("Row Shading");
         grey_picker(ui, &mut prefs.stripe_grey);
@@ -501,7 +535,7 @@ mod tests {
     }
 
     // Regression: Reset To Default replaced every preference, so it also
-    // turned the tutorial back on. It resets what Global shows, and only that.
+    // turned the tutorial back on. It resets what General shows, and only that.
     #[test]
     fn reset_global_resets_shading_and_hover_but_not_the_tutorial() {
         let mut prefs = Prefs {
@@ -514,7 +548,7 @@ mod tests {
             text_size: TextSize::Largest,
         };
         prefs.reset_global();
-        // The currency is not a Global setting, so Reset leaves it.
+        // The currency is not a General setting, so Reset leaves it.
         assert_eq!(prefs.currency, Currency::Gbp);
         assert_eq!(prefs.stripe_grey, Prefs::default().stripe_grey);
         assert!(!prefs.hover_menus);
@@ -540,6 +574,24 @@ mod tests {
         fs::write(&path, "{\"stripe_grey\": 190}").unwrap();
         assert!(load_from(&path).reopen_last);
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn every_page_draws_in_the_fixed_window() {
+        let labels: std::collections::BTreeSet<_> =
+            PrefsPage::ALL.iter().map(|p| p.label()).collect();
+        assert_eq!(labels.len(), PrefsPage::ALL.len());
+        for page in PrefsPage::ALL {
+            let ctx = egui::Context::default();
+            ctx.data_mut(|d| d.insert_temp(egui::Id::new(PAGE_ID), page));
+            let mut open = true;
+            let mut prefs = Prefs::default();
+            let _ = ctx.run(egui::RawInput::default(), |ctx| {
+                window(ctx, &mut open, &mut prefs);
+            });
+            assert!(open);
+            assert_eq!(prefs, Prefs::default(), "{page:?} changed a setting by drawing");
+        }
     }
 
     #[test]

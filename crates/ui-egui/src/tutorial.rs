@@ -466,13 +466,16 @@ const LESSONS: &[Lesson] = &[
         title: "Preferences, and what's next",
         blocks: &[
             Heading("Preferences"),
-            Text("Help > Preferences holds settings that apply to every company:"),
+            Text(
+                "Help > Preferences holds settings that apply to every company. Pick a page \
+                 from the list on the left; its settings appear on the right and take \
+                 effect straight away.",
+            ),
             Bullets(&[
-                "Row Shading: how strongly alternate rows in lists and reports are shaded.",
-                "Open Menus On Hover: open the top menus by resting the mouse on them.",
-                "Open The Last Company At Startup: reopen the company you had open when \
-                 LedgerCraft last closed.",
-                "Reset To Default puts those settings back.",
+                "General: Row Shading (how strongly alternate rows in lists and reports are \
+                 shaded), Open Menus On Hover (open the top menus by resting the mouse on \
+                 them) and Open The Last Company At Startup. Reset To Default puts these \
+                 back.",
                 "Currency: the symbol shown with every amount ($, €, £ and others), in the \
                  app and in Excel exports. It changes how amounts look, not their value.",
                 "Text: the font and size (Standard, Larger or Largest) for the whole app, \
