@@ -269,7 +269,7 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
     // Side by side, split down the middle, while At A Glance still fits next to
     // the workflow buttons; otherwise At A Glance moves below them. The
     // workflow's natural width is measured each frame and used on the next.
-    let width_id = ui.id().with("home_workflow_width");
+    let width_id = ui.scope_id().with("home_workflow_width");
     let workflow_width = ui.data(|d| d.get_temp::<f32>(width_id)).unwrap_or(0.0);
     let full = ui.available_width();
     let left_width = workflow_width.max((full - DIVIDER_WIDTH) / 2.0 - DIVIDER_GAP);

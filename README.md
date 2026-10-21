@@ -42,7 +42,7 @@ own. No subscription, no licence server, no telemetry.
 
 | Requirement | Version | Notes |
 |---|---|---|
-| [Rust](https://rustup.rs) (stable, MSVC toolchain) | **1.88 or newer** | `rustup update stable` to upgrade; `rustc --version` to check |
+| [Rust](https://rustup.rs) (stable, MSVC toolchain) | **1.95 or newer** | `rustup update stable` to upgrade; `rustc --version` to check |
 | Microsoft C++ Build Tools | 2019 or newer | The "Desktop development with C++" workload; provides the linker and the resource compiler that embeds the app icon |
 | Graphics | DirectX 12 (or Vulkan) | Drawn with wgpu. If the window is blank or slow, run `$env:WGPU_BACKEND="vulkan"` first |
 
@@ -50,7 +50,7 @@ own. No subscription, no licence server, no telemetry.
 
 | Requirement | Version | Notes |
 |---|---|---|
-| [Rust](https://rustup.rs) (stable) | **1.88 or newer** | From `rustup`, or your distribution's `rustup` package |
+| [Rust](https://rustup.rs) (stable) | **1.95 or newer** | From `rustup`, or your distribution's `rustup` package |
 | C compiler and linker | any | `base-devel` (Arch), `build-essential` (Debian/Ubuntu), `gcc` (Fedora) |
 | Window system libraries | — | xkbcommon, Wayland and X11 (Xcursor, Xrandr, Xi); see the commands below |
 | Graphics | Vulkan | The driver for your graphics card; in a virtual machine, the Mesa software driver (lavapipe). If the window does not appear, try `WGPU_BACKEND=gl` |
@@ -77,13 +77,13 @@ Then install Rust with `rustup default stable` (Arch) or from
 
 #### macOS (in testing)
 
-Rust 1.88 or newer and the Xcode command-line tools (`xcode-select --install`).
+Rust 1.95 or newer and the Xcode command-line tools (`xcode-select --install`).
 Drawn with Metal. Reports from Mac users are welcome.
 
 #### All platforms
 
-Rust 1.88 is the minimum because of the Excel export library
-(`rust_xlsxwriter`) and the clippy lints the project builds with; it is set as
+Rust 1.95 is the minimum because of the user interface library (egui and
+eframe 0.37, which bring font hinting and sharper text); it is set as
 `rust-version` in `Cargo.toml`, so an older compiler reports the problem
 clearly. The first build downloads and compiles the dependencies and takes a
 few minutes; later builds take seconds.
