@@ -77,8 +77,9 @@ fixes to a release. See docs/releasing.md.
   Calibri, Calibri Light, Verdana, Tahoma and Arial on Windows; DejaVu Sans,
   Noto Sans, Liberation Sans, Ubuntu and Cantarell on Linux. A font that
   cannot be found or read falls back to Classic instead of stopping the app.
-  Inter is bundled under the SIL Open Font License; Help > Licenses has a new
-  Inter Font tab with its licence.
+  Each font's name in the list is shown in that font. Inter is bundled under
+  the SIL Open Font License; Help > Licenses has a new Inter Font tab with its
+  licence.
 - Tutorial brought up to date: opening and changing recorded transactions
   (Fixing mistakes, Working with accounts, Reports), status bar messages that
   clear themselves and the file name on the right (Getting around), and the

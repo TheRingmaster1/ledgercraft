@@ -479,7 +479,7 @@ const LESSONS: &[Lesson] = &[
                 "Currency: the symbol shown with every amount ($, €, £ and others), in the \
                  app and in Excel exports. It changes how amounts look, not their value.",
                 "Text: the font and size (Standard, Larger or Largest) for the whole app, \
-                 with a preview. Inter Light, Inter and Classic come with LedgerCraft; \
+                 with a preview. Each font's name in the list is shown in that font. Inter Light, Inter and Classic come with LedgerCraft; \
                  fonts already on your computer (such as Segoe UI or Calibri on Windows, \
                  DejaVu Sans or Noto Sans on Linux) are listed under \"On this computer\".",
                 "Files (Windows): make double-clicking a .lcbooks file open it in \
