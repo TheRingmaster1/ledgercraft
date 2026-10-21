@@ -122,12 +122,7 @@ pub(crate) fn confirmation(password: &str, confirm: &str) -> Option<bool> {
 }
 
 /// The Confirm field, with "Doesn't match" or "Matches" to its right.
-pub(crate) fn confirm_field(
-    ui: &mut egui::Ui,
-    confirm: &mut String,
-    password: &str,
-    shown: bool,
-) {
+pub(crate) fn confirm_field(ui: &mut egui::Ui, confirm: &mut String, password: &str, shown: bool) {
     ui.horizontal(|ui| {
         password_field(ui, confirm, "type it again", shown);
         match confirmation(password, confirm) {
