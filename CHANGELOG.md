@@ -39,6 +39,11 @@ fixes to a release. See docs/releasing.md.
   taskbar and dock match it to the menu entry and icon (including Wayland).
 
 ### Fixed
+- The status bar no longer overlaps itself in a narrow window. Messages on
+  the left clear themselves after a few seconds (errors after 20), the right
+  side shows the company's file name rather than its whole path (hover for
+  the full path), and both shorten with "…" instead of running into each
+  other.
 - The password meter applies the 12-character minimum first: a short
   password shows "Too short: 9 of 12 characters" instead of "Good" (it
   showed "Good" for "beautiful", which Create then refused).
