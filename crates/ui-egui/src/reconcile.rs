@@ -175,8 +175,24 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ReconcileState, out: &mut Vec<Action>,
     if ui.available_width() >= SIDE_BY_SIDE_WIDTH {
         ui.columns(2, |cols| {
             if let [left, right] = cols {
-                item_list(left, "rec_up", up_title, c, &ups, &mut s.cleared, list_height);
-                item_list(right, "rec_down", down_title, c, &downs, &mut s.cleared, list_height);
+                item_list(
+                    left,
+                    "rec_up",
+                    up_title,
+                    c,
+                    &ups,
+                    &mut s.cleared,
+                    list_height,
+                );
+                item_list(
+                    right,
+                    "rec_down",
+                    down_title,
+                    c,
+                    &downs,
+                    &mut s.cleared,
+                    list_height,
+                );
             }
         });
     } else {

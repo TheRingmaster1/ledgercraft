@@ -259,9 +259,17 @@ fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
                         .width(250.0)
                         .show_ui(ui, |ui| {
                             if matched.is_some() {
-                                ui.selectable_value(&mut row.choice, Choice::Match, label(Choice::Match));
+                                ui.selectable_value(
+                                    &mut row.choice,
+                                    Choice::Match,
+                                    label(Choice::Match),
+                                );
                             }
-                            ui.selectable_value(&mut row.choice, Choice::Add, "Add as a new transaction");
+                            ui.selectable_value(
+                                &mut row.choice,
+                                Choice::Add,
+                                "Add as a new transaction",
+                            );
                             ui.selectable_value(&mut row.choice, Choice::Skip, "Skip");
                         });
                     if row.choice == Choice::Add {
