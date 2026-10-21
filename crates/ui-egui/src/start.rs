@@ -440,19 +440,15 @@ pub(crate) fn new_company_window(
                     .clicked()
                 {
                     let password =
-                        security::check_new(
-                            &form.password.0,
-                            &form.confirm.0,
-                            &[form.name.trim()],
-                        )
-                        .and_then(|()| {
-                            if form.understood {
-                                Ok(())
-                            } else {
-                                Err("Tick the box to confirm you will keep the password safe."
-                                    .to_string())
-                            }
-                        });
+                        security::check_new(&form.password.0, &form.confirm.0, &[form.name.trim()])
+                            .and_then(|()| {
+                                if form.understood {
+                                    Ok(())
+                                } else {
+                                    Err("Tick the box to confirm you will keep the password safe."
+                                        .to_string())
+                                }
+                            });
                     match password.and_then(|()| form.build_with_imports()) {
                         Ok((company, summary)) => {
                             let secret = Secret(std::mem::take(&mut form.password.0));

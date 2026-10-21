@@ -58,9 +58,11 @@ pub(crate) fn strength(password: &str, context: &[&str]) -> Option<u8> {
 pub(crate) fn check_new(password: &str, confirm: &str, context: &[&str]) -> Result<(), String> {
     check_new_password(password)?;
     if strength(password, context).unwrap_or(0) < MIN_STRENGTH {
-        return Err("That password is too easy to guess. Try four or more unrelated words, \
+        return Err(
+            "That password is too easy to guess. Try four or more unrelated words, \
                     or make it longer and less predictable."
-            .into());
+                .into(),
+        );
     }
     if password != confirm {
         return Err("The two passwords do not match.".into());
@@ -412,14 +414,25 @@ mod tests {
 
     #[test]
     fn new_passwords_must_be_long_enough_and_match() {
-        assert!(check_new("Tq7#vL9!pW", "Tq7#vL9!pW", &[]).is_err(), "too short");
-        assert!(check_new(STRONG, "Tq7#vL9!pWz2@kR5", &[]).is_err(), "mismatch");
+        assert!(
+            check_new("Tq7#vL9!pW", "Tq7#vL9!pW", &[]).is_err(),
+            "too short"
+        );
+        assert!(
+            check_new(STRONG, "Tq7#vL9!pWz2@kR5", &[]).is_err(),
+            "mismatch"
+        );
         assert!(check_new(STRONG, STRONG, &[]).is_ok());
     }
 
     #[test]
     fn common_and_patterned_passwords_are_refused() {
-        for weak in ["password1234", "aaaaaaaaaaaa", "qwertyuiop12", "123456789012"] {
+        for weak in [
+            "password1234",
+            "aaaaaaaaaaaa",
+            "qwertyuiop12",
+            "123456789012",
+        ] {
             assert!(check_new(weak, weak, &[]).is_err(), "{weak} was accepted");
             assert!(strength(weak, &[]).unwrap_or(0) < MIN_STRENGTH, "{weak}");
         }
