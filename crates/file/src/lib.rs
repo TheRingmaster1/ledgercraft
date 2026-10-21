@@ -4,6 +4,8 @@
 //! `{"format":"ledgercraft","version":1,"company":{…}}`. It is documented in
 //! `docs/file-format.md` so any program can read your books, forever.
 
+pub mod import;
+
 use std::fmt;
 use std::fs;
 use std::io::Write;

@@ -25,6 +25,8 @@ pub struct LedgerApp {
     session: Option<Session>,
     /// The Create a Company window, while it is open.
     create: Option<NewCompanyForm>,
+    /// What the last import brought in, shown until closed.
+    import_report: Option<ledgercraft_file::import::ImportSummary>,
     start: StartPage,
     page: Page,
     forms: Forms,
@@ -82,6 +84,7 @@ impl LedgerApp {
         Self {
             session,
             create: None,
+            import_report: None,
             start: StartPage::default(),
             page: Page::Home,
             forms: Forms::default(),
@@ -698,10 +701,14 @@ impl LedgerApp {
             None => None,
         };
         match created {
-            Some(start::CreateOutcome::Create(company)) => {
+            Some(start::CreateOutcome::Create(company, summary)) => {
                 let name = company.info.name.clone();
                 self.replace_session(Session::new(company));
-                self.info(format!("Created {name}."));
+                match &summary {
+                    Some(s) => self.info(format!("Created {name}. {s}.")),
+                    None => self.info(format!("Created {name}.")),
+                }
+                self.import_report = summary;
                 // Ask where it lives straight away, as desktop apps do.
                 if !self.save_as() && !self.status_is_error {
                     self.info(format!(
@@ -712,6 +719,7 @@ impl LedgerApp {
             Some(start::CreateOutcome::Cancel) => self.create = None,
             None => {}
         }
+        start::import_report_window(ctx, &mut self.import_report);
         let mut open = self.show_about;
         let mut view_licenses = false;
         egui::Window::new("About LedgerCraft").open(&mut open).collapsible(false).show(ctx, |ui| {

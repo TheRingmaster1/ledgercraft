@@ -1,7 +1,10 @@
 //! What LedgerCraft shows when no company is open: the start page (create,
 //! open, sample, tutorial) and the Create a Company window.
 
+use std::path::PathBuf;
+
 use eframe::egui::{self, RichText};
+use ledgercraft_file::import::{self, ImportSummary, ListKind};
 use ledgercraft_ledger::{Address, Company};
 
 use crate::theme;
@@ -22,6 +25,25 @@ const MONTHS: [&str; 12] = [
     "December",
 ];
 const NAME_MAX: usize = 100;
+/// Largest import file read, so a wrong pick cannot exhaust memory.
+const IMPORT_MAX_BYTES: u64 = 50 * 1024 * 1024;
+
+/// A file chosen for import: an IIF file, or a CSV holding one list.
+struct ImportFile {
+    path: PathBuf,
+    /// `None` for IIF (which holds several lists).
+    csv: Option<ListKind>,
+}
+
+impl ImportFile {
+    fn label(&self) -> String {
+        let name = self.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        match self.csv {
+            None => format!("{name}  (IIF lists)"),
+            Some(kind) => format!("{name}  ({})", kind.label()),
+        }
+    }
+}
 
 /// A button on the start page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -135,6 +157,9 @@ pub(crate) struct NewCompanyForm {
     city: String,
     region: String,
     postal_code: String,
+    imports: Vec<ImportFile>,
+    /// The list the next CSV file holds.
+    csv_kind: ListKind,
     error: Option<String>,
 }
 
@@ -151,12 +176,39 @@ impl Default for NewCompanyForm {
             city: String::new(),
             region: String::new(),
             postal_code: String::new(),
+            imports: Vec::new(),
+            csv_kind: ListKind::Customers,
             error: None,
         }
     }
 }
 
 impl NewCompanyForm {
+    /// Builds the company and brings in the chosen files, or says what is
+    /// wrong. The summary is `None` when nothing was imported.
+    fn build_with_imports(&self) -> Result<(Company, Option<ImportSummary>), String> {
+        let mut company = self.build()?;
+        if self.imports.is_empty() {
+            return Ok((company, None));
+        }
+        let mut summary = ImportSummary::default();
+        // IIF first, then CSV lists with accounts before the items that use them.
+        let mut order: Vec<&ImportFile> = self.imports.iter().collect();
+        order.sort_by_key(|f| f.csv.map_or(0, |k| 1 + ListKind::ALL.iter().position(|x| *x == k).unwrap_or(0)));
+        for file in order {
+            let text = read_import(&file.path)?;
+            match file.csv {
+                None => summary.merge(import::import_iif(&mut company, &text)),
+                Some(kind) => {
+                    let part = import::import_csv(&mut company, kind, &text)
+                        .map_err(|e| format!("{}: {e}", file.label()))?;
+                    summary.merge(part);
+                }
+            }
+        }
+        Ok((company, Some(summary)))
+    }
+
     /// Builds the company, or says what is missing.
     fn build(&self) -> Result<Company, String> {
         let name = self.name.trim();
@@ -187,9 +239,22 @@ impl NewCompanyForm {
     }
 }
 
+fn read_import(path: &std::path::Path) -> Result<String, String> {
+    let shown = path.display();
+    let len = std::fs::metadata(path).map_err(|e| format!("Could not read {shown}: {e}"))?.len();
+    if len > IMPORT_MAX_BYTES {
+        return Err(format!("{shown} is too large to import ({len} bytes)."));
+    }
+    let bytes = std::fs::read(path).map_err(|e| format!("Could not read {shown}: {e}"))?;
+    // IIF files are often saved in the Windows code page, not UTF-8; keep
+    // what can be read rather than refusing the file.
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
 /// What happened in the Create a Company window this frame.
 pub(crate) enum CreateOutcome {
-    Create(Company),
+    /// The new company, and what was imported into it (if anything).
+    Create(Company, Option<ImportSummary>),
     Cancel,
 }
 
@@ -255,6 +320,8 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
                 "Start with a standard small-business chart of accounts (recommended)",
             );
             ui.radio_value(&mut form.starter_accounts, false, "Start with no accounts; I will add my own");
+            ui.add_space(8.0);
+            import_section(ui, form);
             if let Some(error) = &form.error {
                 ui.add_space(6.0);
                 ui.label(RichText::new(error.as_str()).color(theme::NEGATIVE));
@@ -262,8 +329,8 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
             ui.add_space(10.0);
             ui.horizontal(|ui| {
                 if ui.button(RichText::new("Create Company").strong()).clicked() {
-                    match form.build() {
-                        Ok(company) => outcome = Some(CreateOutcome::Create(company)),
+                    match form.build_with_imports() {
+                        Ok((company, summary)) => outcome = Some(CreateOutcome::Create(company, summary)),
                         Err(e) => form.error = Some(e),
                     }
                 }
@@ -283,6 +350,107 @@ pub(crate) fn new_company_window(ctx: &egui::Context, form: &mut NewCompanyForm)
     outcome
 }
 
+/// "Bring in existing data": choose IIF and CSV files to import.
+fn import_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
+    ui.label(RichText::new("Bring in existing data (optional)").strong());
+    ui.label(
+        "Moving from other accounting software? Import your lists now: chart of accounts, \
+         customers, vendors, and products and services. Opening balances and past \
+         transactions are not imported yet; enter balances with a journal entry.",
+    );
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        let iif = ui.button("Add IIF File…").on_hover_text(
+            "An IIF list export, for example from QuickBooks Desktop: File > Utilities > \
+             Export > Lists to IIF Files. Brings in accounts, customers, vendors and items.",
+        );
+        if iif.clicked() {
+            if let Some(path) = rfd::FileDialog::new().add_filter("IIF file", &["iif", "txt"]).pick_file() {
+                form.imports.push(ImportFile { path, csv: None });
+            }
+        }
+        ui.separator();
+        let current = form.csv_kind.label();
+        egui::ComboBox::from_id_salt("csv_kind").selected_text(current).width(170.0).show_ui(ui, |ui| {
+            for kind in ListKind::ALL {
+                ui.selectable_value(&mut form.csv_kind, kind, kind.label());
+            }
+        });
+        let csv = ui.button("Add CSV File…").on_hover_text(format!(
+            "A CSV file with a header row holding this list. Columns read: {}. Only the \
+             name is required.",
+            form.csv_kind.columns()
+        ));
+        if csv.clicked() {
+            if let Some(path) = rfd::FileDialog::new().add_filter("CSV file", &["csv", "txt"]).pick_file() {
+                form.imports.push(ImportFile { path, csv: Some(form.csv_kind) });
+            }
+        }
+    });
+    let mut remove = None;
+    for (i, file) in form.imports.iter().enumerate() {
+        ui.horizontal(|ui| {
+            ui.label(format!("•  {}", file.label()));
+            if ui.small_button("x").on_hover_text("Don't import this file").clicked() {
+                remove = Some(i);
+            }
+        });
+    }
+    if let Some(i) = remove {
+        if i < form.imports.len() {
+            form.imports.remove(i);
+        }
+    }
+}
+
+/// Shows what an import brought in and what it skipped, until closed.
+pub(crate) fn import_report_window(ctx: &egui::Context, report: &mut Option<ImportSummary>) {
+    let Some(summary) = report.as_ref() else { return };
+    let mut open = true;
+    let mut close = false;
+    egui::Window::new("Import Results")
+        .open(&mut open)
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .default_width(460.0)
+        .show(ctx, |ui| {
+            egui::Grid::new("import_counts").num_columns(2).spacing([24.0, 4.0]).show(ui, |ui| {
+                for (label, n) in [
+                    ("Accounts", summary.accounts),
+                    ("Customers", summary.customers),
+                    ("Vendors", summary.vendors),
+                    ("Products and services", summary.items),
+                ] {
+                    ui.label(label);
+                    ui.label(RichText::new(n.to_string()).strong());
+                    ui.end_row();
+                }
+            });
+            if !summary.skipped.is_empty() {
+                ui.add_space(8.0);
+                ui.label(RichText::new(format!("Not imported ({})", summary.skipped.len())).strong());
+                egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
+                    for line in &summary.skipped {
+                        ui.label(RichText::new(line.as_str()).color(theme::MUTED));
+                    }
+                });
+                ui.label(
+                    RichText::new("Fix these in the source file and add them by hand, or leave them out.")
+                        .small()
+                        .color(theme::MUTED),
+                );
+            }
+            ui.add_space(8.0);
+            if ui.button("Close").clicked() {
+                close = true;
+            }
+        });
+    if !open || close {
+        *report = None;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,6 +461,30 @@ mod tests {
         assert!(form.build().is_err());
         let long = NewCompanyForm { name: "x".repeat(NAME_MAX + 1), ..NewCompanyForm::default() };
         assert!(long.build().is_err());
+    }
+
+    #[test]
+    fn imports_run_after_the_company_is_built() {
+        let dir = std::env::temp_dir().join(format!("lc-start-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let csv = dir.join("customers.csv");
+        std::fs::write(&csv, "Name,Terms\nAcme,Net 30\n").unwrap();
+        let form = NewCompanyForm {
+            name: "Import Co".into(),
+            imports: vec![ImportFile { path: csv, csv: Some(ListKind::Customers) }],
+            ..NewCompanyForm::default()
+        };
+        let (company, summary) = form.build_with_imports().unwrap();
+        assert_eq!(summary.map(|s| s.customers), Some(1));
+        assert_eq!(company.customers.len(), 1);
+
+        let missing = NewCompanyForm {
+            name: "Missing Co".into(),
+            imports: vec![ImportFile { path: dir.join("nope.csv"), csv: Some(ListKind::Vendors) }],
+            ..NewCompanyForm::default()
+        };
+        assert!(missing.build_with_imports().is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

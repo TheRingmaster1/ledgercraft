@@ -114,8 +114,9 @@ const LESSONS: &[Lesson] = &[
             Bullets(&[
                 "File > New Company opens Create a Company: enter the name (the only \
                  required field), when your fiscal year starts, and contact details, and \
-                 choose a standard chart of accounts or an empty one. LedgerCraft then asks \
-                 where to save the file.",
+                 choose a standard chart of accounts or an empty one. You can also bring in \
+                 your lists (accounts, customers, vendors, items) from IIF or CSV files \
+                 exported by other software. LedgerCraft then asks where to save the file.",
                 "File > Open Company opens a .lcbooks file you saved earlier.",
                 "File > Open Sample Company loads Pine Ridge Woodworks to practise on.",
                 "File > Close Company puts the books away and returns to the start page. \

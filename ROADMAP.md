@@ -32,6 +32,7 @@ Platform focus: **Windows 10/11 x64 only** until this list is done.
    - Remembered window size, side bar and last company
    - ~~Start page, Create a Company window and Close Company~~ (done)
    - Recent companies on the start page
+   - ~~Import lists (IIF, CSV) when creating a company~~ (done); next: File > Import for an open company, opening balances, transactions
 5. M1.5.5 Windows installer (MSI) and portable zip; code signing later
 
 ## Next (M2 — usable for a real sole proprietor)

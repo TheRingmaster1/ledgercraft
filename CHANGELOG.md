@@ -34,6 +34,11 @@ fixes to a release. See docs/releasing.md.
 - Create a Company window: company name (required), legal name, fiscal year
   start month, email, phone and address, and a standard or empty chart of
   accounts; then asks where to save the file. File > New Company opens it.
+- Import existing lists when creating a company: IIF list exports (for
+  example from QuickBooks Desktop) and CSV files with a header row, for the
+  chart of accounts, customers, vendors and products and services. Records
+  that cannot be added are skipped and listed in an Import Results window.
+  Opening balances and transactions are not imported yet.
 - File > Close Company returns to the start page, asking first if there are
   unsaved changes. Menus and shortcuts that need a company are greyed out
   until one is open.
