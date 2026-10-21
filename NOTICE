@@ -5,7 +5,10 @@ Licensed under the MIT license or the Apache License, Version 2.0, at your
 option. See LICENSE-MIT and LICENSE-APACHE.
 
 Third-party material
-None: every bundled asset is original to LedgerCraft. The default chart of
+Inter font (assets/fonts/Inter-Regular.ttf)
+  Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter)
+  Licensed under the SIL Open Font License, Version 1.1 (assets/fonts/OFL.txt).
+Every other bundled asset is original to LedgerCraft. The default chart of
 accounts, the sample company "Pine Ridge Woodworks" and all UI text were
 written for this project. Rust dependencies are fetched by Cargo under their
 own licenses (see Cargo.lock and `cargo about` / `cargo deny` output).

@@ -16,10 +16,17 @@ pub(crate) enum LicenseTab {
     Mit,
     Apache,
     Notice,
+    Font,
 }
 
 impl LicenseTab {
-    const ALL: [Self; 4] = [Self::Summary, Self::Mit, Self::Apache, Self::Notice];
+    const ALL: [Self; 5] = [
+        Self::Summary,
+        Self::Mit,
+        Self::Apache,
+        Self::Notice,
+        Self::Font,
+    ];
 
     fn label(self) -> &'static str {
         match self {
@@ -27,6 +34,7 @@ impl LicenseTab {
             Self::Mit => "MIT License",
             Self::Apache => "Apache License 2.0",
             Self::Notice => "Notices",
+            Self::Font => "Inter Font",
         }
     }
 }
@@ -61,6 +69,7 @@ impl LicenseWindow {
                     LicenseTab::Mit => text(ui, MIT),
                     LicenseTab::Apache => text(ui, APACHE),
                     LicenseTab::Notice => text(ui, NOTICE),
+                    LicenseTab::Font => text(ui, theme::INTER_LICENSE),
                 }
             });
         self.open = open;
@@ -103,6 +112,12 @@ fn summary(ui: &mut egui::Ui, tab: &mut LicenseTab) {
          each under its own permissive licence. A complete list with licence texts will be \
          included here in a later release.",
     );
+    ui.horizontal(|ui| {
+        ui.label("Text is set in Inter by Rasmus Andersson, under the SIL Open Font License.");
+        if ui.link("Read it").clicked() {
+            *tab = LicenseTab::Font;
+        }
+    });
     ui.add_space(8.0);
     ui.label(
         RichText::new(

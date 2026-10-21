@@ -1,3 +1,5 @@
 # Linux packaging files must keep LF line endings, even on a Windows checkout.
 *.sh text eol=lf
 *.desktop text eol=lf
+# Fonts are binary: never convert line endings.
+*.ttf binary
