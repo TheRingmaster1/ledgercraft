@@ -237,6 +237,17 @@ fn usable(bytes: &[u8]) -> bool {
     ab_glyph::FontRef::try_from_slice(bytes).is_ok()
 }
 
+/// Text darkness, as a grey level for ordinary text: 0 is black (as in
+/// LedgerCraft 0.2), higher is softer. egui has no font hinting to adjust,
+/// so softening the colour is what thins heavy fonts such as Verdana.
+pub(crate) const TEXT_GREY_RANGE: std::ops::RangeInclusive<u8> = 0..=110;
+
+/// The colour of ordinary text for a darkness setting, kept in range so
+/// text always stays readable on the light background.
+pub(crate) fn text_colour(grey: u8) -> Color32 {
+    Color32::from_gray(grey.clamp(*TEXT_GREY_RANGE.start(), *TEXT_GREY_RANGE.end()))
+}
+
 /// How big text is, chosen in Help > Preferences > Text.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -397,6 +408,12 @@ mod tests {
                 }
             });
         });
+    }
+
+    #[test]
+    fn text_darkness_stays_readable() {
+        assert_eq!(text_colour(0), Color32::BLACK);
+        assert_eq!(text_colour(200), Color32::from_gray(*TEXT_GREY_RANGE.end()));
     }
 
     #[test]
