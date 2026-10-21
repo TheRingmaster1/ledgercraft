@@ -64,7 +64,7 @@ impl Default for InvoiceForm {
             due: String::new(),
             number: String::new(),
             memo: String::new(),
-            lines: vec![SalesLineInput::default(); 3],
+            lines: vec![SalesLineInput::default()],
         }
     }
 }
@@ -106,6 +106,14 @@ pub(crate) struct AccountLineInput {
     pub amount: String,
 }
 
+impl AccountLineInput {
+    fn is_blank(&self) -> bool {
+        self.account.is_none()
+            && self.description.trim().is_empty()
+            && self.amount.trim().is_empty()
+    }
+}
+
 /// Enter Bill, Write Check and Make Deposit share this shape.
 pub(crate) struct LinesForm {
     /// The bill, check or deposit being edited, if this is not a new one.
@@ -131,7 +139,7 @@ impl Default for LinesForm {
             due: String::new(),
             number: String::new(),
             memo: String::new(),
-            lines: vec![AccountLineInput::default(); 3],
+            lines: vec![AccountLineInput::default()],
         }
     }
 }
@@ -143,6 +151,16 @@ pub(crate) struct JournalLineInput {
     pub credit: String,
     pub memo: String,
     pub party: Option<Party>,
+}
+
+impl JournalLineInput {
+    fn is_blank(&self) -> bool {
+        self.account.is_none()
+            && self.debit.trim().is_empty()
+            && self.credit.trim().is_empty()
+            && self.memo.trim().is_empty()
+            && self.party.is_none()
+    }
 }
 
 pub(crate) struct JournalForm {
@@ -161,7 +179,7 @@ impl Default for JournalForm {
             date: today(),
             number: String::new(),
             memo: String::new(),
-            lines: vec![JournalLineInput::default(); 4],
+            lines: vec![JournalLineInput::default(); 2],
         }
     }
 }
@@ -348,6 +366,24 @@ fn account_line_inputs(lines: &[AccountLine]) -> Vec<AccountLineInput> {
 
 // ----- shared pieces ----------------------------------------------------------
 
+/// Keeps exactly one empty line at the end of a form's lines (and at least
+/// `min` lines), so there is always somewhere to type the next one: typing in
+/// the last line adds a new one, and spare empty lines at the end go away.
+fn tidy_lines<T: Default>(lines: &mut Vec<T>, min: usize, is_blank: impl Fn(&T) -> bool) {
+    while lines.len() >= 2
+        && lines.len() > min
+        && lines.iter().rev().take(2).all(&is_blank)
+    {
+        lines.pop();
+    }
+    if lines.last().is_none_or(|l| !is_blank(l)) {
+        lines.push(T::default());
+    }
+    while lines.len() < min {
+        lines.push(T::default());
+    }
+}
+
 fn header(ui: &mut Ui, kind: FormKind, editing: Option<TxnId>) {
     if editing.is_some() {
         ui.label(
@@ -530,9 +566,7 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
             f.lines.remove(i);
         }
     }
-    if ui.button("+ Add line").clicked() {
-        f.lines.push(SalesLineInput::default());
-    }
+    tidy_lines(&mut f.lines, 1, SalesLineInput::is_blank);
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         widgets::hint_label(ui, "Memo");
@@ -900,9 +934,7 @@ fn account_lines(ui: &mut Ui, salt: &str, c: &Company, lines: &mut Vec<AccountLi
             lines.remove(i);
         }
     }
-    if ui.button("+ Add line").clicked() {
-        lines.push(AccountLineInput::default());
-    }
+    tidy_lines(lines, 1, AccountLineInput::is_blank);
     total
 }
 
@@ -1170,9 +1202,7 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
             f.lines.remove(i);
         }
     }
-    if ui.button("+ Add line").clicked() {
-        f.lines.push(JournalLineInput::default());
-    }
+    tidy_lines(&mut f.lines, 2, JournalLineInput::is_blank);
     ui.horizontal(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
@@ -1315,6 +1345,34 @@ mod tests {
         }
         // The sample has every kind of form in it.
         assert!(kinds.len() >= 6, "only {kinds:?}");
+    }
+
+    #[test]
+    fn there_is_always_exactly_one_empty_line_to_type_in() {
+        let filled = |amount: &str| AccountLineInput {
+            amount: amount.into(),
+            ..AccountLineInput::default()
+        };
+        // Starts with one empty line.
+        assert_eq!(LinesForm::default().lines.len(), 1);
+        // Typing in the last line adds a new empty one.
+        let mut lines = vec![filled("10")];
+        tidy_lines(&mut lines, 1, AccountLineInput::is_blank);
+        assert_eq!(lines.len(), 2);
+        assert!(lines[1].is_blank());
+        // Spare empty lines at the end go, leaving one.
+        let mut lines = vec![filled("10"), filled(""), filled(""), filled("")];
+        tidy_lines(&mut lines, 1, AccountLineInput::is_blank);
+        assert_eq!(lines.len(), 2);
+        // A blank line in the middle stays where it is.
+        let mut lines = vec![filled("10"), filled(""), filled("20")];
+        tidy_lines(&mut lines, 1, AccountLineInput::is_blank);
+        assert_eq!(lines.len(), 4);
+        // Journal entries keep at least two lines.
+        let mut lines = vec![JournalLineInput::default()];
+        tidy_lines(&mut lines, 2, JournalLineInput::is_blank);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(JournalForm::default().lines.len(), 2);
     }
 
     #[test]
