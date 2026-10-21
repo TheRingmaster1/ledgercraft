@@ -57,6 +57,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
   Linux: install.sh)
 * Edit recorded transactions in their forms (M2.1)
 * Bank and credit card reconciliation with reports (M2.2)
+* Bank feed import from OFX, QFX, QBO and CSV downloads, with matching and rules (M2.3)
 
 ## Now (M1.5: solid on Windows, Linux and macOS)
 
@@ -96,7 +97,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 
 1. ~~M2.1 Edit a posted transaction; open a transaction from any list or report~~ (done: Transactions page, registers and the Transaction List report; `txn.update`)
 2. ~~M2.2 Bank reconciliation with cleared status and reconciliation reports~~ (done: Banking > Reconcile, `account.reconcile`)
-3. M2.3 Bank feed import: OFX/QFX/QBO and CSV, with matching and rules
+3. ~~M2.3 Bank feed import: OFX/QFX/QBO and CSV, with matching and rules~~ (done: Banking > Import Bank Transactions, `bank.import`)
    - M2.3b Live bank connections (after M2.3, which they build on): download
      transactions straight from the bank instead of a file.
      - Sign in through the web browser (OAuth with a local callback), so

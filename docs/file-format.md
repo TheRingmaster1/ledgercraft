@@ -34,6 +34,9 @@ A company file is UTF-8 JSON:
 * Quantities (`qty`) are integers in **thousandths** (`1000` = 1).
 * Dates are `YYYY-MM-DD`.
 * Ids are unique across the whole file.
+* `feed_links` records downloaded bank lines already imported (account, the
+  bank's id, and the transaction it became or matched); `bank_rules` holds the
+  import rules (payee text and category). Both are absent in older files.
 * `reconciliations` lists completed bank and credit card reconciliations,
   oldest first, with the transactions each one cleared. Files written before
   reconciliation existed have no such field and open with none; adding it did

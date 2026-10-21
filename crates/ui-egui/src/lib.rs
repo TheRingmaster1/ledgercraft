@@ -6,6 +6,7 @@
 
 mod app;
 mod assoc;
+mod bankimport;
 mod currency;
 mod forms;
 mod hints;
@@ -37,6 +38,7 @@ pub(crate) enum Page {
     Transactions,
     Reports,
     Reconcile,
+    BankImport,
     Form(FormKind),
 }
 
@@ -88,6 +90,13 @@ pub(crate) enum Action {
     Go(Page),
     /// Open Reconcile for this account.
     Reconcile(AccountId),
+    /// Open Reconcile for this account with a downloaded statement's date and
+    /// ending balance filled in.
+    ReconcileStatement {
+        account: AccountId,
+        date: ledgercraft_core::Date,
+        balance: ledgercraft_core::Money,
+    },
     InvoiceFor(CustomerId),
     PaymentFrom(CustomerId),
     BillFrom(VendorId),

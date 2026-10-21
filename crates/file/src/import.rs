@@ -376,7 +376,7 @@ pub fn import_csv(
 }
 
 /// RFC 4180 CSV: quoted fields may hold commas, quotes ("") and line breaks.
-fn parse_csv(text: &str) -> Vec<Vec<String>> {
+pub(crate) fn parse_csv(text: &str) -> Vec<Vec<String>> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut rows = Vec::new();
     let mut row = Vec::new();

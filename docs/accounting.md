@@ -52,6 +52,24 @@ transaction, with these extra rules:
 Undo restores the transaction as it was. There is no change history in the
 file yet; an audit trail report is planned (ROADMAP M2.7).
 
+## Bank feed import
+
+Downloaded amounts are signed from the account holder's side: money into the
+account is positive, money out negative. For a credit card that means a
+charge is negative and a payment or refund positive; compared with the card
+account's own sign (charges raise what is owed), the sign is flipped.
+
+* Match: the line is an existing transaction whose amount in the account is
+  the same, dated within 10 days; an equal check number is preferred, then
+  the nearest date. Nothing is posted; the line is only remembered.
+* Add: money out becomes a check (from the bank or card) to the category;
+  money in becomes a deposit to a bank, or, for a card, a journal entry
+  debiting the card and crediting the category. The category may be any
+  account except Accounts Receivable or Payable.
+* Every matched or added line's bank id (OFX FITID; for CSV without one, an id
+  built from date, amount, payee and number) is kept, so the same line is
+  never imported twice.
+
 ## Reconciliation
 
 A reconciliation compares a bank or credit card account with its statement.

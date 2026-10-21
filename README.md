@@ -142,8 +142,8 @@ ledgercraft-cli commands                                # every command and its 
 | Vendors | Enter bills, pay bills applied to open bills |
 | Banking | Write checks / expenses (bank or credit card), deposits, journal entries with names on AR/AP lines |
 | Reports | Profit & Loss, Balance Sheet (retained earnings rolled forward by fiscal year), Trial Balance, A/R and A/P Aging, Transaction List, account registers; CSV and Excel export, currency symbol of your choice |
-| Help | Fourteen-lesson tutorial with "Try it" buttons, hover help, Preferences (row shading, hover menus, currency, text font and size, reopen last company) |
-| Banking | Reconcile bank and credit card accounts against statements, with a reconciliation report; reconciled items are marked R and protected |
+| Help | Fifteen-lesson tutorial with "Try it" buttons, hover help, Preferences (row shading, hover menus, currency, text font and size, reopen last company) |
+| Banking | Import bank and card downloads (OFX, QFX, QBO, CSV) with matching, categories and rules; reconcile bank and credit card accounts against statements, with a reconciliation report; reconciled items are marked R and protected |
 | Editing | Open any recorded transaction from the Transactions page, a register or the Transaction List and change it in its form; payments stay applied, Undo restores the original |
 | Safety | Void instead of delete (audit trail), payments block voiding the invoices they pay, all-or-nothing commands, atomic saves |
 

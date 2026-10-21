@@ -10,6 +10,7 @@ use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
 use crate::recent::{AppState, WindowState};
+use crate::bankimport::{self, ImportState};
 use crate::reconcile::{self, ReconcileState};
 use crate::security::{
     self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice,
@@ -48,6 +49,7 @@ pub struct LedgerApp {
     lists: ListState,
     reports: ReportState,
     reconcile: ReconcileState,
+    bank_import: ImportState,
     status: String,
     status_is_error: bool,
     /// When the status message appeared (egui time, seconds); `None` until
@@ -161,6 +163,7 @@ impl LedgerApp {
             lists: ListState::default(),
             reports: ReportState::default(),
             reconcile: ReconcileState::default(),
+            bank_import: ImportState::default(),
             status: "Ready".into(),
             status_is_error: false,
             status_since: None,
@@ -424,6 +427,7 @@ impl LedgerApp {
         self.forms = Forms::default();
         self.lists = ListState::default();
         self.reconcile = ReconcileState::default();
+        self.bank_import = ImportState::default();
         self.page = Page::Home;
     }
 
@@ -435,6 +439,7 @@ impl LedgerApp {
         self.forms = Forms::default();
         self.lists = ListState::default();
         self.reconcile = ReconcileState::default();
+        self.bank_import = ImportState::default();
         self.page = Page::Home;
     }
 
@@ -575,6 +580,14 @@ impl LedgerApp {
             Action::Go(page) => self.page = page,
             Action::Reconcile(account) => {
                 self.reconcile.start(account);
+                self.page = Page::Reconcile;
+            }
+            Action::ReconcileStatement {
+                account,
+                date,
+                balance,
+            } => {
+                self.reconcile.start_statement(account, date, balance);
                 self.page = Page::Reconcile;
             }
             Action::InvoiceFor(id) => {
@@ -884,6 +897,10 @@ impl LedgerApp {
                             }
                         }
                         ui.separator();
+                        if ui.button("Import Bank Transactions…").clicked() {
+                            ui.close();
+                            self.page = Page::BankImport;
+                        }
                         if ui.button("Reconcile…").clicked() {
                             ui.close();
                             self.page = Page::Reconcile;
@@ -1356,6 +1373,9 @@ impl eframe::App for LedgerApp {
                 Page::Transactions => pages::transactions(ui, company, &mut actions),
                 Page::Reports => pages::reports(ui, company, &mut self.reports, &mut actions),
                 Page::Reconcile => reconcile::page(ui, company, &mut self.reconcile, &mut actions),
+                Page::BankImport => {
+                    bankimport::page(ui, company, &mut self.bank_import, &mut actions)
+                }
                 _ => {
                     let stripe = self.prefs.stripe();
                     let salt = ("page", format!("{page:?}"));

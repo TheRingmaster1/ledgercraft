@@ -8,6 +8,18 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Bank feed import (Banking > Import Bank Transactions). Read a download from
+  the bank or card website: OFX (SGML and XML), QFX, QBO or CSV (columns found
+  by name: Date, Description/Payee, Amount or Debit/Credit, Check number).
+  Each line is matched to a transaction already recorded (same amount within
+  10 days, an equal check number first), added as a new transaction in a
+  chosen category (a deposit, a check or card charge, or a card payment), or
+  skipped. One Import brings everything in and one Undo takes it out. Lines
+  imported before (by the bank's id) are never imported twice. Remember
+  creates a rule (payee text to category), listed with Delete. Afterwards,
+  Reconcile with This Statement opens Reconcile with the download's date and
+  ending balance. New engine commands `bank.import` and `bank.removeRule`; a
+  sample download is in docs/samples; a new tutorial lesson explains it.
 - Bank and credit card reconciliation (Banking > Reconcile, the side bar, or
   the Reconcile link on a bank or credit card register). Enter the statement
   date and ending balance, tick the items on the statement in two lists

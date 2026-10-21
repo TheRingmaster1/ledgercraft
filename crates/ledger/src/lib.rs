@@ -6,6 +6,7 @@
 //! the books always balance by construction.
 
 mod account;
+mod bankfeed;
 mod company;
 mod error;
 mod ids;
@@ -16,6 +17,7 @@ mod template;
 mod txn;
 
 pub use account::{Account, AccountType, Class};
+pub use bankfeed::{BankRule, FeedAction, FeedEntry, FeedLine, FeedLink, MATCH_DAYS};
 pub use company::{Company, CompanyInfo, LedgerEntry};
 pub use error::{LedgerError, LedgerResult};
 pub use ids::{AccountId, CustomerId, ItemId, TxnId, VendorId};
