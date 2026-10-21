@@ -28,6 +28,8 @@ pub(crate) fn nav_visuals(ui: &mut egui::Ui) {
     v.widgets.hovered.weak_bg_fill = NAV_HOVER;
     v.widgets.hovered.bg_stroke = egui::Stroke::NONE;
     v.widgets.active.weak_bg_fill = ACCENT;
+    // No outlines on the dark side bar (entry boxes elsewhere have them).
+    v.widgets.inactive.bg_stroke = egui::Stroke::NONE;
 }
 
 /// Inter by Rasmus Andersson, Regular and Light. SIL Open Font License 1.1;
