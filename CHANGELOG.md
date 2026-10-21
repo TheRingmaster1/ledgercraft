@@ -79,7 +79,8 @@ fixes to a release. See docs/releasing.md.
 - Help > Preferences is a fixed-size window with its pages listed on the left
   (General, Currency, Text, Files, styled like the side bar) and the chosen
   page's settings on the right, instead of one column that grew with every
-  new setting. "Global" is now called General.
+  new setting. "Global" is now called General. Its contents fit the window
+  exactly, so the title bar spans the whole window.
 - Help > Preferences > Text: choose the font and the size (Standard, Larger,
   Largest) for the whole app, with a preview. Included with LedgerCraft:
   Classic (the egui font 0.2 used), Inter and Inter Light, the new default.

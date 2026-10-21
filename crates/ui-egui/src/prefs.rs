@@ -229,8 +229,10 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
                 page_list(ui, &mut page);
                 ui.add_space(PAGE_GAP);
                 ui.vertical(|ui| {
-                    // The settings side takes the rest of the window.
-                    ui.set_width(WINDOW_SIZE.x - LIST_WIDTH - PAGE_GAP);
+                    // The settings side takes exactly what is left of the
+                    // window (after the list, the gap and egui's spacing), so
+                    // the window never grows past its title bar.
+                    ui.set_width(ui.available_width());
                     ui.label(RichText::new(page.label()).heading().color(theme::ACCENT));
                     ui.label(RichText::new(page.summary()).small().color(theme::MUTED));
                     ui.separator();
