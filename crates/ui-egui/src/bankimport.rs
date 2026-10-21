@@ -9,9 +9,7 @@ use eframe::egui::{self, RichText, Ui};
 use ledgercraft_core::Date;
 use ledgercraft_engine::Command;
 use ledgercraft_file::bankfeed::{read_statement, Statement};
-use ledgercraft_ledger::{
-    AccountId, AccountType, Company, FeedAction, FeedEntry, FeedLine, TxnId,
-};
+use ledgercraft_ledger::{AccountId, AccountType, Company, FeedAction, FeedEntry, FeedLine, TxnId};
 
 use crate::widgets::{self, money_label};
 use crate::{currency, theme, Action, Reset};
@@ -95,7 +93,11 @@ pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut ImportState, out: &mut Vec<
 }
 
 fn body(ui: &mut Ui, c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
-    ui.label(RichText::new("Import Bank Transactions").heading().color(theme::ACCENT));
+    ui.label(
+        RichText::new("Import Bank Transactions")
+            .heading()
+            .color(theme::ACCENT),
+    );
     ui.label(
         RichText::new(
             "Bring in a download from your bank or card website (OFX, QFX, QBO or CSV). \
@@ -110,7 +112,10 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
     if let (Some(before), Some(account)) = (s.sent, s.account) {
         if c.feed_links.len() > before {
             let count = c.feed_links.len() - before;
-            s.done = Some(format!("{count} lines imported into {}.", c.account_name(account)));
+            s.done = Some(format!(
+                "{count} lines imported into {}.",
+                c.account_name(account)
+            ));
             s.rows.clear();
         }
         s.sent = None;
@@ -237,9 +242,17 @@ fn lines_table(ui: &mut Ui, c: &Company, s: &mut ImportState) {
                     .width(250.0)
                     .show_ui(ui, |ui| {
                         if matched.is_some() {
-                            ui.selectable_value(&mut row.choice, Choice::Match, label(Choice::Match));
+                            ui.selectable_value(
+                                &mut row.choice,
+                                Choice::Match,
+                                label(Choice::Match),
+                            );
                         }
-                        ui.selectable_value(&mut row.choice, Choice::Add, "Add as a new transaction");
+                        ui.selectable_value(
+                            &mut row.choice,
+                            Choice::Add,
+                            "Add as a new transaction",
+                        );
                         ui.selectable_value(&mut row.choice, Choice::Skip, "Skip");
                     });
                 if row.choice == Choice::Add {
@@ -348,7 +361,9 @@ fn finished(
             ));
             if ui
                 .button("Reconcile with This Statement")
-                .on_hover_text("Open Reconcile with the statement date and ending balance filled in")
+                .on_hover_text(
+                    "Open Reconcile with the statement date and ending balance filled in",
+                )
                 .clicked()
             {
                 out.push(Action::ReconcileStatement {

@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     default_chart_of_accounts, Account, AccountId, AccountLine, AccountType, Address, Applied,
-    Contact, Customer, CustomerId, Item, ItemId, ItemSpec, LedgerError, LedgerResult, Party,
-    BankRule, FeedLink, Posting, Reconciliation, Transaction, TxnBody, TxnId, Vendor, VendorId,
+    BankRule, Contact, Customer, CustomerId, FeedLink, Item, ItemId, ItemSpec, LedgerError,
+    LedgerResult, Party, Posting, Reconciliation, Transaction, TxnBody, TxnId, Vendor, VendorId,
 };
 
 /// Company-wide settings.

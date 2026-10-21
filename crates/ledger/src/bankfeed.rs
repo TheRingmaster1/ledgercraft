@@ -52,7 +52,9 @@ impl FeedLine {
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum FeedAction {
     /// It is this transaction, already in the books.
-    Match { txn: TxnId },
+    Match {
+        txn: TxnId,
+    },
     /// Record it as a new transaction in this category (an income, expense
     /// or other account, not Accounts Receivable or Payable).
     Add {
@@ -162,7 +164,11 @@ impl Company {
     /// whose bank id was imported before are passed over. Returns how many
     /// lines were matched or added. All or nothing: an error part-way leaves
     /// the books unchanged (the engine discards the whole command).
-    pub fn import_feed(&mut self, account: AccountId, entries: Vec<FeedEntry>) -> LedgerResult<usize> {
+    pub fn import_feed(
+        &mut self,
+        account: AccountId,
+        entries: Vec<FeedEntry>,
+    ) -> LedgerResult<usize> {
         let kind = self
             .require_kind(
                 account,
@@ -175,7 +181,9 @@ impl Company {
         for entry in entries {
             let line = entry.line;
             let fit_id = line.fit_id.trim().to_string();
-            if !fit_id.is_empty() && (self.is_imported(account, &fit_id) || !seen.insert(fit_id.clone())) {
+            if !fit_id.is_empty()
+                && (self.is_imported(account, &fit_id) || !seen.insert(fit_id.clone()))
+            {
                 continue;
             }
             let txn = match entry.action {
@@ -234,7 +242,12 @@ impl Company {
 /// The transaction a new downloaded line becomes. Money out is a check (or
 /// card charge) to the category; money in is a deposit for a bank, or, for a
 /// credit card (a payment or refund), a journal entry lowering the balance.
-fn feed_body(kind: AccountType, account: AccountId, category: AccountId, line: &FeedLine) -> LedgerResult<TxnBody> {
+fn feed_body(
+    kind: AccountType,
+    account: AccountId,
+    category: AccountId,
+    line: &FeedLine,
+) -> LedgerResult<TxnBody> {
     let description = line.description().to_string();
     let amount = line.amount;
     if amount.is_zero() {
@@ -332,8 +345,14 @@ mod tests {
         let l = line("2026-01-08", -200, "CHECK 101", "101", "A1");
         assert_eq!(c.suggest_match(checking, &l, &none), Some(check));
         // Too far apart, or a different amount: no match.
-        assert_eq!(c.suggest_match(checking, &line("2026-02-20", -200, "", "", "A2"), &none), None);
-        assert_eq!(c.suggest_match(checking, &line("2026-01-05", -201, "", "", "A3"), &none), None);
+        assert_eq!(
+            c.suggest_match(checking, &line("2026-02-20", -200, "", "", "A2"), &none),
+            None
+        );
+        assert_eq!(
+            c.suggest_match(checking, &line("2026-01-05", -201, "", "", "A3"), &none),
+            None
+        );
         // Already taken by another line in this download.
         let taken: BTreeSet<TxnId> = [check].into();
         assert_eq!(c.suggest_match(checking, &l, &taken), None);

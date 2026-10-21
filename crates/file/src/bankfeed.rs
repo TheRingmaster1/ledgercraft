@@ -116,7 +116,9 @@ fn read_ofx(text: &str) -> Result<Statement, String> {
             match tag.as_str() {
                 "DTPOSTED" => match ofx_date(&value) {
                     Some(date) => line.date = date,
-                    None => statement.skipped.push(format!("Transaction {row}: date {value:?}")),
+                    None => statement
+                        .skipped
+                        .push(format!("Transaction {row}: date {value:?}")),
                 },
                 "TRNAMT" => match Money::parse(&value) {
                     Ok(amount) => line.amount = amount,
@@ -196,7 +198,9 @@ fn read_csv(text: &str) -> Result<Statement, String> {
     let mut rows = rows.into_iter();
     let header = rows.next().ok_or("the file is empty")?;
     let cols = Columns::from_header(&header);
-    let date_col = cols.date.ok_or("no Date column was found in the header row")?;
+    let date_col = cols
+        .date
+        .ok_or("no Date column was found in the header row")?;
     if cols.amount.is_none() && cols.debit.is_none() && cols.credit.is_none() {
         return Err("no Amount (or Debit and Credit) column was found in the header row".into());
     }
@@ -224,7 +228,9 @@ fn read_csv(text: &str) -> Result<Statement, String> {
             }
         };
         let Ok(amount) = amount else {
-            statement.skipped.push(format!("Row {n}: no readable amount"));
+            statement
+                .skipped
+                .push(format!("Row {n}: no readable amount"));
             continue;
         };
         let payee = cell(cols.payee);
@@ -277,7 +283,10 @@ mod tests {
         let first = &s.lines[0];
         assert_eq!(first.date, Date::parse("2026-01-07").unwrap());
         assert_eq!(first.amount, Money::from_cents(-20_000));
-        assert_eq!((first.number.as_str(), first.fit_id.as_str()), ("101", "A1"));
+        assert_eq!(
+            (first.number.as_str(), first.fit_id.as_str()),
+            ("101", "A1")
+        );
         assert_eq!(s.lines[1].payee, "Smith & Co");
         assert_eq!(s.lines[1].memo, "Invoice 1001");
         assert_eq!(s.ending_balance, Some(Money::from_cents(30_000)));
@@ -304,12 +313,16 @@ mod tests {
         assert_eq!(s.lines[1].payee, "Smith, Co");
         assert_eq!(s.lines[0].number, "101");
         // Made-up ids are stable, so a second import is recognised.
-        assert_eq!(read_statement(csv).unwrap().lines[0].fit_id, s.lines[0].fit_id);
+        assert_eq!(
+            read_statement(csv).unwrap().lines[0].fit_id,
+            s.lines[0].fit_id
+        );
     }
 
     #[test]
     fn csv_with_debit_and_credit_columns() {
-        let csv = "Posted Date,Payee,Debit,Credit\n2026-02-01,Rent,1200.00,\n2026-02-03,Sale,,75.50\n";
+        let csv =
+            "Posted Date,Payee,Debit,Credit\n2026-02-01,Rent,1200.00,\n2026-02-03,Sale,,75.50\n";
         let s = read_statement(csv).unwrap();
         assert_eq!(s.lines[0].amount, Money::from_cents(-120_000));
         assert_eq!(s.lines[1].amount, Money::from_cents(7_550));

@@ -6,8 +6,8 @@
 //! `{"format":"ledgercraft","version":2,"encryption":{…},"ciphertext":"…"}`.
 //! Both are documented in `docs/file-format.md`.
 
-pub mod crypto;
 pub mod bankfeed;
+pub mod crypto;
 pub mod import;
 
 pub use crypto::{check_new_password, Protection, MIN_PASSWORD_CHARS};
