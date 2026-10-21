@@ -1,7 +1,7 @@
 use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
-    AccountId, AccountType, Company, Contact, CustomerId, ItemSpec, LedgerResult, TxnBody, TxnId,
-    VendorId,
+    AccountId, AccountType, Company, Contact, CustomerId, FeedEntry, ItemSpec, LedgerResult,
+    TxnBody, TxnId, VendorId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -74,6 +74,13 @@ pub enum Command {
     },
     #[serde(rename = "account.undoReconciliation")]
     AccountUndoReconciliation { account: AccountId },
+    #[serde(rename = "bank.import")]
+    BankImport {
+        account: AccountId,
+        entries: Vec<FeedEntry>,
+    },
+    #[serde(rename = "bank.removeRule")]
+    BankRemoveRule { index: usize },
 }
 
 /// One row of the command catalog shown by `ledgercraft-cli commands`.
@@ -98,6 +105,8 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "txn.void", summary: "Void a transaction (it stays on file). {id}" },
     CommandInfo { id: "account.reconcile", summary: "Reconcile a bank or credit card account against a statement; the cleared items must match the ending balance exactly. {account, statement_date, ending_balance, cleared:[txn ids]}" },
     CommandInfo { id: "account.undoReconciliation", summary: "Undo an account's last reconciliation. {account}" },
+    CommandInfo { id: "bank.import", summary: "Bring downloaded bank lines into an account: match, add in a category, or skip each; lines imported before are passed over. {account, entries:[{line:{date, amount, payee?, memo?, number?, fit_id?}, action:{action: match|add|skip, txn? | category?, remember?}}]}" },
+    CommandInfo { id: "bank.removeRule", summary: "Delete a bank feed rule by its position, from 0. {index}" },
 ];
 
 impl Command {
@@ -118,6 +127,8 @@ impl Command {
             Self::TxnVoid { .. } => "txn.void",
             Self::AccountReconcile { .. } => "account.reconcile",
             Self::AccountUndoReconciliation { .. } => "account.undoReconciliation",
+            Self::BankImport { .. } => "bank.import",
+            Self::BankRemoveRule { .. } => "bank.removeRule",
         }
     }
 
@@ -140,6 +151,8 @@ impl Command {
             Self::TxnVoid { id } => format!("Void {id}"),
             Self::AccountReconcile { .. } => "Reconcile".into(),
             Self::AccountUndoReconciliation { .. } => "Undo Reconciliation".into(),
+            Self::BankImport { .. } => "Import Bank Transactions".into(),
+            Self::BankRemoveRule { .. } => "Delete Bank Rule".into(),
         }
     }
 
@@ -227,6 +240,14 @@ impl Command {
             }
             Self::AccountUndoReconciliation { account } => {
                 c.undo_last_reconciliation(account)?;
+                None
+            }
+            Self::BankImport { account, entries } => {
+                let done = c.import_feed(account, entries)?;
+                Some(format!("{done} lines"))
+            }
+            Self::BankRemoveRule { index } => {
+                c.remove_bank_rule(index)?;
                 None
             }
         })

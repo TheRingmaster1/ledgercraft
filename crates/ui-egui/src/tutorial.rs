@@ -437,6 +437,43 @@ const LESSONS: &[Lesson] = &[
         try_it: &[("Open Transactions", Target::Page(Page::Transactions))],
     },
     Lesson {
+        title: "Importing from your bank",
+        blocks: &[
+            Text(
+                "Instead of typing every bank or card transaction, download them from your \
+                 bank's website and import the file. Most banks offer OFX, QFX (Quicken), \
+                 QBO (QuickBooks Web Connect) or CSV downloads.",
+            ),
+            Steps(&[
+                "Open Banking > Import Bank Transactions.",
+                "Choose the bank or credit card account, then Choose File… and pick the \
+                 download.",
+                "Each line shows what LedgerCraft suggests. Match means it is a transaction \
+                 you already recorded (same amount, within 10 days, same check number if \
+                 there is one). Add records it as a new transaction: choose its category, \
+                 such as Utilities or Sales. Skip leaves it out.",
+                "Click Import. Everything comes in at once, and Edit > Undo takes it all \
+                 back out.",
+                "Then click Reconcile with This Statement: Reconcile opens with the \
+                 statement date and ending balance from the download filled in.",
+            ]),
+            Bullets(&[
+                "Tick Remember when adding a line to make a rule: next time, lines from \
+                 that payee get the same category. Rules are listed at the bottom of the \
+                 page, with Delete.",
+                "Importing the same download twice is safe: lines brought in before show \
+                 as Already imported and are passed over.",
+                "Money in becomes a deposit (or, on a credit card, a payment lowering what \
+                 you owe); money out becomes a check or card charge.",
+            ]),
+            Tip(
+                "To try it, open the sample company and import docs/samples/\
+                 pine-ridge-checking.ofx from the LedgerCraft source folder into Checking.",
+            ),
+        ],
+        try_it: &[("Open Import Bank Transactions", Target::Page(Page::BankImport))],
+    },
+    Lesson {
         title: "Reconciling with your statement",
         blocks: &[
             Text(
@@ -533,8 +570,7 @@ const LESSONS: &[Lesson] = &[
             ),
             Heading("Coming later"),
             Text(
-                "Importing bank \
-                 statements, sales tax, printable invoices and more. See ROADMAP.md in the \
+                "Live bank connections, sales tax, printable invoices and more. See ROADMAP.md in the \
                  project for the plan. Help > Licenses and Help > About explain the open- \
                  source licence (and the licence of Inter, the font LedgerCraft's text is \
                  set in).",

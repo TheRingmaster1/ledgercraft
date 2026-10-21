@@ -30,6 +30,17 @@ pub(crate) struct ReconcileState {
 }
 
 impl ReconcileState {
+    /// Starts reconciling a downloaded statement: the account, its date and
+    /// ending balance filled in.
+    pub(crate) fn start_statement(&mut self, account: AccountId, date: Date, balance: Money) {
+        *self = Self {
+            account: Some(account),
+            statement_date: date.to_string(),
+            ending_balance: balance.to_plain_string(),
+            ..Self::default()
+        };
+    }
+
     /// Starts reconciling `account` (from a register, say).
     pub(crate) fn start(&mut self, account: AccountId) {
         if self.account != Some(account) {

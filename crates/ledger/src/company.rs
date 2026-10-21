@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     default_chart_of_accounts, Account, AccountId, AccountLine, AccountType, Address, Applied,
     Contact, Customer, CustomerId, Item, ItemId, ItemSpec, LedgerError, LedgerResult, Party,
-    Posting, Reconciliation, Transaction, TxnBody, TxnId, Vendor, VendorId,
+    BankRule, FeedLink, Posting, Reconciliation, Transaction, TxnBody, TxnId, Vendor, VendorId,
 };
 
 /// Company-wide settings.
@@ -61,6 +61,12 @@ pub struct Company {
     /// Completed bank and credit card reconciliations, oldest first.
     #[serde(default)]
     pub reconciliations: Vec<Reconciliation>,
+    /// Downloaded bank lines already imported (so none comes in twice).
+    #[serde(default)]
+    pub feed_links: Vec<FeedLink>,
+    /// Bank feed rules: payee text to category.
+    #[serde(default)]
+    pub bank_rules: Vec<BankRule>,
     #[serde(default)]
     next_id: u64,
 }
@@ -84,6 +90,8 @@ impl Company {
             items: Vec::new(),
             transactions: Vec::new(),
             reconciliations: Vec::new(),
+            feed_links: Vec::new(),
+            bank_rules: Vec::new(),
             next_id: 0,
         }
     }
