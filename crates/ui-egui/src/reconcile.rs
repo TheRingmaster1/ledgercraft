@@ -351,14 +351,9 @@ fn item_list(
         });
 }
 
-/// Earlier reconciliations, and the report of the chosen (or just saved) one.
-fn history(
-    ui: &mut Ui,
-    c: &Company,
-    account: AccountId,
-    s: &mut ReconcileState,
-    out: &mut Vec<Action>,
-) {
+/// Earlier reconciliations; the chosen (or just saved) one's report opens in
+/// a window.
+fn history(ui: &mut Ui, c: &Company, account: AccountId, s: &mut ReconcileState, out: &mut Vec<Action>) {
     let recs = c.reconciliations_for(account);
     if recs.is_empty() {
         return;
@@ -373,8 +368,12 @@ fn history(
                 r.statement_date,
                 currency::format(r.ending_balance)
             );
-            if ui.selectable_label(s.report == Some(i), text).clicked() {
-                s.report = if s.report == Some(i) { None } else { Some(i) };
+            if ui
+                .selectable_label(s.report == Some(i), text)
+                .on_hover_text("Open this reconciliation's report")
+                .clicked()
+            {
+                s.report = Some(i);
             }
         }
     });
@@ -382,21 +381,38 @@ fn history(
         return;
     };
     let report = reconciliation_report(c, account, index);
-    ui.horizontal(|ui| {
-        if ui.button("Export to Excel…").clicked() {
-            out.push(Action::ExportXlsx {
-                name: "reconciliation.xlsx".into(),
-                data: report.to_xlsx(currency::current().symbol()),
+    // The report opens in its own window, with its export buttons.
+    let mut open = true;
+    let mut close = false;
+    egui::Window::new("Reconciliation Report")
+        .open(&mut open)
+        .collapsible(false)
+        .resizable(true)
+        .default_size([680.0, 520.0])
+        .show(ui.ctx(), |ui| {
+            ui.horizontal(|ui| {
+                if ui.button("Export to Excel…").clicked() {
+                    out.push(Action::ExportXlsx {
+                        name: "reconciliation.xlsx".into(),
+                        data: report.to_xlsx(currency::current().symbol()),
+                    });
+                }
+                if ui.button("Export CSV…").clicked() {
+                    out.push(Action::ExportCsv {
+                        name: "reconciliation.csv".into(),
+                        csv: report.to_csv(),
+                    });
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    close = ui.button("Close").clicked();
+                });
             });
-        }
-        if ui.button("Export CSV…").clicked() {
-            out.push(Action::ExportCsv {
-                name: "reconciliation.csv".into(),
-                csv: report.to_csv(),
-            });
-        }
-    });
-    widgets::report_view(ui, &report, out);
+            ui.separator();
+            widgets::report_view(ui, &report, out);
+        });
+    if !open || close {
+        s.report = None;
+    }
 }
 
 #[cfg(test)]

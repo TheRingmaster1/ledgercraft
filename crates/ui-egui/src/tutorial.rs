@@ -451,8 +451,9 @@ const LESSONS: &[Lesson] = &[
                  printed on the statement.",
                 "Tick each item that appears on the statement, in the two lists: money in, \
                  and money out. Mark All and Unmark All help with long lists.",
-                "Watch the Difference. When it reaches $0.00, click Reconcile Now. A \
-                 report of the reconciliation opens below.",
+                "Watch the Difference. When it reaches $0.00, click Reconcile Now. The \
+                 reconciliation report opens in its own window, with Export to Excel and \
+                 Export CSV.",
             ]),
             Bullets(&[
                 "Items that are not on the statement yet (a check not cashed) stay \
@@ -462,8 +463,8 @@ const LESSONS: &[Lesson] = &[
                  stays agreed. Its memo can still change.",
                 "Made a mistake? Undo Last Reconciliation (click it twice) un-reconciles \
                  the last statement's items so you can fix them and reconcile again.",
-                "Previous reconciliations are listed under the lists; click one to see its \
-                 report, and export it to Excel or CSV.",
+                "Previous reconciliations are listed under the lists; click one to open \
+                 its report window again.",
             ]),
             Tip(
                 "If the difference will not reach $0.00, look for an amount typed wrongly, \
