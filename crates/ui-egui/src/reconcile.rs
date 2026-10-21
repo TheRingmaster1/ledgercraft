@@ -353,7 +353,13 @@ fn item_list(
 
 /// Earlier reconciliations; the chosen (or just saved) one's report opens in
 /// a window.
-fn history(ui: &mut Ui, c: &Company, account: AccountId, s: &mut ReconcileState, out: &mut Vec<Action>) {
+fn history(
+    ui: &mut Ui,
+    c: &Company,
+    account: AccountId,
+    s: &mut ReconcileState,
+    out: &mut Vec<Action>,
+) {
     let recs = c.reconciliations_for(account);
     if recs.is_empty() {
         return;
