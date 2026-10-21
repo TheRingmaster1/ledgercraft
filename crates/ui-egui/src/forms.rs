@@ -370,10 +370,7 @@ fn account_line_inputs(lines: &[AccountLine]) -> Vec<AccountLineInput> {
 /// `min` lines), so there is always somewhere to type the next one: typing in
 /// the last line adds a new one, and spare empty lines at the end go away.
 fn tidy_lines<T: Default>(lines: &mut Vec<T>, min: usize, is_blank: impl Fn(&T) -> bool) {
-    while lines.len() >= 2
-        && lines.len() > min
-        && lines.iter().rev().take(2).all(&is_blank)
-    {
+    while lines.len() >= 2 && lines.len() > min && lines.iter().rev().take(2).all(&is_blank) {
         lines.pop();
     }
     if lines.last().is_none_or(|l| !is_blank(l)) {
