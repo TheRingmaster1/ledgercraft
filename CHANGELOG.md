@@ -33,6 +33,13 @@ fixes to a release. See docs/releasing.md.
 - The window identifies itself as `ledgercraft` to Linux desktops, so the
   taskbar and dock match it to the menu entry and icon (including Wayland).
 
+### Fixed
+- Create a Company no longer runs off the bottom of a small LedgerCraft
+  window. The company details are on the left and the password and imports on
+  the right; if the window is still too short, the fields scroll while the
+  Create Company and Cancel buttons stay in view. (A window too narrow for two
+  columns gets one scrolling column.)
+
 ### Changed
 - New passwords need at least 12 characters (was 8). Files protected with an
   older, shorter password still open; only new passwords are checked.

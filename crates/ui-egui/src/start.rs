@@ -345,137 +345,181 @@ pub(crate) enum CreateOutcome {
 
 /// Draws Create a Company. Returns `None` while the person is still filling
 /// it in.
+/// Width of each column of Create a Company, in points.
+const COLUMN_WIDTH: f32 = 420.0;
+/// Space between the two columns.
+const COLUMN_GAP: f32 = 28.0;
+/// Room the window needs around its scrolling part: title bar, the line at
+/// the top, the buttons and messages at the bottom, and margins.
+const CREATE_CHROME: f32 = 190.0;
+
 pub(crate) fn new_company_window(
     ctx: &egui::Context,
     form: &mut NewCompanyForm,
 ) -> Option<CreateOutcome> {
     let mut outcome = None;
     let mut open = true;
+    // Two columns side by side when the app window is wide enough, one
+    // otherwise; either way the fields scroll if the window is short, so the
+    // buttons always stay in view.
+    let screen = ctx.screen_rect();
+    let wide = screen.width() >= 2.0 * COLUMN_WIDTH + COLUMN_GAP + 60.0;
+    let scroll_height = (screen.height() - CREATE_CHROME).max(120.0);
     egui::Window::new("Create a Company")
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-        .default_width(460.0)
         .show(ctx, |ui| {
             ui.label("Tell LedgerCraft about the business. Only the name is required.");
-            ui.add_space(8.0);
-            egui::Grid::new("new_company")
-                .num_columns(2)
-                .spacing([12.0, 6.0])
+            ui.add_space(6.0);
+            egui::ScrollArea::vertical()
+                .max_height(scroll_height)
                 .show(ui, |ui| {
-                    let field = |ui: &mut egui::Ui, text: &mut String, hint: &str| {
-                        ui.add_sized(
-                            [280.0, 22.0],
-                            egui::TextEdit::singleline(text).hint_text(hint),
-                        );
-                    };
-                    ui.label(RichText::new("Company name").strong());
-                    field(ui, &mut form.name, "e.g. Acme Repair");
-                    ui.end_row();
-                    ui.label("Legal name");
-                    field(
-                        ui,
-                        &mut form.legal_name,
-                        "if different, e.g. Acme Repair LLC",
-                    );
-                    ui.end_row();
-                    ui.label("Fiscal year starts").on_hover_text(
-                    "The first month of your financial year. Most small businesses use January.",
-                );
-                    let index = usize::try_from(form.fiscal_month.saturating_sub(1)).unwrap_or(0);
-                    let current = MONTHS.get(index).copied().unwrap_or("January");
-                    egui::ComboBox::from_id_salt("fiscal_month")
-                        .selected_text(current)
-                        .width(160.0)
-                        .show_ui(ui, |ui| {
-                            for (month, label) in (1u32..).zip(MONTHS) {
-                                ui.selectable_value(&mut form.fiscal_month, month, label);
-                            }
+                    if wide {
+                        ui.horizontal_top(|ui| {
+                            ui.vertical(|ui| {
+                                ui.set_width(COLUMN_WIDTH);
+                                details_section(ui, form);
+                            });
+                            ui.add_space(COLUMN_GAP);
+                            ui.vertical(|ui| {
+                                ui.set_width(COLUMN_WIDTH);
+                                password_section(ui, form);
+                                ui.add_space(12.0);
+                                import_section(ui, form);
+                            });
                         });
-                    ui.end_row();
-                    ui.label("Email");
-                    field(ui, &mut form.email, "");
-                    ui.end_row();
-                    ui.label("Phone");
-                    field(ui, &mut form.phone, "");
-                    ui.end_row();
-                    ui.label("Street");
-                    field(ui, &mut form.line1, "");
-                    ui.end_row();
-                    ui.label("City");
-                    field(ui, &mut form.city, "");
-                    ui.end_row();
-                    ui.label("State / region");
-                    field(ui, &mut form.region, "");
-                    ui.end_row();
-                    ui.label("Postal code");
-                    field(ui, &mut form.postal_code, "");
-                    ui.end_row();
+                    } else {
+                        ui.vertical(|ui| {
+                            ui.set_width(COLUMN_WIDTH);
+                            details_section(ui, form);
+                            ui.add_space(8.0);
+                            password_section(ui, form);
+                            ui.add_space(8.0);
+                            import_section(ui, form);
+                        });
+                    }
                 });
-            ui.add_space(8.0);
-            ui.label(RichText::new("Chart of accounts").strong());
-            ui.radio_value(
-                &mut form.starter_accounts,
-                true,
-                "Start with a standard small-business chart of accounts (recommended)",
-            );
-            ui.radio_value(
-                &mut form.starter_accounts,
-                false,
-                "Start with no accounts; I will add my own",
-            );
-            ui.add_space(8.0);
-            password_section(ui, form);
-            ui.add_space(8.0);
-            import_section(ui, form);
+            ui.separator();
             if let Some(error) = &form.error {
-                ui.add_space(6.0);
                 ui.label(RichText::new(error.as_str()).color(theme::NEGATIVE));
             }
-            ui.add_space(10.0);
             ui.horizontal(|ui| {
                 if ui
                     .button(RichText::new("Create Company").strong())
                     .clicked()
                 {
-                    let password =
-                        security::check_new(
-                            &form.password.0,
-                            &form.confirm.0,
-                            &[form.name.trim()],
-                        )
-                        .and_then(|()| {
-                            if form.understood {
-                                Ok(())
-                            } else {
-                                Err("Tick the box to confirm you will keep the password safe."
-                                    .to_string())
-                            }
-                        });
-                    match password.and_then(|()| form.build_with_imports()) {
-                        Ok((company, summary)) => {
-                            let secret = Secret(std::mem::take(&mut form.password.0));
-                            outcome =
-                                Some(CreateOutcome::Create(Box::new(company), summary, secret));
-                        }
-                        Err(e) => form.error = Some(e),
-                    }
+                    outcome = create_clicked(form);
                 }
                 if ui.button("Cancel").clicked() {
                     outcome = Some(CreateOutcome::Cancel);
                 }
+                ui.label(
+                    RichText::new("Next, LedgerCraft asks where to save the company file.")
+                        .small()
+                        .color(theme::MUTED),
+                );
             });
-            ui.label(
-                RichText::new("Next, LedgerCraft asks where to save the company file.")
-                    .small()
-                    .color(theme::MUTED),
-            );
         });
     if !open {
         outcome = Some(CreateOutcome::Cancel);
     }
     outcome
+}
+
+/// Create Company: checks the password, builds the company and runs the
+/// imports, or notes what is wrong on the form.
+fn create_clicked(form: &mut NewCompanyForm) -> Option<CreateOutcome> {
+    let password = security::check_new(&form.password.0, &form.confirm.0, &[form.name.trim()])
+        .and_then(|()| {
+            if form.understood {
+                Ok(())
+            } else {
+                Err("Tick the box to confirm you will keep the password safe.".to_string())
+            }
+        });
+    match password.and_then(|()| form.build_with_imports()) {
+        Ok((company, summary)) => {
+            let secret = Secret(std::mem::take(&mut form.password.0));
+            Some(CreateOutcome::Create(Box::new(company), summary, secret))
+        }
+        Err(e) => {
+            form.error = Some(e);
+            None
+        }
+    }
+}
+
+/// The company's name, fiscal year, contact details and starting chart of
+/// accounts.
+fn details_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
+    ui.label(RichText::new("Company").strong());
+    egui::Grid::new("new_company")
+        .num_columns(2)
+        .spacing([12.0, 6.0])
+        .show(ui, |ui| {
+            let field = |ui: &mut egui::Ui, text: &mut String, hint: &str| {
+                ui.add_sized(
+                    [280.0, 22.0],
+                    egui::TextEdit::singleline(text).hint_text(hint),
+                );
+            };
+            ui.label(RichText::new("Company name").strong());
+            field(ui, &mut form.name, "e.g. Acme Repair");
+            ui.end_row();
+            ui.label("Legal name");
+            field(
+                ui,
+                &mut form.legal_name,
+                "if different, e.g. Acme Repair LLC",
+            );
+            ui.end_row();
+            ui.label("Fiscal year starts").on_hover_text(
+                "The first month of your financial year. Most small businesses use January.",
+            );
+            let index = usize::try_from(form.fiscal_month.saturating_sub(1)).unwrap_or(0);
+            let current = MONTHS.get(index).copied().unwrap_or("January");
+            egui::ComboBox::from_id_salt("fiscal_month")
+                .selected_text(current)
+                .width(160.0)
+                .show_ui(ui, |ui| {
+                    for (month, label) in (1u32..).zip(MONTHS) {
+                        ui.selectable_value(&mut form.fiscal_month, month, label);
+                    }
+                });
+            ui.end_row();
+            ui.label("Email");
+            field(ui, &mut form.email, "");
+            ui.end_row();
+            ui.label("Phone");
+            field(ui, &mut form.phone, "");
+            ui.end_row();
+            ui.label("Street");
+            field(ui, &mut form.line1, "");
+            ui.end_row();
+            ui.label("City");
+            field(ui, &mut form.city, "");
+            ui.end_row();
+            ui.label("State / region");
+            field(ui, &mut form.region, "");
+            ui.end_row();
+            ui.label("Postal code");
+            field(ui, &mut form.postal_code, "");
+            ui.end_row();
+        });
+    ui.add_space(12.0);
+    ui.label(RichText::new("Chart of accounts").strong());
+    ui.radio_value(
+        &mut form.starter_accounts,
+        true,
+        "Start with a standard small-business chart of accounts (recommended)",
+    );
+    ui.radio_value(
+        &mut form.starter_accounts,
+        false,
+        "Start with no accounts; I will add my own",
+    );
 }
 
 /// The company file's password. Every new company is encrypted with one.
