@@ -115,6 +115,10 @@ fixes to a release. See docs/releasing.md.
   (older files open with none). A new tutorial lesson explains it.
 
 ### Changed
+- Reports (Profit & Loss, Balance Sheet, Trial Balance and the rest, and
+  account registers) center their table under the heading, and the scroll
+  area fills the page, so the scroll bars run along its edges instead of
+  beside a table squeezed to the left.
 - Form lines fit the window: the Description box (Memo on journal entries)
   takes the room the other columns leave, so at the smallest window size
   the whole line, Amount included, is on screen, and in a large window the
