@@ -258,8 +258,9 @@ const fn form(kind: FormKind) -> Go {
     Go::Page(Page::Form(kind))
 }
 
-/// One area of work on Home: a card with a title, a line on what it is for,
-/// a small flowchart whose arrows show what leads to what, and links.
+/// A flowcard: one area of work on Home, as a card with a title, a line on
+/// what it is for, a small flowchart whose arrows show what leads to what,
+/// and links.
 struct FlowCard {
     title: &'static str,
     blurb: &'static str,
@@ -381,7 +382,7 @@ fn flow_arrow(painter: &egui::Painter, a: egui::Rect, b: egui::Rect, stroke: egu
     }
 }
 
-/// A Home card with its flowchart, `width` wide.
+/// Draws a flowcard, `width` wide.
 fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
     card_frame(ui).show(ui, |ui| {
         let inner = width - 2.0 * CARD_MARGIN - 2.0;

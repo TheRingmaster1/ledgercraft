@@ -80,8 +80,8 @@ const LESSONS: &[Lesson] = &[
                  Reconcile, with the everyday forms under Create.",
                 "The menus along the top: File, Edit, View, Lists, Customers, Vendors, \
                  Banking, Reports and Help.",
-                "The Home page: a card each for Customers, Vendors and Banking, with a small \
-                 flowchart of the work (arrows show what leads to what: invoices are paid, \
+                "The Home page's flowcards: a card each for Customers, Vendors and Banking, \
+                 with a small flowchart of the work (arrows show what leads to what: invoices are paid, \
                  then deposited; sales receipts go straight to the deposit). Smaller boxes and \
                  the links under each chart are the less common tasks. Your key balances are \
                  in the At A Glance card.",

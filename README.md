@@ -19,7 +19,8 @@ own. No subscription, no licence server, no telemetry.
 
 * **Familiar.** The things you do every day work the way you expect:
   the Home workflow (Enter Bills → Pay Bills, Create Invoices → Receive
-  Payments → Record Deposits), Write Checks, Make Journal Entry, the Chart of
+  Payments → Record Deposits) laid out as **flowcards**, small flowcharts
+  on cards for Customers, Vendors and Banking, Write Checks, Make Journal Entry, the Chart of
   Accounts, account registers, Undeposited Funds, and the reports you hand to
   your accountant.
 * **Correct by construction.** Money is exact integer cents, never floating
