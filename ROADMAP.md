@@ -116,6 +116,11 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
      invoices and their PDFs, Streamlined Sales Tax rate import, quarterly
      reminder~~ (done)
    - ~~Sales Tax Liability report; Pay Sales Tax form~~ (done)
+   - Rate import supports only the 24 Streamlined Sales Tax states (see
+     docs/sales-tax.md). Other states get it when a dependable, free,
+     machine-readable rate source for them is listed alongside the SST files;
+     until then their rates are entered by hand. Vermont's street-address
+     boundary file is not read yet.
 5. M2.5 Printable and PDF invoices and statements (original templates)
    - ~~PDF invoices~~ (done: Save as PDF… on the invoice form, PDF in
      Transactions, `ledgercraft-cli invoice-pdf`)

@@ -181,6 +181,10 @@ swapped without touching the books.
 | L4 | `ledgercraft-ui-egui` | the desktop interface |
 | L5 | `apps/ledgercraft`, `apps/ledgercraft-cli` | desktop app, command line |
 
+Sales tax rate import covers the 24 Streamlined Sales Tax states only, until a
+comparable free source for the others exists; see
+[docs/sales-tax.md](docs/sales-tax.md).
+
 More in [docs/architecture.md](docs/architecture.md) and
 [docs/accounting.md](docs/accounting.md). Contributor and agent rules
 (clean-room, never-crash, quality gates) are in [AGENTS.md](AGENTS.md).

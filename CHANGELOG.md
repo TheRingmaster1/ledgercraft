@@ -8,6 +8,11 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- docs/sales-tax.md: which states rate import supports (the 24 Streamlined
+  Sales Tax states, until a comparable free source for the others is
+  published), getting and unzipping the files, sourcing, the quarterly
+  reminder, and responsibility. README, ROADMAP, the tutorial and the import
+  window say the same.
 - Find a customer's tax group from their address: Customers > Sales tax >
   Find from address (ZIP+4)… looks up the customer's location in the
   Streamlined Sales Tax files last imported for their state (remembered on
