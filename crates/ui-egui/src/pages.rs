@@ -399,7 +399,12 @@ fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
                     .color(theme::ACCENT);
                 let link = egui::Button::new(title).frame(false);
                 let hover = format!("Open the {} list", card.title.to_lowercase());
-                if ui.add(link).on_hover_text(hover).clicked() {
+                if ui
+                    .add(link)
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .on_hover_text(hover)
+                    .clicked()
+                {
                     out.push(go.action());
                 }
                 ui.label(RichText::new(card.blurb).small().color(theme::MUTED));
@@ -447,7 +452,12 @@ fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
                     }
                     let link =
                         egui::Button::new(RichText::new(*label).color(theme::ACCENT)).frame(false);
-                    if ui.add(link).on_hover_text(go.hint()).clicked() {
+                    if ui
+                        .add(link)
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        .on_hover_text(go.hint())
+                        .clicked()
+                    {
                         out.push(go.action());
                     }
                 }
