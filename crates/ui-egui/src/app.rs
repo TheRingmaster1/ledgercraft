@@ -1253,7 +1253,7 @@ impl LedgerApp {
             .and_then(|form| company_info::window(ctx, form));
         match info {
             Some(CompanyInfoOutcome::Save(cmd)) => {
-                if self.run(cmd, Reset::Nothing).is_some() {
+                if self.run(*cmd, Reset::Nothing).is_some() {
                     self.company_info = None;
                 }
             }
