@@ -212,7 +212,7 @@ fn flow_button(ui: &mut Ui, label: &str, page: Page, out: &mut Vec<Action>) {
 /// A workflow arrow, drawn rather than typed: egui's built-in font has no
 /// arrow glyph, so "→" would show as an empty box.
 fn arrow(ui: &mut Ui) {
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 44.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(ARROW_WIDTH, 44.0), egui::Sense::hover());
     let y = rect.center().y;
     let stroke = egui::Stroke::new(2.0_f32, theme::MUTED);
     let start = egui::pos2(rect.left() + 4.0, y);
@@ -226,11 +226,13 @@ fn arrow(ui: &mut Ui) {
 
 /// Wide enough for the longest label ("Import Transactions").
 const FLOW_BUTTON_WIDTH: f32 = 172.0;
+/// The room an arrow between two workflow buttons takes.
+const ARROW_WIDTH: f32 = 28.0;
 
 /// Where an arrow would be, left empty, so buttons line up with the
 /// columns of the rows that have arrows.
 fn no_arrow(ui: &mut Ui) {
-    ui.allocate_exact_size(egui::vec2(28.0, 44.0), egui::Sense::hover());
+    ui.allocate_exact_size(egui::vec2(ARROW_WIDTH, 44.0), egui::Sense::hover());
 }
 
 /// A Home workflow section's heading, with room above it.
@@ -396,11 +398,13 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
     // Side by side, split down the middle, while At A Glance still fits next to
     // the workflow buttons; otherwise At A Glance moves below them. The
     // workflow's natural width is measured each frame and used on the next.
-    let width_id = ui.scope_id().with("home_workflow_width");
-    let workflow_width = ui.data(|d| d.get_temp::<f32>(width_id)).unwrap_or(0.0);
+    // The workflow needs room for its widest row, three buttons and two
+    // arrows, from the very first frame; otherwise it gets half the page.
+    let gap = ui.spacing().item_spacing.x;
+    let workflow_width = 3.0 * FLOW_BUTTON_WIDTH + 2.0 * ARROW_WIDTH + 4.0 * gap + 2.0;
     let full = ui.available_width();
     let left_width = workflow_width.max((full - DIVIDER_WIDTH) / 2.0 - DIVIDER_GAP);
-    let measured = if full - left_width - DIVIDER_WIDTH - 2.0 * DIVIDER_GAP >= GLANCE_MIN_WIDTH {
+    if full - left_width - DIVIDER_WIDTH - 2.0 * DIVIDER_GAP >= GLANCE_MIN_WIDTH {
         ui.horizontal_top(|ui| {
             let size = egui::vec2(left_width, ui.available_height());
             let left = ui.allocate_ui_with_layout(
@@ -418,11 +422,9 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
                 left.top()..=left.bottom().max(right.bottom()),
             );
             ui.painter().rect_filled(divider, 0.0, theme::NAV_BG);
-            left.width()
-        })
-        .inner
+        });
     } else {
-        let left = ui.vertical(&mut workflow).response.rect;
+        ui.vertical(&mut workflow);
         ui.add_space(DIVIDER_GAP);
         let (divider, _) =
             ui.allocate_exact_size(egui::vec2(full, DIVIDER_WIDTH), egui::Sense::hover());
@@ -432,11 +434,6 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
             ui.set_max_width(full.min(2.0 * GLANCE_MIN_WIDTH));
             glance(ui);
         });
-        left.width()
-    };
-    if measured != workflow_width {
-        ui.data_mut(|d| d.insert_temp(width_id, measured));
-        ui.ctx().request_repaint();
     }
 }
 
