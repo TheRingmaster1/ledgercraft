@@ -50,7 +50,10 @@ const LESSONS: &[Lesson] = &[
             ),
             Text(
                 "These lessons walk through everything the app can do today. Each takes a \
-                 minute or two. Use Next and Back below, or pick a lesson from the list.",
+                 minute or two. Use Next and Back below, or pick a lesson from the list. \
+                 The tutorial has a window of its own: move it beside LedgerCraft, or onto \
+                 a second screen, and follow along in the sample company. A Try it button \
+                 brings the app to the front.",
             ),
             Heading("The best way to learn"),
             Text(
@@ -667,9 +670,6 @@ pub(crate) struct Tutorial {
     lesson: usize,
 }
 
-/// Draws the Tutorial window. The "Never show again" box edits `prefs` (the
-/// app saves them). Returns where a "Try it" button asks to go, if one was
-/// clicked.
 /// Share of the app window the tutorial takes, and its size limits in points.
 const WIDTH_SHARE: f32 = 0.70;
 const HEIGHT_SHARE: f32 = 0.75;
@@ -690,70 +690,88 @@ fn window_size(screen: egui::Vec2) -> egui::Vec2 {
         .max(egui::vec2(200.0, 160.0))
 }
 
-/// Draws the Tutorial window. The "Never show again" box edits `prefs` (the
-/// app saves them). Returns where a "Try it" button asks to go, if one was
-/// clicked.
+/// Shows the Tutorial in a window of its own, beside the app, so the lessons
+/// can be followed in the sample company while they stay in view. (Where
+/// the system cannot open another window, egui shows it inside the app.)
+/// The "Never show again" box edits `prefs` (the app saves them). Returns
+/// where a "Try it" button asks to go, if one was clicked.
 pub(crate) fn window(
     ctx: &egui::Context,
     open: &mut bool,
     prefs: &mut Prefs,
     state: &mut Tutorial,
 ) -> Option<Target> {
-    let mut go = None;
+    if !*open {
+        return None;
+    }
     let last = LESSONS.len().saturating_sub(1);
     state.lesson = state.lesson.min(last);
-    let screen = ctx.content_rect();
-    let size = window_size(screen.size());
-    let body_height = (size.y - FOOTER_HEIGHT).max(80.0);
-    egui::Window::new("Tutorial")
-        .open(open)
-        .collapsible(false)
-        // A fixed size that follows the app window: everything inside is laid
-        // out to it, so nothing can push the window past the screen.
-        .fixed_size(size)
-        .pivot(egui::Align2::CENTER_CENTER)
-        .default_pos(screen.center())
-        .constrain(true)
-        .show(ctx, |ui| {
-            ui.horizontal_top(|ui| {
-                ui.set_height(body_height);
-                lesson_list(ui, state, body_height);
-                ui.separator();
-                ui.vertical(|ui| {
-                    egui::ScrollArea::vertical()
-                        .id_salt("tutorial_lesson")
-                        .max_height(body_height)
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| {
-                            if let Some(lesson) = LESSONS.get(state.lesson) {
-                                go = lesson_body(ui, lesson);
-                            }
-                        });
-                });
-            });
-            ui.separator();
-            ui.horizontal(|ui| {
-                let mut never = !prefs.show_tutorial;
-                if ui.checkbox(&mut never, "Never show again").changed() {
-                    prefs.show_tutorial = !never;
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .add_enabled(state.lesson < last, egui::Button::new("Next"))
-                        .clicked()
-                    {
-                        state.lesson += 1;
-                    }
-                    ui.label(format!("{} of {}", state.lesson + 1, LESSONS.len()));
-                    if ui
-                        .add_enabled(state.lesson > 0, egui::Button::new("Back"))
-                        .clicked()
-                    {
-                        state.lesson -= 1;
+    // It starts at a share of the app window's size; then it is the user's
+    // to move and resize.
+    let size = window_size(ctx.content_rect().size());
+    let builder = egui::ViewportBuilder::default()
+        .with_title("LedgerCraft Tutorial")
+        .with_inner_size(size)
+        .with_min_inner_size(MIN_SIZE);
+    let id = egui::ViewportId(egui::Id::NULL.with("ledgercraft_tutorial"));
+    ctx.show_viewport_immediate(id, builder, |ui, _class| {
+        if ui.input(|i| i.viewport().close_requested()) {
+            *open = false;
+        }
+        egui::CentralPanel::default()
+            .show(ui, |ui| contents(ui, prefs, state))
+            .inner
+    })
+}
+
+/// The lesson list, the lesson, and the footer, filling the window.
+fn contents(ui: &mut egui::Ui, prefs: &mut Prefs, state: &mut Tutorial) -> Option<Target> {
+    let mut go = None;
+    let last = LESSONS.len().saturating_sub(1);
+    let body_height = (ui.available_height() - FOOTER_HEIGHT).max(80.0);
+    ui.horizontal_top(|ui| {
+        ui.set_height(body_height);
+        lesson_list(ui, state, body_height);
+        ui.separator();
+        ui.vertical(|ui| {
+            egui::ScrollArea::vertical()
+                .id_salt("tutorial_lesson")
+                .max_height(body_height)
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    if let Some(lesson) = LESSONS.get(state.lesson) {
+                        go = lesson_body(ui, lesson);
                     }
                 });
-            });
         });
+    });
+    ui.separator();
+    ui.horizontal(|ui| {
+        let mut never = !prefs.show_tutorial;
+        if ui.checkbox(&mut never, "Never show again").changed() {
+            prefs.show_tutorial = !never;
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .add_enabled(state.lesson < last, egui::Button::new("Next"))
+                .clicked()
+            {
+                state.lesson += 1;
+            }
+            ui.label(format!("{} of {}", state.lesson + 1, LESSONS.len()));
+            if ui
+                .add_enabled(state.lesson > 0, egui::Button::new("Back"))
+                .clicked()
+            {
+                state.lesson -= 1;
+            }
+        });
+    });
+    // A Try it button acts in the app: bring its window to the front.
+    if go.is_some() {
+        ui.ctx()
+            .send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Focus);
+    }
     go
 }
 
