@@ -162,7 +162,7 @@ pub(crate) fn item_combo(
         .unwrap_or_else(|| "Choose item…".into());
     egui::ComboBox::from_id_salt(salt)
         .selected_text(text)
-        .width(150.0)
+        .width(130.0)
         .show_ui(ui, |ui| {
             ui.selectable_value(value, None, "(no item)");
             for x in c.items.iter().filter(|x| x.active) {

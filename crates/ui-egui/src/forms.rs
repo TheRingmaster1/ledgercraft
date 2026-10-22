@@ -474,6 +474,33 @@ fn command_for(editing: Option<TxnId>, built: Result<Command, String>) -> Result
     })
 }
 
+/// The account box on invoice and journal lines (narrower than elsewhere, so
+/// the lines fit the smallest window).
+const LINE_ACCOUNT_WIDTH: f32 = 170.0;
+/// What an invoice line's other columns take: item 130, qty 50, rate 80,
+/// account, amount about 85, the remove button about 22, and the gaps.
+const INVOICE_FIXED: f32 = 130.0 + 50.0 + 80.0 + LINE_ACCOUNT_WIDTH + 85.0 + 22.0 + 6.0 * 8.0;
+/// Bill, check and deposit lines: account 230, amount 90, remove, gaps.
+const ACCOUNT_LINES_FIXED: f32 = 230.0 + 90.0 + 22.0 + 3.0 * 8.0;
+/// Journal lines: account, debit, credit, name about 170, remove, gaps.
+const JOURNAL_FIXED: f32 = LINE_ACCOUNT_WIDTH + 90.0 + 90.0 + 170.0 + 22.0 + 5.0 * 8.0;
+
+/// The width left for a line's stretchy text box once the fixed columns are
+/// placed, kept between `min` and `max`: the lines fill a wide window and
+/// still fit a small one.
+fn flex_width(ui: &Ui, fixed: f32, min: f32, max: f32) -> f32 {
+    (ui.available_width() - fixed).clamp(min, max)
+}
+
+/// Part of a line grid's id: a grid remembers its column widths, so when the
+/// stretchy column changes size (in 10-point steps) the grid starts afresh
+/// instead of holding on to the old, wider column.
+// Widths are clamped to a few hundred points, far inside i32.
+#[allow(clippy::cast_possible_truncation)]
+fn width_step(width: f32) -> i32 {
+    (width / 10.0).round() as i32
+}
+
 /// Narrower than this, a form's heading fields go one to a row.
 const HEAD_TWO_PAIRS_WIDTH: f32 = 640.0;
 
@@ -555,7 +582,9 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
 
     let mut remove = None;
     let mut total = Money::ZERO;
-    egui::Grid::new("inv_lines")
+    // Description takes the room the other columns leave.
+    let description_width = flex_width(ui, INVOICE_FIXED, 100.0, 420.0);
+    egui::Grid::new(("inv_lines", width_step(description_width)))
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             for h in [
@@ -581,12 +610,17 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
                         }
                     }
                 }
-                field(ui, &mut line.description, 220.0, "");
+                field(ui, &mut line.description, description_width, "");
                 field(ui, &mut line.qty, 50.0, "1");
                 field(ui, &mut line.rate, 80.0, "0.00");
-                widgets::account_combo(ui, ("inv_acct", i), c, &mut line.account, |k| {
-                    !k.needs_party()
-                });
+                widgets::account_combo_width(
+                    ui,
+                    ("inv_acct", i),
+                    c,
+                    &mut line.account,
+                    |k| !k.needs_party(),
+                    LINE_ACCOUNT_WIDTH,
+                );
                 let qty = if line.qty.trim().is_empty() {
                     Ok(Qty::ONE)
                 } else {
@@ -978,7 +1012,10 @@ fn build_pay_bills(c: &Company, f: &PaymentForm, amount: Money) -> Result<Comman
 fn account_lines(ui: &mut Ui, salt: &str, c: &Company, lines: &mut Vec<AccountLineInput>) -> Money {
     let mut remove = None;
     let mut total = Money::ZERO;
-    egui::Grid::new(salt).spacing([8.0, 4.0]).show(ui, |ui| {
+    let description_width = flex_width(ui, ACCOUNT_LINES_FIXED, 160.0, 480.0);
+    egui::Grid::new((salt, width_step(description_width)))
+        .spacing([8.0, 4.0])
+        .show(ui, |ui| {
         for h in ["Account", "Description", "Amount", ""] {
             widgets::column_header(ui, h);
         }
@@ -987,7 +1024,7 @@ fn account_lines(ui: &mut Ui, salt: &str, c: &Company, lines: &mut Vec<AccountLi
             widgets::account_combo(ui, (salt, "acct", i), c, &mut line.account, |k| {
                 !k.needs_party()
             });
-            field(ui, &mut line.description, 260.0, "");
+            field(ui, &mut line.description, description_width, "");
             field(ui, &mut line.amount, 90.0, "0.00");
             if let Ok(m) = Money::parse(&line.amount) {
                 total = total.saturating_add(m);
@@ -1239,7 +1276,9 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
     let mut remove = None;
     let mut debits = Money::ZERO;
     let mut credits = Money::ZERO;
-    egui::Grid::new("je_lines")
+    // The memo takes the room the other columns leave.
+    let memo_width = flex_width(ui, JOURNAL_FIXED, 90.0, 360.0);
+    egui::Grid::new(("je_lines", width_step(memo_width)))
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             for h in ["Account", "Debit", "Credit", "Memo", "Name", ""] {
@@ -1247,10 +1286,17 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
             }
             ui.end_row();
             for (i, line) in f.lines.iter_mut().enumerate() {
-                widgets::account_combo(ui, ("je_acct", i), c, &mut line.account, |_| true);
+                widgets::account_combo_width(
+                    ui,
+                    ("je_acct", i),
+                    c,
+                    &mut line.account,
+                    |_| true,
+                    LINE_ACCOUNT_WIDTH,
+                );
                 field(ui, &mut line.debit, 90.0, "");
                 field(ui, &mut line.credit, 90.0, "");
-                field(ui, &mut line.memo, 180.0, "");
+                field(ui, &mut line.memo, memo_width, "");
                 widgets::party_combo(ui, ("je_party", i), c, &mut line.party);
                 debits =
                     debits.saturating_add(Money::parse_or_zero(&line.debit).unwrap_or(Money::ZERO));
@@ -1355,6 +1401,22 @@ mod tests {
         let c = ledgercraft_engine::sample_company().unwrap();
         assert!(draw_all(&c, 420.0).is_empty());
         assert!(draw_all(&c, 1400.0).is_empty());
+    }
+
+    #[test]
+    fn line_text_boxes_stretch_to_the_room_left() {
+        let ctx = egui::Context::default();
+        crate::theme::apply(&ctx);
+        let mut widths = Vec::new();
+        for width in [680.0, 1400.0] {
+            crate::theme::test_frame_sized(&ctx, egui::vec2(width, 600.0), |ui| {
+                widths.push(flex_width(ui, INVOICE_FIXED, 100.0, 420.0));
+            });
+        }
+        // The smallest window's page still leaves the description a usable box.
+        assert!(widths[0] >= 100.0 && widths[0] < 420.0, "{widths:?}");
+        assert!((widths[1] - 420.0).abs() < f32::EPSILON);
+        assert_eq!(width_step(104.0), 10);
     }
 
     #[test]
