@@ -17,6 +17,12 @@ fixes to a release. See docs/releasing.md.
   `taxGroup.create`, `taxGroup.update`, `taxGroup.setActive`,
   `customer.setTax` and `item.setTaxable`. The screens, the invoice form, PDF
   and liability report follow.
+- Rate review reminder (the rule; the popup comes with the screens): states
+  in the Streamlined Sales Tax agreement change rates only at the start of a
+  calendar quarter and publish them by the first of the month before, so once
+  March, June, September or December 1 has passed since the rates were last
+  checked, a review is due. Adding a tax or a rate counts as checking;
+  `tax.markChecked` records a check.
 - PDF invoices. Save as PDF… on the invoice form records the invoice (or the
   changes to it) and saves it as a PDF to email or print; recorded invoices
   also have a PDF button in Transactions, and `ledgercraft-cli invoice-pdf

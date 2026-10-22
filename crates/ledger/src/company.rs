@@ -74,6 +74,9 @@ pub struct Company {
     /// Sales tax groups: the components charged together at a location.
     #[serde(default)]
     pub tax_groups: Vec<TaxGroup>,
+    /// When the sales tax rates were last checked or changed.
+    #[serde(default)]
+    pub tax_rates_checked: Option<Date>,
     #[serde(default)]
     next_id: u64,
 }
@@ -101,6 +104,7 @@ impl Company {
             bank_rules: Vec::new(),
             tax_components: Vec::new(),
             tax_groups: Vec::new(),
+            tax_rates_checked: None,
             next_id: 0,
         }
     }
