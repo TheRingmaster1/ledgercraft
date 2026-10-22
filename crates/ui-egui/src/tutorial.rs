@@ -52,8 +52,8 @@ const LESSONS: &[Lesson] = &[
                 "These lessons walk through everything the app can do today. Each takes a \
                  minute or two. Use Next and Back below, or pick a lesson from the list. \
                  The tutorial has a window of its own: move it beside LedgerCraft, or onto \
-                 a second screen, and follow along in the sample company. A Try it button \
-                 brings the app to the front.",
+                 a second screen, and follow along in the sample company. It stays on top \
+                 while it is open, so the lesson is always in view.",
             ),
             Heading("The best way to learn"),
             Text(
@@ -725,7 +725,10 @@ pub(crate) fn window(
     let builder = egui::ViewportBuilder::default()
         .with_title("LedgerCraft Tutorial")
         .with_inner_size(size)
-        .with_min_inner_size(MIN_SIZE);
+        .with_min_inner_size(MIN_SIZE)
+        // It stays above the app, so a Try it button (which brings the app
+        // forward to work in) never hides the lesson.
+        .with_window_level(egui::WindowLevel::AlwaysOnTop);
     let id = egui::ViewportId(egui::Id::NULL.with("ledgercraft_tutorial"));
     ctx.show_viewport_immediate(id, builder, |ui, _class| {
         if ui.input(|i| i.viewport().close_requested()) {
@@ -786,7 +789,8 @@ fn contents(ui: &mut egui::Ui, prefs: &mut Prefs, state: &mut Tutorial) -> Optio
             }
         });
     });
-    // A Try it button acts in the app: bring its window to the front.
+    // A Try it button acts in the app: give its window the keyboard (the
+    // tutorial stays on top of it).
     if go.is_some() {
         ui.ctx()
             .send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Focus);
