@@ -476,7 +476,7 @@ fn history(
                 });
             });
             ui.separator();
-            widgets::report_view(ui, &report, out);
+            widgets::report_view(ui, &report, out, false);
         });
     if !open || close {
         s.report = None;

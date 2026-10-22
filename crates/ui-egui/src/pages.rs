@@ -473,7 +473,7 @@ pub(crate) fn register(ui: &mut Ui, c: &Company, account: AccountId, out: &mut V
         }
     });
     let report = account_register(c, account);
-    widgets::report_view(ui, &report, out);
+    widgets::report_view(ui, &report, out, true);
 }
 
 // ----- customers / vendors -----------------------------------------------------------
@@ -1151,7 +1151,7 @@ pub(crate) fn reports(ui: &mut Ui, c: &Company, s: &mut ReportState, out: &mut V
     });
 
     ui.separator();
-    widgets::report_view(ui, &report, out);
+    widgets::report_view(ui, &report, out, true);
 }
 
 #[cfg(test)]

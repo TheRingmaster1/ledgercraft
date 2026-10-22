@@ -205,16 +205,41 @@ pub(crate) fn next_number(c: &Company, start: u64, pick: impl Fn(&TxnBody) -> bo
     }
 }
 
-pub(crate) fn report_view(ui: &mut Ui, r: &Report, out: &mut Vec<Action>) {
+/// A report: its heading, then its table centered beneath. `fill_page`
+/// makes the scroll area take the whole page (on a page; not in a window,
+/// which would grow to the screen's size).
+pub(crate) fn report_view(ui: &mut Ui, r: &Report, out: &mut Vec<Action>, fill_page: bool) {
     ui.vertical_centered(|ui| {
         ui.label(RichText::new(r.company.as_str()).strong());
         ui.label(RichText::new(r.title.as_str()).heading());
         ui.label(RichText::new(r.period.as_str()).color(theme::MUTED));
     });
     ui.add_space(8.0);
+    // The table sits centered under the heading, and the scroll area fills
+    // the page so its bars run along the page's edges. The table's width is
+    // measured each frame and used to center it on the next.
+    let width_id = ui.id().with(("report_width", r.title.as_str()));
+    let last_width = ui.data(|d| d.get_temp::<f32>(width_id)).unwrap_or(0.0);
     egui::ScrollArea::both()
         .id_salt("report_scroll")
+        .auto_shrink([!fill_page, !fill_page])
         .show(ui, |ui| {
+            let pad = ((ui.available_width() - last_width) / 2.0).max(0.0);
+            let width = ui
+                .horizontal_top(|ui| {
+                    ui.add_space(pad);
+                    report_grid(ui, r, out)
+                })
+                .inner;
+            if (width - last_width).abs() > 0.5 {
+                ui.data_mut(|d| d.insert_temp(width_id, width));
+                ui.ctx().request_repaint();
+            }
+        });
+}
+
+/// The report's rows; returns the table's width.
+fn report_grid(ui: &mut Ui, r: &Report, out: &mut Vec<Action>) -> f32 {
             egui::Grid::new("report_grid")
                 .striped(true)
                 .min_col_width(90.0)
@@ -275,8 +300,10 @@ pub(crate) fn report_view(ui: &mut Ui, r: &Report, out: &mut Vec<Action>) {
                         }
                         ui.end_row();
                     }
-                });
-        });
+                })
+                .response
+                .rect
+                .width()
 }
 
 /// A cell in a row that stands for one transaction: double-click opens it.
