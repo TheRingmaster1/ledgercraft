@@ -8,6 +8,15 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Sales tax, part 1 (the books): sales tax components with dated rate
+  histories and tax groups; customers' tax group and exemption; taxable
+  items and invoice lines; invoices store the tax they charge (rate, taxable
+  amount and tax per component) and post it to Sales Tax Payable, which is
+  made when the first tax is added. Engine commands `tax.create`,
+  `tax.update`, `tax.setRate`, `tax.removeRate`, `tax.setActive`,
+  `taxGroup.create`, `taxGroup.update`, `taxGroup.setActive`,
+  `customer.setTax` and `item.setTaxable`. The screens, the invoice form, PDF
+  and liability report follow.
 - PDF invoices. Save as PDF… on the invoice form records the invoice (or the
   changes to it) and saves it as a PDF to email or print; recorded invoices
   also have a PDF button in Transactions, and `ledgercraft-cli invoice-pdf

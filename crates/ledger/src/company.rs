@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     default_chart_of_accounts, Account, AccountId, AccountLine, AccountType, Address, Applied,
-    BankRule, Contact, Customer, CustomerId, FeedLink, Item, ItemId, ItemSpec, LedgerError,
-    LedgerResult, Party, Posting, Reconciliation, Transaction, TxnBody, TxnId, Vendor, VendorId,
+    BankRule, Contact, Customer, CustomerId, CustomerTax, FeedLink, Item, ItemId, ItemSpec,
+    LedgerError, LedgerResult, Party, Posting, Reconciliation, TaxComponent, TaxGroup,
+    Transaction, TxnBody, TxnId, Vendor, VendorId,
 };
 
 /// Company-wide settings.
@@ -67,6 +68,12 @@ pub struct Company {
     /// Bank feed rules: payee text to category.
     #[serde(default)]
     pub bank_rules: Vec<BankRule>,
+    /// Sales tax components (one rate for one agency, with its history).
+    #[serde(default)]
+    pub tax_components: Vec<TaxComponent>,
+    /// Sales tax groups: the components charged together at a location.
+    #[serde(default)]
+    pub tax_groups: Vec<TaxGroup>,
     #[serde(default)]
     next_id: u64,
 }
@@ -92,6 +99,8 @@ impl Company {
             reconciliations: Vec::new(),
             feed_links: Vec::new(),
             bank_rules: Vec::new(),
+            tax_components: Vec::new(),
+            tax_groups: Vec::new(),
             next_id: 0,
         }
     }
@@ -107,7 +116,7 @@ impl Company {
         c
     }
 
-    fn alloc(&mut self) -> u64 {
+    pub(crate) fn alloc(&mut self) -> u64 {
         self.next_id = self.next_id.saturating_add(1);
         self.next_id
     }
@@ -122,6 +131,8 @@ impl Company {
             .chain(self.vendors.iter().map(|v| v.id.0))
             .chain(self.items.iter().map(|i| i.id.0))
             .chain(self.transactions.iter().map(|t| t.id.0))
+            .chain(self.tax_components.iter().map(|t| t.id.0))
+            .chain(self.tax_groups.iter().map(|g| g.id.0))
             .max()
             .unwrap_or(0);
         self.next_id = self.next_id.max(max);
@@ -311,6 +322,7 @@ impl Company {
             id,
             contact,
             active: true,
+            tax: CustomerTax::default(),
         });
         Ok(id)
     }
@@ -587,6 +599,7 @@ impl Company {
                 if !total.is_positive() {
                     return Err(LedgerError::NotPositive("The invoice total"));
                 }
+                self.validate_invoice_tax(inv)?;
             }
             TxnBody::ReceivePayment(p) => {
                 self.require_customer(p.customer)?;
@@ -973,11 +986,13 @@ mod tests {
             customer: cust,
             due_date: d("2026-02-01"),
             ar_account: acct(c, "Accounts Receivable"),
+            tax: None,
             lines: vec![SalesLine {
                 item: None,
                 description: "Work".into(),
                 qty: Qty::from_whole(2),
                 rate: Money::from_cents(cents),
+                taxable: true,
                 account: acct(c, "Service Income"),
             }],
         })
@@ -1088,6 +1103,7 @@ mod tests {
             customer: cust,
             due_date: d("2026-02-01"),
             ar_account: acct(&c, "Accounts Receivable"),
+            tax: None,
             lines: Vec::new(),
         });
         assert!(c.update(inv, d("2026-01-02"), "", "", empty).is_err());

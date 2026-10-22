@@ -52,6 +52,21 @@ transaction, with these extra rules:
 Undo restores the transaction as it was. There is no change history in the
 file yet; an audit trail report is planned (ROADMAP M2.7).
 
+## Sales tax
+
+An invoice that charges sales tax debits Accounts Receivable for the lines
+plus tax, credits each line's income account, and credits the Sales Tax
+Payable liability account once per tax component (state, county, city,
+district), so the account holds what is owed to the agencies. Paying the
+tax is a check (or bill) to the agency posted to Sales Tax Payable.
+
+Each component's rate history is dated; an invoice uses the rates in force
+on its date. The tax is worked out per component on the invoice's taxable
+total (its taxable lines added up) and rounded to the cent once, half a cent
+away from zero. What was charged is stored on the invoice (component, rate,
+taxable amount and tax), and the ledger checks it adds up, so a later rate
+change never alters a recorded invoice or the tax already owed.
+
 ## Bank feed import
 
 Downloaded amounts are signed from the account holder's side: money into the

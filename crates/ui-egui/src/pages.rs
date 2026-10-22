@@ -583,6 +583,7 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                         kind: n.kind,
                         rate,
                         income_account,
+                        taxable: true,
                     }),
                 };
                 match built {

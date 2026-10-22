@@ -425,6 +425,7 @@ mod tests {
                 kind: ItemKind::NonInventory,
                 rate: Money::from_dollars(2400),
                 income_account: sales,
+                taxable: true,
             })
             .unwrap();
         let date = Date::parse("2026-01-15").unwrap();
@@ -432,12 +433,14 @@ mod tests {
             customer,
             due_date: Date::parse("2026-02-14").unwrap(),
             ar_account: account(&c, "Accounts Receivable"),
+            tax: None,
             lines: vec![
                 SalesLine {
                     item: Some(table),
                     description: "Solid hardwood, made to order".into(),
                     qty: Qty::from_whole(2),
                     rate: Money::from_dollars(2400),
+                    taxable: true,
                     account: sales,
                 },
                 SalesLine {
@@ -445,6 +448,7 @@ mod tests {
                     description: "Delivery (München) — “white glove”".into(),
                     qty: Qty::ONE,
                     rate: Money::from_dollars(150),
+                    taxable: true,
                     account: sales,
                 },
             ],

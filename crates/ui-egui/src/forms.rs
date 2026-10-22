@@ -725,6 +725,7 @@ fn build_invoice(c: &Company, f: &InvoiceForm) -> Result<Command, String> {
             description: l.description.clone(),
             qty,
             rate,
+            taxable: true,
             account,
         });
     }
@@ -741,6 +742,7 @@ fn build_invoice(c: &Company, f: &InvoiceForm) -> Result<Command, String> {
             customer,
             due_date,
             ar_account,
+            tax: None,
             lines,
         }),
     })

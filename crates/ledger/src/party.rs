@@ -64,6 +64,9 @@ pub struct Customer {
     pub id: CustomerId,
     pub contact: Contact,
     pub active: bool,
+    /// Their tax group and any exemption.
+    #[serde(default)]
+    pub tax: crate::CustomerTax,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

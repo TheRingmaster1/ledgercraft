@@ -30,11 +30,13 @@ fn books() -> Company {
         customer: cust,
         due_date: d("2025-07-01"),
         ar_account: id(&c, "Accounts Receivable"),
+        tax: None,
         lines: vec![SalesLine {
             item: None,
             description: String::new(),
             qty: Qty::ONE,
             rate: Money::from_dollars(1000),
+            taxable: true,
             account: id(&c, "Service Income"),
         }],
     });

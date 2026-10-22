@@ -334,6 +334,7 @@ fn add_item(company: &mut Company, r: &Record, summary: &mut ImportSummary) {
         kind,
         rate,
         income_account,
+        taxable: true,
     };
     match company.add_item(spec) {
         Ok(_) => summary.items += 1,
