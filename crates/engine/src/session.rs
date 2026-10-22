@@ -303,10 +303,14 @@ mod tests {
             .created
             .unwrap();
         let id: u64 = state.trim_start_matches('X').parse().unwrap();
-        s.execute_json(&format!(r#"{{"command":"tax.setRate","id":{id},"from":"2026-10-01","rate":5}}"#))
-            .unwrap();
+        s.execute_json(&format!(
+            r#"{{"command":"tax.setRate","id":{id},"from":"2026-10-01","rate":5}}"#
+        ))
+        .unwrap();
         let group = s
-            .execute_json(&format!(r#"{{"command":"taxGroup.create","name":"Statewide","components":[{id}]}}"#))
+            .execute_json(&format!(
+                r#"{{"command":"taxGroup.create","name":"Statewide","components":[{id}]}}"#
+            ))
             .unwrap()
             .created
             .unwrap();
@@ -318,7 +322,8 @@ mod tests {
         assert_eq!(s.undo().as_deref(), Some("New Tax Group Statewide"));
         assert!(s.company().tax_groups.is_empty());
         // A rate that is not a percentage is refused.
-        let bad = format!(r#"{{"command":"tax.setRate","id":{id},"from":"2026-01-01","rate":"lots"}}"#);
+        let bad =
+            format!(r#"{{"command":"tax.setRate","id":{id},"from":"2026-01-01","rate":"lots"}}"#);
         assert!(s.execute_json(&bad).is_err());
     }
 

@@ -53,7 +53,9 @@ pub fn rate_publication_date(today: Date) -> Date {
 pub const SALES_TAX_ACCOUNT: &str = "Sales Tax Payable";
 
 /// A tax rate, held exactly in millionths of the amount: 7.125% is 71,250.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[serde(try_from = "RateText", into = "String")]
 pub struct TaxRate(u32);
 
@@ -117,7 +119,11 @@ impl TaxRate {
         if frac.len() > 4 {
             return Err(format!("{text:?} has more than four decimal places"));
         }
-        let whole: u32 = if whole.is_empty() { 0 } else { whole.parse().map_err(|_| bad())? };
+        let whole: u32 = if whole.is_empty() {
+            0
+        } else {
+            whole.parse().map_err(|_| bad())?
+        };
         let mut padded = frac.to_string();
         while padded.len() < 4 {
             padded.push('0');
@@ -138,14 +144,21 @@ impl TaxRate {
         let t = text.trim();
         let bad = || format!("{text:?} is not a rate");
         let (whole, frac) = t.split_once('.').unwrap_or((t, ""));
-        if !whole.chars().all(|c| c.is_ascii_digit()) || !frac.chars().all(|c| c.is_ascii_digit()) || t.is_empty() {
+        if !whole.chars().all(|c| c.is_ascii_digit())
+            || !frac.chars().all(|c| c.is_ascii_digit())
+            || t.is_empty()
+        {
             return Err(bad());
         }
         let frac = frac.trim_end_matches('0');
         if frac.len() > 6 {
             return Err(format!("{text:?} is more precise than a millionth"));
         }
-        let whole: u32 = if whole.is_empty() { 0 } else { whole.parse().map_err(|_| bad())? };
+        let whole: u32 = if whole.is_empty() {
+            0
+        } else {
+            whole.parse().map_err(|_| bad())?
+        };
         let mut padded = frac.to_string();
         while padded.len() < 6 {
             padded.push('0');
@@ -314,7 +327,11 @@ impl Company {
         }
     }
 
-    fn check_component_name(&self, name: &str, except: Option<TaxComponentId>) -> LedgerResult<String> {
+    fn check_component_name(
+        &self,
+        name: &str,
+        except: Option<TaxComponentId>,
+    ) -> LedgerResult<String> {
         let name = name.trim();
         if name.is_empty() {
             return Err(LedgerError::Required("A tax name"));
@@ -324,7 +341,9 @@ impl Company {
             .iter()
             .any(|t| Some(t.id) != except && t.name.eq_ignore_ascii_case(name))
         {
-            return Err(LedgerError::Duplicate(format!("A sales tax named {name:?}")));
+            return Err(LedgerError::Duplicate(format!(
+                "A sales tax named {name:?}"
+            )));
         }
         Ok(name.to_string())
     }
@@ -377,7 +396,12 @@ impl Company {
 
     /// Sets the rate starting on `from`, replacing one that starts that day.
     /// Invoices already recorded keep the rate they were charged.
-    pub fn set_tax_rate(&mut self, id: TaxComponentId, from: Date, rate: TaxRate) -> LedgerResult<()> {
+    pub fn set_tax_rate(
+        &mut self,
+        id: TaxComponentId,
+        from: Date,
+        rate: TaxRate,
+    ) -> LedgerResult<()> {
         let t = self.tax_component_mut(id)?;
         match t.rates.iter_mut().find(|r| r.from == from) {
             Some(r) => r.rate = rate,
@@ -406,7 +430,11 @@ impl Company {
         Ok(())
     }
 
-    pub fn set_tax_component_active(&mut self, id: TaxComponentId, active: bool) -> LedgerResult<()> {
+    pub fn set_tax_component_active(
+        &mut self,
+        id: TaxComponentId,
+        active: bool,
+    ) -> LedgerResult<()> {
         self.tax_component_mut(id)?.active = active;
         Ok(())
     }
@@ -426,7 +454,9 @@ impl Company {
             .iter()
             .any(|g| Some(g.id) != except && g.name.eq_ignore_ascii_case(name))
         {
-            return Err(LedgerError::Duplicate(format!("A tax group named {name:?}")));
+            return Err(LedgerError::Duplicate(format!(
+                "A tax group named {name:?}"
+            )));
         }
         if components.is_empty() {
             return Err(LedgerError::Required("At least one sales tax in the group"));
@@ -436,13 +466,19 @@ impl Company {
                 return Err(LedgerError::NotFound(format!("Sales tax {c}")));
             }
             if components[..i].contains(c) {
-                return Err(LedgerError::Invalid(format!("Sales tax {c} is in the group twice")));
+                return Err(LedgerError::Invalid(format!(
+                    "Sales tax {c} is in the group twice"
+                )));
             }
         }
         Ok(name.to_string())
     }
 
-    pub fn add_tax_group(&mut self, name: &str, components: Vec<TaxComponentId>) -> LedgerResult<TaxGroupId> {
+    pub fn add_tax_group(
+        &mut self,
+        name: &str,
+        components: Vec<TaxComponentId>,
+    ) -> LedgerResult<TaxGroupId> {
         let name = self.check_group(name, &components, None)?;
         let id = TaxGroupId(self.alloc());
         self.tax_groups.push(TaxGroup {
@@ -544,7 +580,12 @@ impl Company {
 
     /// The tax a group charges on `taxable` on `date`, at the rates in force
     /// that day, ready to store on an invoice.
-    pub fn invoice_tax(&self, group: TaxGroupId, date: Date, taxable: Money) -> LedgerResult<InvoiceTax> {
+    pub fn invoice_tax(
+        &self,
+        group: TaxGroupId,
+        date: Date,
+        taxable: Money,
+    ) -> LedgerResult<InvoiceTax> {
         let g = self
             .tax_group(group)
             .ok_or_else(|| LedgerError::NotFound(format!("Tax group {group}")))?;
@@ -568,7 +609,11 @@ impl Company {
                 amount,
             });
         }
-        Ok(InvoiceTax { group, account, lines })
+        Ok(InvoiceTax {
+            group,
+            account,
+            lines,
+        })
     }
 
     /// Checks the tax stored on an invoice adds up: each line taxes the
@@ -582,7 +627,12 @@ impl Company {
         }
         self.require_kind(
             tax.account,
-            |k| matches!(k, AccountType::OtherCurrentLiability | AccountType::LongTermLiability),
+            |k| {
+                matches!(
+                    k,
+                    AccountType::OtherCurrentLiability | AccountType::LongTermLiability
+                )
+            },
             "a liability account for sales tax",
         )?;
         let taxable = inv.taxable_amount().ok_or(LedgerError::Overflow)?;
@@ -637,11 +687,23 @@ mod tests {
     #[test]
     fn rates_round_half_a_cent_away_from_zero() {
         // 7.25% of $10.10 is 73.225 cents: 73. Of $10.30, 74.675: 75.
-        assert_eq!(rate("7.25").tax_on(Money::from_cents(1010)), Some(Money::from_cents(73)));
-        assert_eq!(rate("7.25").tax_on(Money::from_cents(1030)), Some(Money::from_cents(75)));
+        assert_eq!(
+            rate("7.25").tax_on(Money::from_cents(1010)),
+            Some(Money::from_cents(73))
+        );
+        assert_eq!(
+            rate("7.25").tax_on(Money::from_cents(1030)),
+            Some(Money::from_cents(75))
+        );
         // 5% of $0.10 is half a cent: rounds up; of -$0.10, down.
-        assert_eq!(rate("5").tax_on(Money::from_cents(10)), Some(Money::from_cents(1)));
-        assert_eq!(rate("5").tax_on(Money::from_cents(-10)), Some(Money::from_cents(-1)));
+        assert_eq!(
+            rate("5").tax_on(Money::from_cents(10)),
+            Some(Money::from_cents(1))
+        );
+        assert_eq!(
+            rate("5").tax_on(Money::from_cents(-10)),
+            Some(Money::from_cents(-1))
+        );
     }
 
     #[test]
@@ -657,13 +719,27 @@ mod tests {
     fn books() -> (Company, TaxGroupId, TaxComponentId) {
         let mut c = Company::with_default_accounts("Tax Co");
         let state = c
-            .add_tax_component("Utah State", "Utah State Tax Commission", "", d("2020-01-01"), rate("4.85"))
+            .add_tax_component(
+                "Utah State",
+                "Utah State Tax Commission",
+                "",
+                d("2020-01-01"),
+                rate("4.85"),
+            )
             .unwrap();
         let city = c
-            .add_tax_component("Provo City", "Utah State Tax Commission", "", d("2020-01-01"), rate("2.4"))
+            .add_tax_component(
+                "Provo City",
+                "Utah State Tax Commission",
+                "",
+                d("2020-01-01"),
+                rate("2.4"),
+            )
             .unwrap();
         c.set_tax_rate(city, d("2026-10-01"), rate("2.6")).unwrap();
-        let group = c.add_tax_group("Provo combined", vec![state, city]).unwrap();
+        let group = c
+            .add_tax_group("Provo combined", vec![state, city])
+            .unwrap();
         (c, group, city)
     }
 
@@ -695,7 +771,9 @@ mod tests {
             taxable,
         };
         let date = d("2026-09-15");
-        let tax = c.invoice_tax(group, date, Money::from_dollars(100)).unwrap();
+        let tax = c
+            .invoice_tax(group, date, Money::from_dollars(100))
+            .unwrap();
         let invoice = Invoice {
             customer,
             due_date: date,
@@ -705,14 +783,19 @@ mod tests {
         };
         // $4.85 + $2.40 on the $100 taxable; the $50 line is not taxed.
         assert_eq!(invoice.total(), Some(Money::from_cents(15_725)));
-        let id = c.post(date, "1", "", TxnBody::Invoice(invoice.clone())).unwrap();
+        let id = c
+            .post(date, "1", "", TxnBody::Invoice(invoice.clone()))
+            .unwrap();
         let payable = c.sales_tax_account().unwrap();
         assert_eq!(c.account_balance(payable, None), Money::from_cents(725));
 
         // A later rate change leaves the recorded invoice alone.
         c.set_tax_rate(city, d("2026-09-01"), rate("3")).unwrap();
         assert_eq!(c.account_balance(payable, None), Money::from_cents(725));
-        assert_eq!(c.txn(id).and_then(|t| t.body.total()), Some(Money::from_cents(15_725)));
+        assert_eq!(
+            c.txn(id).and_then(|t| t.body.total()),
+            Some(Money::from_cents(15_725))
+        );
 
         // Tax that does not add up is refused.
         let mut wrong = invoice;
@@ -728,7 +811,9 @@ mod tests {
         assert!(c.add_tax_group("Provo combined", vec![city]).is_err());
         assert!(c.add_tax_group("Empty", vec![]).is_err());
         assert!(c.add_tax_group("Twice", vec![city, city]).is_err());
-        assert!(c.add_tax_group("Ghost", vec![TaxComponentId(9_999)]).is_err());
+        assert!(c
+            .add_tax_group("Ghost", vec![TaxComponentId(9_999)])
+            .is_err());
         assert!(c.add_tax_group("City only", vec![city]).is_ok());
     }
 
@@ -770,7 +855,8 @@ mod tests {
     fn the_sales_tax_account_is_made_when_missing() {
         let mut c = Company::new("Bare Co");
         assert_eq!(c.sales_tax_account(), None);
-        c.add_tax_component("State", "", "", d("2026-01-01"), rate("5")).unwrap();
+        c.add_tax_component("State", "", "", d("2026-01-01"), rate("5"))
+            .unwrap();
         assert!(c.sales_tax_account().is_some());
     }
 }

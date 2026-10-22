@@ -116,7 +116,9 @@ impl Invoice {
 
     /// The sales tax charged; zero without tax.
     pub fn tax_total(&self) -> Option<Money> {
-        self.tax.as_ref().map_or(Some(Money::ZERO), InvoiceTax::total)
+        self.tax
+            .as_ref()
+            .map_or(Some(Money::ZERO), InvoiceTax::total)
     }
 
     /// What the customer owes: the lines plus tax.
