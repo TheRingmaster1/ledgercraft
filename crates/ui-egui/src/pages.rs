@@ -344,7 +344,12 @@ fn card_frame(ui: &Ui) -> egui::Frame {
 
 /// A card's title, and the line under it.
 fn card_heading(ui: &mut Ui, title: &str, blurb: &str) {
-    ui.label(RichText::new(title).strong().size(16.0).color(theme::ACCENT));
+    ui.label(
+        RichText::new(title)
+            .strong()
+            .size(16.0)
+            .color(theme::ACCENT),
+    );
     if !blurb.is_empty() {
         ui.label(RichText::new(blurb).small().color(theme::MUTED));
     }
@@ -389,8 +394,7 @@ fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
         ui.set_width(inner);
         card_heading(ui, card.title, card.blurb);
         let rows = card.steps.iter().map(|s| s.row).max().map_or(1, |r| r + 1);
-        let step_width =
-            ((inner - 2.0 * COLUMN_GAP) / 3.0).clamp(STEP_MIN_WIDTH, STEP_MAX_WIDTH);
+        let step_width = ((inner - 2.0 * COLUMN_GAP) / 3.0).clamp(STEP_MIN_WIDTH, STEP_MAX_WIDTH);
         let height = f32::from(rows) * ROW_PITCH - (ROW_PITCH - STEP_HEIGHT);
         let (area, _) = ui.allocate_exact_size(egui::vec2(inner, height), egui::Sense::hover());
         let rect_of = |s: &Step| {
