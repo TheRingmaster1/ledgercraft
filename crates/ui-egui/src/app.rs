@@ -1066,7 +1066,6 @@ impl LedgerApp {
                             FormKind::ReceivePayment,
                             FormKind::CreditMemo,
                             FormKind::Refund,
-                            FormKind::Deposit,
                         ] {
                             if ui.button(kind.title()).clicked() {
                                 ui.close();
@@ -1201,6 +1200,8 @@ impl LedgerApp {
                     });
                 });
                 ui.add_space(12.0);
+                // Places to go; forms are under Create below, on Home and in
+                // the menus.
                 let items: [(&str, Page); 9] = [
                     ("Home", Page::Home),
                     ("Chart of Accounts", Page::Accounts),
@@ -1208,9 +1209,9 @@ impl LedgerApp {
                     ("Vendors", Page::Vendors),
                     ("Products & Services", Page::Items),
                     ("Transactions", Page::Transactions),
+                    ("Sales Tax", Page::SalesTax),
                     ("Reports", Page::Reports),
                     ("Reconcile", Page::Reconcile),
-                    ("Journal Entry", Page::Form(FormKind::Journal)),
                 ];
                 for (label, page) in items {
                     let selected = self.page == page;
@@ -1225,11 +1226,10 @@ impl LedgerApp {
                 }
                 ui.add_space(16.0);
                 ui.label(RichText::new("Create").color(theme::NAV_TEXT).small());
+                // The everyday forms only; the rest are in the menus and on Home.
                 for kind in [
                     FormKind::Invoice,
-                    FormKind::SalesReceipt,
                     FormKind::ReceivePayment,
-                    FormKind::CreditMemo,
                     FormKind::Bill,
                     FormKind::PayBills,
                     FormKind::Check,

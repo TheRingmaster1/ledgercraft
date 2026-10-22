@@ -201,8 +201,9 @@ fn title(ui: &mut Ui, text: &str) {
 // ----- home -------------------------------------------------------------------
 
 fn flow_button(ui: &mut Ui, label: &str, page: Page, out: &mut Vec<Action>) {
-    let button =
-        egui::Button::new(RichText::new(label).size(15.0)).min_size(egui::vec2(150.0, 44.0));
+    // One width for every button, so the columns line up.
+    let button = egui::Button::new(RichText::new(label).size(15.0))
+        .min_size(egui::vec2(FLOW_BUTTON_WIDTH, 44.0));
     if ui.add(button).on_hover_text(page.hint()).clicked() {
         out.push(Action::Go(page));
     }
@@ -222,6 +223,9 @@ fn arrow(ui: &mut Ui) {
     ui.painter()
         .line_segment([tip, egui::pos2(tip.x - 7.0, y + 6.0)], stroke);
 }
+
+/// Wide enough for the longest label ("Import Transactions").
+const FLOW_BUTTON_WIDTH: f32 = 172.0;
 
 /// Where an arrow would be, left empty, so buttons line up with the
 /// columns of the rows that have arrows.
@@ -357,16 +361,9 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
             no_arrow(ui);
             flow_button(ui, "Reconcile", Page::Reconcile, out);
         });
-        section(ui, "Company");
         more_links(
             ui,
-            &[
-                ("Chart of Accounts", Some(Page::Accounts)),
-                ("Products & Services", Some(Page::Items)),
-                ("Sales Tax", Some(Page::SalesTax)),
-                ("Journal Entry", Some(Page::Form(FormKind::Journal))),
-                ("Reports", Some(Page::Reports)),
-            ],
+            &[("Journal Entry", Some(Page::Form(FormKind::Journal)))],
             out,
         );
     };
