@@ -329,7 +329,10 @@ mod tests {
             deposit_to: c.account_by_name("Undeposited Funds").unwrap().id,
             method: "Cash".into(),
             lines: lines(400),
-            tax: Some(c.invoice_tax(group, date, Money::from_dollars(400)).unwrap()),
+            tax: Some(
+                c.invoice_tax(group, date, Money::from_dollars(400))
+                    .unwrap(),
+            ),
         };
         c.post(date, "1", "", TxnBody::SalesReceipt(receipt))
             .unwrap();
@@ -337,17 +340,22 @@ mod tests {
             customer,
             ar_account: c.first_account_of(AccountType::AccountsReceivable).unwrap(),
             lines: lines(100),
-            tax: Some(c.invoice_tax(group, date, Money::from_dollars(100)).unwrap()),
+            tax: Some(
+                c.invoice_tax(group, date, Money::from_dollars(100))
+                    .unwrap(),
+            ),
             applied: Vec::new(),
         };
-        c.post(date, "CM-1", "", TxnBody::CreditMemo(memo))
-            .unwrap();
+        c.post(date, "CM-1", "", TxnBody::CreditMemo(memo)).unwrap();
 
         let r = sales_tax_liability(&c, d("2026-10-01"), d("2026-10-31"));
         assert_eq!(money_in(&r, "Total sales", 0), Money::from_dollars(300));
         assert_eq!(money_in(&r, "Taxable sales", 0), Money::from_dollars(300));
         assert_eq!(money_in(&r, "Utah", 2), Money::from_dollars(15));
-        assert_eq!(money_in(&r, "Owed at 2026-10-31", 2), Money::from_dollars(15));
+        assert_eq!(
+            money_in(&r, "Owed at 2026-10-31", 2),
+            Money::from_dollars(15)
+        );
         let owed = c.sales_tax_owed(d("2026-10-31"));
         assert_eq!(owed.first().map(|o| o.owed), Some(Money::from_dollars(15)));
     }

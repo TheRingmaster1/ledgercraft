@@ -306,7 +306,12 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
         });
         ui.add_space(4.0);
         ui.horizontal_wrapped(|ui| {
-            flow_button(ui, "Sales Receipts", Page::Form(FormKind::SalesReceipt), out);
+            flow_button(
+                ui,
+                "Sales Receipts",
+                Page::Form(FormKind::SalesReceipt),
+                out,
+            );
             flow_button(ui, "Credit Memos", Page::Form(FormKind::CreditMemo), out);
             flow_button(ui, "Refunds", Page::Form(FormKind::Refund), out);
         });

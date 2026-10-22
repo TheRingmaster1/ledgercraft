@@ -42,9 +42,7 @@ impl FormKind {
                 "Credit a customer for a return, a discount or a mistake. It lowers what \
                  they owe and can pay down their open invoices."
             }
-            Self::Refund => {
-                "Pay a customer back the credit left on their credit memos."
-            }
+            Self::Refund => "Pay a customer back the credit left on their credit memos.",
         }
     }
 }

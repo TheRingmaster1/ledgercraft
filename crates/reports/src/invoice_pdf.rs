@@ -278,7 +278,12 @@ fn gather(c: &Company, t: &Transaction, sale: &Sale<'_>, currency: &str) -> Resu
             });
         }
         totals.push(TotalLine {
-            label: if credit { "Credit remaining" } else { "Balance due" }.into(),
+            label: if credit {
+                "Credit remaining"
+            } else {
+                "Balance due"
+            }
+            .into(),
             amount: money(open),
             strong: true,
         });
@@ -721,9 +726,7 @@ mod tests {
             }],
         };
         let date = Date::parse("2026-01-20").unwrap();
-        let memo = c
-            .post(date, "CM-7", "", TxnBody::CreditMemo(memo))
-            .unwrap();
+        let memo = c.post(date, "CM-7", "", TxnBody::CreditMemo(memo)).unwrap();
         let text = text_of(&invoice_pdf(&c, memo, "$").unwrap());
         for shown in [
             "(CREDIT MEMO) Tj",

@@ -1604,7 +1604,12 @@ mod tests {
             amount: Money::from_cents(20_000),
         }];
         let memo = c
-            .post(d("2026-01-10"), "CM-1", "", credit(&c, cust, 30_000, applied))
+            .post(
+                d("2026-01-10"),
+                "CM-1",
+                "",
+                credit(&c, cust, 30_000, applied),
+            )
             .unwrap();
         assert_eq!(c.customer_balance(cust), Money::from_cents(70_000));
         assert_eq!(c.open_balance(inv, None), Money::from_cents(80_000));
@@ -1637,11 +1642,18 @@ mod tests {
 
         // A refunded credit cannot be voided, or shrink below its refund.
         assert!(c.void(memo).is_err());
-        let smaller = credit(&c, cust, 25_000, vec![Applied {
-            txn: inv,
-            amount: Money::from_cents(20_000),
-        }]);
-        assert!(c.update(memo, d("2026-01-10"), "CM-1", "", smaller).is_err());
+        let smaller = credit(
+            &c,
+            cust,
+            25_000,
+            vec![Applied {
+                txn: inv,
+                amount: Money::from_cents(20_000),
+            }],
+        );
+        assert!(c
+            .update(memo, d("2026-01-10"), "CM-1", "", smaller)
+            .is_err());
         // Undo the refund, then voiding the credit reopens the invoice in full.
         c.void(r).unwrap();
         c.void(memo).unwrap();
@@ -1653,7 +1665,12 @@ mod tests {
     fn a_refund_must_pay_back_credit_memos() {
         let (mut c, cust, _) = setup();
         let memo = c
-            .post(d("2026-01-10"), "CM-1", "", credit(&c, cust, 30_000, Vec::new()))
+            .post(
+                d("2026-01-10"),
+                "CM-1",
+                "",
+                credit(&c, cust, 30_000, Vec::new()),
+            )
             .unwrap();
         let mut unapplied = refund(&c, cust, memo, 5_000);
         if let TxnBody::Refund(r) = &mut unapplied {

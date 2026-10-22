@@ -585,7 +585,13 @@ impl Company {
         {
             // Invoices and sales receipts collect tax; credit memos give it back.
             let credit = t.body.sales_sign() < 0;
-            for l in t.body.sale().iter().flat_map(|s| s.tax).flat_map(|x| &x.lines) {
+            for l in t
+                .body
+                .sale()
+                .iter()
+                .flat_map(|s| s.tax)
+                .flat_map(|x| &x.lines)
+            {
                 let entry = by_agency.entry(self.tax_agency(l)).or_default();
                 entry.0 = if credit {
                     entry.0.saturating_sub(l.amount)

@@ -17,8 +17,7 @@ use ledgercraft_ledger::{
     tax_payment_memo, AccountId, AccountLine, AccountType, Address, Applied, BankRule, Bill, Check,
     Company, Contact, CreditMemo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
     ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Party, PayBill,
-    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, TaxRate, TxnBody, TxnId,
-    VendorId,
+    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, TaxRate, TxnBody, TxnId, VendorId,
 };
 
 fn d(y: i32, m: u32, day: u32) -> LedgerResult<Date> {
@@ -1479,7 +1478,14 @@ fn rest_of_year(
         &[(chair, "Returned chair", 1, dollars(325))],
         None,
     )?;
-    refund(c, d(2026, 7, 10)?, lin, checking, "Refund to Visa", &[(returned, None)])?;
+    refund(
+        c,
+        d(2026, 7, 10)?,
+        lin,
+        checking,
+        "Refund to Visa",
+        &[(returned, None)],
+    )?;
     check(
         c,
         d(2026, 7, 6)?,
@@ -1769,7 +1775,14 @@ fn rest_of_year(
         ],
     )?;
     // Alpine Lodge pays a little of what they owe.
-    receive(c, d(2026, 9, 20)?, alpine, checking, "Check #388", &[(cabins, Some(dollars(1_000)))])?;
+    receive(
+        c,
+        d(2026, 9, 20)?,
+        alpine,
+        checking,
+        "Check #388",
+        &[(cabins, Some(dollars(1_000)))],
+    )?;
     // An allowance for a late delivery, not used yet.
     credit_memo(
         c,

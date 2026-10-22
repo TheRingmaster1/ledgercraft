@@ -644,12 +644,7 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
 }
 
 /// A sale paid on the spot.
-pub(crate) fn sales_receipt(
-    ui: &mut Ui,
-    c: &Company,
-    f: &mut InvoiceForm,
-    out: &mut Vec<Action>,
-) {
+pub(crate) fn sales_receipt(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut Vec<Action>) {
     sales_form(ui, c, f, FormKind::SalesReceipt, out);
 }
 
@@ -722,9 +717,7 @@ fn sales_form(
         }
     });
     if kind == FormKind::SalesReceipt && f.customer.is_none() {
-        ui.label(
-            RichText::new("A walk-in sale needs no customer.").color(theme::MUTED),
-        );
+        ui.label(RichText::new("A walk-in sale needs no customer.").color(theme::MUTED));
     }
     if let Some(cust) = f.customer.and_then(|id| c.customer(id)) {
         let addr = cust.contact.address.lines().join(", ");
@@ -977,7 +970,10 @@ fn credit_applications(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, credit: Mo
         "cm_docs",
         &docs,
         &mut f.amounts,
-        ("Apply to all open", "Fill in each open amount, oldest first."),
+        (
+            "Apply to all open",
+            "Fill in each open amount, oldest first.",
+        ),
     );
     let left = credit.saturating_sub(applied);
     let text = if left.is_negative() {
@@ -1318,16 +1314,17 @@ pub(crate) fn refund(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut Ve
         None => Vec::new(),
     };
     if f.customer.is_some() && docs.is_empty() {
-        ui.label(
-            RichText::new("This customer has no credit left to refund.").color(theme::MUTED),
-        );
+        ui.label(RichText::new("This customer has no credit left to refund.").color(theme::MUTED));
     }
     let total = open_docs_grid(
         ui,
         "rf_docs",
         &docs,
         &mut f.amounts,
-        ("Refund all credit", "Fill in the credit left on each credit memo."),
+        (
+            "Refund all credit",
+            "Fill in the credit left on each credit memo.",
+        ),
     );
     ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
@@ -1399,8 +1396,7 @@ fn open_docs_grid(
         ui.add_space(8.0);
         return Money::ZERO;
     }
-    if ui.button(fill).on_hover_text(fill_hover).clicked()
-    {
+    if ui.button(fill).on_hover_text(fill_hover).clicked() {
         for doc in docs {
             amounts.insert(doc.id, doc.open.to_plain_string());
         }
