@@ -21,6 +21,34 @@ use crate::{
     TaxComponentId, TaxGroupId,
 };
 
+/// A reminder that sales tax rates may have changed since they were checked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TaxReview {
+    /// When the new quarter's rates were published (the 1st of March, June,
+    /// September or December).
+    pub published: Date,
+    /// When they take effect: the start of the next calendar quarter.
+    pub takes_effect: Date,
+    /// When the rates were last checked, if ever.
+    pub last_checked: Option<Date>,
+}
+
+/// The most recent day, on or before `today`, by which states publish the
+/// next quarter's rate changes: Streamlined Sales Tax states may change rates
+/// only at the start of a calendar quarter, and post them by the first day of
+/// the month before (March 1 for April 1, and so on).
+pub fn rate_publication_date(today: Date) -> Date {
+    let (year, month, _) = today.ymd();
+    let (year, month) = match month {
+        12 => (year, 12),
+        9..=11 => (year, 9),
+        6..=8 => (year, 6),
+        3..=5 => (year, 3),
+        _ => (year - 1, 12),
+    };
+    Date::from_ymd(year, month, 1).unwrap_or(today)
+}
+
 /// The name of the liability account tax is owed in.
 pub const SALES_TAX_ACCOUNT: &str = "Sales Tax Payable";
 
@@ -471,6 +499,37 @@ impl Company {
         Ok(())
     }
 
+    /// Whether to remind the user to check their rates: they charge sales tax,
+    /// and a new quarter's rates have been published since they last checked.
+    pub fn tax_review_due(&self, today: Date) -> Option<TaxReview> {
+        if !self.tax_components.iter().any(|t| t.active) {
+            return None;
+        }
+        let published = rate_publication_date(today);
+        if self.tax_rates_checked.is_some_and(|d| d >= published) {
+            return None;
+        }
+        let (year, month, _) = published.ymd();
+        let takes_effect = if month == 12 {
+            Date::from_ymd(year + 1, 1, 1)
+        } else {
+            Date::from_ymd(year, month + 1, 1)
+        }
+        .unwrap_or(published);
+        Some(TaxReview {
+            published,
+            takes_effect,
+            last_checked: self.tax_rates_checked,
+        })
+    }
+
+    /// Records that the rates were checked (or changed) on `on`.
+    pub fn mark_tax_rates_checked(&mut self, on: Date) {
+        if self.tax_rates_checked.is_none_or(|d| d < on) {
+            self.tax_rates_checked = Some(on);
+        }
+    }
+
     /// Marks an item taxable or not. Invoices already recorded keep the tax
     /// they charged.
     pub fn set_item_taxable(&mut self, id: ItemId, taxable: bool) -> LedgerResult<()> {
@@ -678,6 +737,33 @@ mod tests {
         let (mut c, _, city) = books();
         c.remove_tax_rate(city, d("2026-10-01")).unwrap();
         assert!(c.remove_tax_rate(city, d("2020-01-01")).is_err());
+    }
+
+    #[test]
+    fn rates_are_published_before_each_quarter() {
+        assert_eq!(rate_publication_date(d("2026-10-22")), d("2026-09-01"));
+        assert_eq!(rate_publication_date(d("2026-12-01")), d("2026-12-01"));
+        assert_eq!(rate_publication_date(d("2027-02-28")), d("2026-12-01"));
+        assert_eq!(rate_publication_date(d("2026-03-01")), d("2026-03-01"));
+    }
+
+    #[test]
+    fn a_review_is_due_after_new_rates_are_published() {
+        let (mut c, _, _) = books();
+        let review = c.tax_review_due(d("2026-10-22")).unwrap();
+        assert_eq!(review.published, d("2026-09-01"));
+        assert_eq!(review.takes_effect, d("2026-10-01"));
+        assert_eq!(review.last_checked, None);
+        c.mark_tax_rates_checked(d("2026-09-05"));
+        assert_eq!(c.tax_review_due(d("2026-10-22")), None);
+        // Due again once December's rates are out, for January 1.
+        let next = c.tax_review_due(d("2026-12-02")).unwrap();
+        assert_eq!(next.takes_effect, d("2027-01-01"));
+        // An older check never replaces a newer one.
+        c.mark_tax_rates_checked(d("2026-01-01"));
+        assert_eq!(c.tax_rates_checked, Some(d("2026-09-05")));
+        // Without sales tax there is nothing to review.
+        assert_eq!(Company::new("No Tax").tax_review_due(d("2026-10-22")), None);
     }
 
     #[test]

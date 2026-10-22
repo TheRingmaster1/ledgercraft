@@ -43,7 +43,8 @@ A company file is UTF-8 JSON:
   `taxable` and an invoice line's `taxable` default to true. An invoice's
   `tax`, when it charges tax, stores what was charged: `group`, the
   liability `account`, and `lines` of `{component, name, rate, taxable,
-  amount}`. All are absent in older files.
+  amount}`. `tax_rates_checked` is the date the rates were last checked or
+  changed (for the quarterly reminder). All are absent in older files.
 * `feed_links` records downloaded bank lines already imported (account, the
   bank's id, and the transaction it became or matched); `bank_rules` holds the
   import rules (payee text and category). Both are absent in older files.

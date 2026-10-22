@@ -26,8 +26,8 @@ pub use item::{Item, ItemKind, ItemSpec};
 pub use party::{Address, Contact, Customer, Party, Vendor};
 pub use reconcile::{ReconcileItem, Reconciliation};
 pub use salestax::{
-    CustomerTax, DatedRate, InvoiceTax, TaxComponent, TaxGroup, TaxLine, TaxRate,
-    SALES_TAX_ACCOUNT,
+    rate_publication_date, CustomerTax, DatedRate, InvoiceTax, TaxComponent, TaxGroup, TaxLine,
+    TaxRate, TaxReview, SALES_TAX_ACCOUNT,
 };
 pub use template::{default_chart_of_accounts, AccountTemplate};
 pub use txn::{

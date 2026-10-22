@@ -147,6 +147,9 @@ pub enum Command {
     },
     #[serde(rename = "item.setTaxable")]
     ItemSetTaxable { id: ItemId, taxable: bool },
+    /// The sales tax rates were checked and are current as of `on`.
+    #[serde(rename = "tax.markChecked")]
+    TaxMarkChecked { on: Date },
 }
 
 /// One row of the command catalog shown by `ledgercraft-cli commands`.
@@ -184,6 +187,7 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "taxGroup.setActive", summary: "Make a tax group active or inactive. {id, active}" },
     CommandInfo { id: "customer.setTax", summary: "A customer's tax group and exemption. {id, tax:{group?, exempt?, exemption?}}" },
     CommandInfo { id: "item.setTaxable", summary: "Mark an item taxable or not. {id, taxable}" },
+    CommandInfo { id: "tax.markChecked", summary: "Record that the sales tax rates were checked on a date (stops the quarterly reminder). {on}" },
 ];
 
 impl Command {
@@ -217,6 +221,7 @@ impl Command {
             Self::TaxGroupSetActive { .. } => "taxGroup.setActive",
             Self::CustomerSetTax { .. } => "customer.setTax",
             Self::ItemSetTaxable { .. } => "item.setTaxable",
+            Self::TaxMarkChecked { .. } => "tax.markChecked",
         }
     }
 
@@ -251,6 +256,7 @@ impl Command {
             Self::TaxGroupSetActive { .. } => "Tax Group Status".into(),
             Self::CustomerSetTax { .. } => "Customer Sales Tax".into(),
             Self::ItemSetTaxable { .. } => "Item Taxable".into(),
+            Self::TaxMarkChecked { .. } => "Sales Tax Rates Checked".into(),
         }
     }
 
@@ -380,7 +386,12 @@ impl Command {
                 code,
                 from,
                 rate,
-            } => Some(c.add_tax_component(&name, &agency, &code, from, rate)?.to_string()),
+            } => {
+                let id = c.add_tax_component(&name, &agency, &code, from, rate)?;
+                // Adding a rate is checking it.
+                c.mark_tax_rates_checked(Date::today());
+                Some(id.to_string())
+            }
             Self::TaxUpdate {
                 id,
                 name,
@@ -392,6 +403,7 @@ impl Command {
             }
             Self::TaxSetRate { id, from, rate } => {
                 c.set_tax_rate(id, from, rate)?;
+                c.mark_tax_rates_checked(Date::today());
                 None
             }
             Self::TaxRemoveRate { id, from } => {
@@ -423,6 +435,10 @@ impl Command {
             }
             Self::ItemSetTaxable { id, taxable } => {
                 c.set_item_taxable(id, taxable)?;
+                None
+            }
+            Self::TaxMarkChecked { on } => {
+                c.mark_tax_rates_checked(on);
                 None
             }
         })
