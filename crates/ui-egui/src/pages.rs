@@ -472,7 +472,11 @@ fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
         }
         if card.title_go.is_some() {
             ui.add_space(4.0);
-            let note = format!("* Click {} to open the {}", card.title, card_list_name(card));
+            let note = format!(
+                "* Click {} to open the {}",
+                card.title,
+                card_list_name(card)
+            );
             // One row high: a right-to-left layout on its own would take the
             // rest of the page.
             ui.horizontal(|ui| {
