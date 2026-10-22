@@ -450,26 +450,42 @@ mod tests {
         assert!(c.customers.iter().any(|x| x.tax.exempt));
         assert!(c.tax_components.iter().any(|t| t.rates.len() > 1));
         let owed = c.sales_tax_owed(today);
-        assert!(owed.iter().any(|o| o.paid.is_positive() && o.owed.is_positive()));
+        assert!(owed
+            .iter()
+            .any(|o| o.paid.is_positive() && o.owed.is_positive()));
         assert!(c.tax_review_due(today).is_none());
 
         // Every aging column has something in it, on both sides.
         let ar = aging_buckets(&c, today, true);
         assert!(ar.iter().all(|m| m.is_positive()), "A/R aging {ar:?}");
         let ap = aging_buckets(&c, today, false);
-        assert!(ap[0].is_positive() && ap[1].is_positive(), "A/P aging {ap:?}");
+        assert!(
+            ap[0].is_positive() && ap[1].is_positive(),
+            "A/P aging {ap:?}"
+        );
 
         // Money waiting to be deposited, and reconciled card and savings
         // accounts, but Checking left for the Reconcile lesson.
-        assert!(c.account_balance(account("Undeposited Funds"), None).is_positive());
-        assert_eq!(c.reconciliations_for(account("Business Credit Card")).len(), 1);
+        assert!(c
+            .account_balance(account("Undeposited Funds"), None)
+            .is_positive());
+        assert_eq!(
+            c.reconciliations_for(account("Business Credit Card")).len(),
+            1
+        );
         assert_eq!(c.reconciliations_for(account("Savings")).len(), 1);
         assert!(c.reconciliations_for(account("Checking")).is_empty());
         assert!(c.account_balance(account("Checking"), None).is_positive());
 
         // Mistakes voided, things retired, rules for the bank download.
-        assert!(c.transactions.iter().any(|t| t.voided && matches!(t.body, TxnBody::Check(_))));
-        assert!(c.transactions.iter().any(|t| t.voided && matches!(t.body, TxnBody::Invoice(_))));
+        assert!(c
+            .transactions
+            .iter()
+            .any(|t| t.voided && matches!(t.body, TxnBody::Check(_))));
+        assert!(c
+            .transactions
+            .iter()
+            .any(|t| t.voided && matches!(t.body, TxnBody::Invoice(_))));
         assert!(c.customers.iter().any(|x| !x.active));
         assert!(c.vendors.iter().any(|x| !x.active));
         assert!(c.items.iter().any(|x| !x.active));
@@ -478,7 +494,10 @@ mod tests {
 
         // A loan, partly repaid, and depreciation.
         let loan = c.account_balance(account("Loan Payable"), None);
-        assert!(loan.is_positive() && loan < Money::from_dollars(12_000), "{loan}");
+        assert!(
+            loan.is_positive() && loan < Money::from_dollars(12_000),
+            "{loan}"
+        );
         assert!(!c
             .account_balance(account("Accumulated Depreciation"), None)
             .is_zero());

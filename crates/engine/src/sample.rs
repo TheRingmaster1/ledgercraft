@@ -669,7 +669,12 @@ pub fn sample_company() -> LedgerResult<Company> {
         }),
     )?;
 
-    rest_of_year(&mut c, [maple, harbor, lin], [lumber, power, landlord], [table, chair, design])?;
+    rest_of_year(
+        &mut c,
+        [maple, harbor, lin],
+        [lumber, power, landlord],
+        [table, chair, design],
+    )?;
     Ok(c)
 }
 
@@ -892,7 +897,8 @@ fn rest_of_year(
     let county = c.add_tax_component("Utah County", agency, "", from, rate("0.95")?)?;
     // The county's rate went up in July: invoices before then keep the old one.
     c.set_tax_rate(county, d(2026, 7, 1)?, rate("1.05")?)?;
-    let springville_city = c.add_tax_component("Springville City", agency, "", from, rate("1.00")?)?;
+    let springville_city =
+        c.add_tax_component("Springville City", agency, "", from, rate("1.00")?)?;
     let provo_city = c.add_tax_component("Provo City", agency, "", from, rate("1.10")?)?;
     let lehi_city = c.add_tax_component("Lehi City", agency, "", from, rate("1.00")?)?;
     let springville = c.add_tax_group("Springville", vec![state, county, springville_city])?;
@@ -970,7 +976,14 @@ fn rest_of_year(
         checking,
         vec![line(rent, "Shop rent", dollars(1_800))],
     )?;
-    receive(c, d(2026, 4, 3)?, harbor, checking, "ACH", &[(inv1004, None)])?;
+    receive(
+        c,
+        d(2026, 4, 3)?,
+        harbor,
+        checking,
+        "ACH",
+        &[(inv1004, None)],
+    )?;
     let jw = invoice(
         c,
         d(2026, 4, 6)?,
@@ -1001,7 +1014,14 @@ fn rest_of_year(
         &[(inv1001, None)],
     )?;
     let jw_total = total(c, jw)?;
-    receive(c, d(2026, 4, 10)?, whitfield, undeposited, "Cash", &[(jw, None)])?;
+    receive(
+        c,
+        d(2026, 4, 10)?,
+        whitfield,
+        undeposited,
+        "Cash",
+        &[(jw, None)],
+    )?;
     deposit(
         c,
         d(2026, 4, 13)?,
@@ -1021,7 +1041,12 @@ fn rest_of_year(
         30,
         Some(provo),
         &[
-            (bookshelf, "Bookshelves for the reading nook", 2, dollars(890)),
+            (
+                bookshelf,
+                "Bookshelves for the reading nook",
+                2,
+                dollars(890),
+            ),
             (delivery, "Delivery and set-up", 1, dollars(75)),
         ],
     )?;
@@ -1108,15 +1133,16 @@ fn rest_of_year(
             line(interest_expense, "Interest", dollars(75)),
         ],
     )?;
-    pay_bills(
-        c,
-        d(2026, 5, 6)?,
-        "1010",
-        lumber,
-        &[(lumber_apr, None)],
-    )?;
+    pay_bills(c, d(2026, 5, 6)?, "1010", lumber, &[(lumber_apr, None)])?;
     pay_bills(c, d(2026, 5, 8)?, "1011", power, &[(power_apr, None)])?;
-    receive(c, d(2026, 5, 12)?, maple, checking, "ACH", &[(inv1006, None)])?;
+    receive(
+        c,
+        d(2026, 5, 12)?,
+        maple,
+        checking,
+        "ACH",
+        &[(inv1006, None)],
+    )?;
     let inv1008 = invoice(
         c,
         d(2026, 5, 18)?,
@@ -1163,7 +1189,14 @@ fn rest_of_year(
         vec![line(rent, "Shop rent", dollars(1_800))],
     )?;
     let summit_pay = total(c, inv1007)?;
-    receive(c, d(2026, 6, 2)?, summit, undeposited, "Check #10552", &[(inv1007, None)])?;
+    receive(
+        c,
+        d(2026, 6, 2)?,
+        summit,
+        undeposited,
+        "Check #10552",
+        &[(inv1007, None)],
+    )?;
     check(
         c,
         d(2026, 6, 4)?,
@@ -1177,7 +1210,14 @@ fn rest_of_year(
         ],
     )?;
     let harbor_pay = total(c, inv1008)?;
-    receive(c, d(2026, 6, 5)?, harbor, undeposited, "Check #5120", &[(inv1008, None)])?;
+    receive(
+        c,
+        d(2026, 6, 5)?,
+        harbor,
+        undeposited,
+        "Check #5120",
+        &[(inv1008, None)],
+    )?;
     deposit(
         c,
         d(2026, 6, 8)?,
@@ -1260,7 +1300,12 @@ fn rest_of_year(
         "JE-2",
         "Second-quarter depreciation",
         &[
-            (depreciation, dollars(625), Money::ZERO, "Table saw and CNC router"),
+            (
+                depreciation,
+                dollars(625),
+                Money::ZERO,
+                "Table saw and CNC router",
+            ),
             (accumulated, Money::ZERO, dollars(625), ""),
         ],
     )?;
@@ -1420,15 +1465,16 @@ fn rest_of_year(
             line(interest_expense, "Interest", dollars(69)),
         ],
     )?;
-    pay_bills(
-        c,
-        d(2026, 8, 5)?,
-        "1024",
-        lumber,
-        &[(lumber_jun, None)],
-    )?;
+    pay_bills(c, d(2026, 8, 5)?, "1024", lumber, &[(lumber_jun, None)])?;
     // A partial payment: the rest came in September.
-    receive(c, d(2026, 8, 7)?, maple, checking, "ACH", &[(inv1011, Some(dollars(2_000)))])?;
+    receive(
+        c,
+        d(2026, 8, 7)?,
+        maple,
+        checking,
+        "ACH",
+        &[(inv1011, Some(dollars(2_000)))],
+    )?;
     let lumber_aug = bill(
         c,
         d(2026, 8, 12)?,
@@ -1505,7 +1551,11 @@ fn rest_of_year(
         "MSI-26-09",
         insurer,
         30,
-        vec![line(insurance, "Liability insurance, next six months", dollars(1_140))],
+        vec![line(
+            insurance,
+            "Liability insurance, next six months",
+            dollars(1_140),
+        )],
     )?;
     // Not paid yet: a month late by October.
     invoice(
@@ -1533,14 +1583,15 @@ fn rest_of_year(
             line(interest_expense, "Interest", dollars(67)),
         ],
     )?;
-    receive(c, d(2026, 9, 8)?, maple, checking, "ACH", &[(inv1011, None)])?;
-    pay_bills(
+    receive(
         c,
-        d(2026, 9, 10)?,
-        "1028",
-        lumber,
-        &[(lumber_aug, None)],
+        d(2026, 9, 8)?,
+        maple,
+        checking,
+        "ACH",
+        &[(inv1011, None)],
     )?;
+    pay_bills(c, d(2026, 9, 10)?, "1028", lumber, &[(lumber_aug, None)])?;
     pay_bills(c, d(2026, 9, 10)?, "1029", power, &[(power_aug, None)])?;
     invoice(
         c,
@@ -1556,7 +1607,14 @@ fn rest_of_year(
         ],
     )?;
     // Alpine Lodge pays a little of what they owe.
-    receive(c, d(2026, 9, 20)?, alpine, checking, "Check #388", &[(cabins, Some(dollars(1_000)))])?;
+    receive(
+        c,
+        d(2026, 9, 20)?,
+        alpine,
+        checking,
+        "Check #388",
+        &[(cabins, Some(dollars(1_000)))],
+    )?;
     check(
         c,
         d(2026, 9, 21)?,
@@ -1588,7 +1646,12 @@ fn rest_of_year(
         "JE-3",
         "Third-quarter depreciation",
         &[
-            (depreciation, dollars(825), Money::ZERO, "Table saw and CNC router"),
+            (
+                depreciation,
+                dollars(825),
+                Money::ZERO,
+                "Table saw and CNC router",
+            ),
             (accumulated, Money::ZERO, dollars(825), ""),
         ],
     )?;
