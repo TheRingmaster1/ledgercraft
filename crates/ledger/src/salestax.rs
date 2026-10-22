@@ -49,6 +49,21 @@ pub fn rate_publication_date(today: Date) -> Date {
     Date::from_ymd(year, month, 1).unwrap_or(today)
 }
 
+/// What is owed one agency: tax charged on invoices, less payments made to it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgencyOwed {
+    pub agency: String,
+    pub collected: Money,
+    pub paid: Money,
+    pub owed: Money,
+}
+
+/// The description a sales tax payment line carries, naming the agency it
+/// pays, so what is owed can be worked out per agency.
+pub fn tax_payment_memo(agency: &str) -> String {
+    format!("Sales tax: {}", agency.trim())
+}
+
 /// The name of the liability account tax is owed in.
 pub const SALES_TAX_ACCOUNT: &str = "Sales Tax Payable";
 
@@ -548,6 +563,55 @@ impl Company {
         Ok(())
     }
 
+    /// The agency a tax line is paid to: its component's agency now, or its
+    /// name when the component has none.
+    pub fn tax_agency(&self, line: &TaxLine) -> String {
+        self.tax_component(line.component)
+            .map(|t| t.agency.trim())
+            .filter(|a| !a.is_empty())
+            .map_or_else(|| line.name.clone(), str::to_string)
+    }
+
+    /// What is owed each agency on `as_of`: tax charged on invoices dated
+    /// then or before (voided ones left out), less payments posted to the
+    /// sales tax account with that agency's payment memo.
+    pub fn sales_tax_owed(&self, as_of: Date) -> Vec<AgencyOwed> {
+        let mut by_agency: std::collections::BTreeMap<String, (Money, Money)> =
+            std::collections::BTreeMap::new();
+        for t in self.transactions.iter().filter(|t| !t.voided && t.date <= as_of) {
+            if let crate::TxnBody::Invoice(inv) = &t.body {
+                for l in inv.tax.iter().flat_map(|x| x.lines.iter()) {
+                    let entry = by_agency.entry(self.tax_agency(l)).or_default();
+                    entry.0 = entry.0.saturating_add(l.amount);
+                }
+            }
+        }
+        if let Some(account) = self.sales_tax_account() {
+            for e in self.ledger_entries() {
+                if e.date > as_of || e.posting.account != account || !e.posting.amount.is_positive() {
+                    continue;
+                }
+                let paid_to = by_agency
+                    .keys()
+                    .find(|a| e.posting.memo == tax_payment_memo(a))
+                    .cloned();
+                if let Some(agency) = paid_to {
+                    let entry = by_agency.entry(agency).or_default();
+                    entry.1 = entry.1.saturating_add(e.posting.amount);
+                }
+            }
+        }
+        by_agency
+            .into_iter()
+            .map(|(agency, (collected, paid))| AgencyOwed {
+                agency,
+                collected,
+                paid,
+                owed: collected.saturating_sub(paid),
+            })
+            .collect()
+    }
+
     /// Whether to remind the user to check their rates: they charge sales tax,
     /// and a new quarter's rates have been published since they last checked.
     pub fn tax_review_due(&self, today: Date) -> Option<TaxReview> {
@@ -873,6 +937,55 @@ mod tests {
             t.lines[0].amount = Money::from_cents(1);
         }
         assert!(c.post(date, "2", "", TxnBody::Invoice(wrong)).is_err());
+    }
+
+    #[test]
+    fn what_is_owed_is_worked_out_per_agency() {
+        let (mut c, group, _) = books();
+        let customer = c
+            .add_customer(Contact {
+                name: "Cafe".into(),
+                ..Contact::default()
+            })
+            .unwrap();
+        let sales = c.account_by_name("Sales").unwrap().id;
+        let date = d("2026-09-15");
+        let tax = c.invoice_tax(group, date, Money::from_dollars(100)).unwrap();
+        let invoice = Invoice {
+            customer,
+            due_date: date,
+            ar_account: c.first_account_of(AccountType::AccountsReceivable).unwrap(),
+            lines: vec![SalesLine {
+                item: None,
+                description: String::new(),
+                qty: Qty::ONE,
+                rate: Money::from_dollars(100),
+                account: sales,
+                taxable: true,
+            }],
+            tax: Some(tax),
+        };
+        c.post(date, "1", "", TxnBody::Invoice(invoice)).unwrap();
+        // Both taxes are paid to the one agency: $4.85 + $2.40.
+        let owed = c.sales_tax_owed(d("2026-09-30"));
+        assert_eq!(owed.len(), 1);
+        assert_eq!(owed[0].agency, "Utah State Tax Commission");
+        assert_eq!(owed[0].owed, Money::from_cents(725));
+        // Paying $5 of it, tagged with the agency.
+        let payable = c.sales_tax_account().unwrap();
+        let check = TxnBody::Check(crate::Check {
+            payee: None,
+            pay_from: c.account_by_name("Checking").unwrap().id,
+            lines: vec![crate::AccountLine {
+                account: payable,
+                description: tax_payment_memo("Utah State Tax Commission"),
+                amount: Money::from_dollars(5),
+            }],
+        });
+        c.post(d("2026-10-10"), "", "", check).unwrap();
+        assert_eq!(c.sales_tax_owed(d("2026-09-30"))[0].owed, Money::from_cents(725));
+        let after = &c.sales_tax_owed(d("2026-10-31"))[0];
+        assert_eq!((after.paid, after.owed), (Money::from_dollars(5), Money::from_cents(225)));
     }
 
     #[test]

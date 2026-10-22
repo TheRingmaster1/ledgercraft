@@ -107,7 +107,8 @@ impl ListState {
             | Reset::Form(_)
             | Reset::NewTax
             | Reset::NewTaxGroup
-            | Reset::NewTaxRate => {}
+            | Reset::NewTaxRate
+            | Reset::PayTax => {}
         }
     }
 }

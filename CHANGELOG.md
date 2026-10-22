@@ -8,6 +8,15 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Sales tax, part 3: the Sales Tax Liability report (Reports, and
+  `ledgercraft-cli report FILE sales-tax`): total, non-taxable and taxable
+  sales; tax charged by location (tax group) with its combined rate, and by
+  agency with each tax's rate; and Sales Tax Payable: charged and paid in the
+  period and owed at its end. Pay sales tax on Lists > Sales Tax shows what
+  each agency is owed (tax charged, less payments recorded there) and
+  records a payment: a check to Sales Tax Payable naming the agency. Taxes
+  can be renamed (Edit), and the empty line at the end of an invoice no
+  longer shows a Tax box.
 - Sales tax, part 1 (the books): sales tax components with dated rate
   histories and tax groups; customers' tax group and exemption; taxable
   items and invoice lines; invoices store the tax they charge (rate, taxable

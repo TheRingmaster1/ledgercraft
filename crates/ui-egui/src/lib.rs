@@ -83,6 +83,7 @@ pub(crate) enum Reset {
     NewTax,
     NewTaxGroup,
     NewTaxRate,
+    PayTax,
 }
 
 // `Run` carries a whole `Command` (contacts are large); a handful per frame is fine.

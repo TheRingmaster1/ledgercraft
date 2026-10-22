@@ -115,7 +115,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
    - ~~Taxes with dated rates, groups, taxable items, exempt customers, tax on
      invoices and their PDFs, Streamlined Sales Tax rate import, quarterly
      reminder~~ (done)
-   - Sales Tax Liability report; Pay Sales Tax form
+   - ~~Sales Tax Liability report; Pay Sales Tax form~~ (done)
 5. M2.5 Printable and PDF invoices and statements (original templates)
    - ~~PDF invoices~~ (done: Save as PDF… on the invoice form, PDF in
      Transactions, `ledgercraft-cli invoice-pdf`)
