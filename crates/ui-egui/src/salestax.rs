@@ -274,10 +274,12 @@ fn rates_editor(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<A
 /// Checkboxes choosing a group's taxes, in the order they are ticked.
 fn member_boxes(ui: &mut Ui, c: &Company, g: &mut GroupInput) {
     ui.horizontal_wrapped(|ui| {
+        // Taxes already in the group stay listed even if made inactive since.
+        let before = g.members.clone();
         for t in c
             .tax_components
             .iter()
-            .filter(|t| t.active || g.members.contains(&t.id))
+            .filter(|t| t.active || before.contains(&t.id))
         {
             let mut on = g.members.contains(&t.id);
             if ui.checkbox(&mut on, t.name.as_str()).changed() {
