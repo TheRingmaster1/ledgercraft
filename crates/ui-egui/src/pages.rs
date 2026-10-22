@@ -388,7 +388,8 @@ fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
         match card.title_go {
             Some(go) => {
                 // The title is a link to the card's list.
-                let title = RichText::new(card.title)
+                // The asterisk points to the note at the bottom of the card.
+                let title = RichText::new(format!("{}*", card.title))
                     .strong()
                     .size(16.0)
                     .color(theme::ACCENT);
@@ -457,6 +458,17 @@ fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
                         out.push(go.action());
                     }
                 }
+            });
+        }
+        if card.title_go.is_some() {
+            ui.add_space(4.0);
+            let note = format!(
+                "* Click {} to open the {} list",
+                card.title,
+                card.title.to_lowercase()
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(RichText::new(note).small().color(theme::MUTED));
             });
         }
     });

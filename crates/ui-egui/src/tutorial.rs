@@ -83,7 +83,8 @@ const LESSONS: &[Lesson] = &[
                 "The Home page's flowcards: a card each for Customers, Vendors and Banking, \
                  with a small flowchart of the work (arrows show what leads to what: invoices are paid, \
                  then deposited; sales receipts go straight to the deposit). Smaller boxes are \
-                 the less common tasks, and a card's title (Customers, Vendors) opens its list. \
+                 the less common tasks. A title with an asterisk (Customers*, Vendors*) opens \
+                 its list, as the note at the bottom of the card says. \
                  Your key balances are in the At A Glance card.",
             ]),
             Text(
