@@ -589,7 +589,7 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
     let mut remove = None;
     let mut total = Money::ZERO;
     // Description takes the room the other columns leave.
-    let description_width = flex_width(ui, INVOICE_FIXED, 100.0, 420.0);
+    let description_width = flex_width(ui, INVOICE_FIXED, 80.0, 420.0);
     egui::Grid::new(("inv_lines", width_step(description_width)))
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
@@ -1416,11 +1416,11 @@ mod tests {
         let mut widths = Vec::new();
         for width in [680.0, 1400.0] {
             crate::theme::test_frame_sized(&ctx, egui::vec2(width, 600.0), |ui| {
-                widths.push(flex_width(ui, INVOICE_FIXED, 100.0, 420.0));
+                widths.push(flex_width(ui, INVOICE_FIXED, 80.0, 420.0));
             });
         }
         // The smallest window's page still leaves the description a usable box.
-        assert!(widths[0] >= 100.0 && widths[0] < 420.0, "{widths:?}");
+        assert!(widths[0] >= 80.0 && widths[0] < 420.0, "{widths:?}");
         assert!((widths[1] - 420.0).abs() < f32::EPSILON);
         assert_eq!(width_step(104.0), 10);
     }
