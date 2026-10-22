@@ -18,6 +18,7 @@ use crate::security::{
     self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice,
 };
 use crate::start::{self, NewCompanyForm, StartChoice, StartPage};
+use crate::statement::{self, StatementForm, StatementOutcome};
 use crate::{forms, theme, tutorial, Action, FormKind, Page, Reset};
 
 /// Something waiting for the user to decide what to do with unsaved changes.
@@ -43,6 +44,8 @@ pub struct LedgerApp {
     password: Option<PasswordForm>,
     /// File > Company Information…, while open.
     company_info: Option<CompanyInfoForm>,
+    /// Customers > Create Statement…, while open.
+    statement: Option<StatementForm>,
     /// Lists > Sales Tax, and its import window.
     sales_tax: SalesTaxState,
     /// The quarterly "check your sales tax rates" reminder was put off until
@@ -166,6 +169,7 @@ impl LedgerApp {
             unlock: None,
             password: None,
             company_info: None,
+            statement: None,
             sales_tax: SalesTaxState::default(),
             tax_reminder_later: false,
             offer_protection: false,
@@ -441,6 +445,7 @@ impl LedgerApp {
         self.reconcile = ReconcileState::default();
         self.bank_import = ImportState::default();
         self.company_info = None;
+        self.statement = None;
         self.sales_tax = SalesTaxState::default();
         self.tax_reminder_later = false;
         self.page = Page::Home;
@@ -456,6 +461,7 @@ impl LedgerApp {
         self.reconcile = ReconcileState::default();
         self.bank_import = ImportState::default();
         self.company_info = None;
+        self.statement = None;
         self.sales_tax = SalesTaxState::default();
         self.tax_reminder_later = false;
         self.page = Page::Home;
@@ -632,6 +638,7 @@ impl LedgerApp {
                 Err(e) => self.error(e),
             },
             Action::InvoicePdf(id) => self.save_invoice_pdf(id),
+            Action::Statement(customer) => self.statement = Some(StatementForm::new(customer)),
             Action::FindTaxGroup(id) => self.find_tax_group(id),
             Action::SstFilesUsed {
                 state,
@@ -775,6 +782,50 @@ impl LedgerApp {
         match std::fs::write(&path, bytes) {
             Ok(()) => self.info(format!("Saved {}", file_name(&path))),
             Err(e) => self.error(format!("Could not write {}: {e}", path.display())),
+        }
+    }
+
+    /// Asks where to save a customer's statement as a PDF, and writes it.
+    /// Returns whether it was saved.
+    fn save_statement_pdf(
+        &mut self,
+        customer: CustomerId,
+        from: ledgercraft_core::Date,
+        to: ledgercraft_core::Date,
+    ) -> bool {
+        let Some(company) = self.session.as_ref().map(Session::company) else {
+            return false;
+        };
+        let name = ledgercraft_reports::statement_pdf_name(company, customer, to);
+        let bytes = match ledgercraft_reports::statement_pdf(
+            company,
+            customer,
+            from,
+            to,
+            crate::currency::current().symbol(),
+        ) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                self.error(e);
+                return false;
+            }
+        };
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("PDF document", &["pdf"])
+            .set_file_name(name)
+            .save_file()
+        else {
+            return false;
+        };
+        match std::fs::write(&path, bytes) {
+            Ok(()) => {
+                self.info(format!("Saved {}", file_name(&path)));
+                true
+            }
+            Err(e) => {
+                self.error(format!("Could not write {}: {e}", path.display()));
+                false
+            }
         }
     }
 
@@ -1018,6 +1069,11 @@ impl LedgerApp {
                                 ui.close();
                                 self.page = Page::Form(kind);
                             }
+                        }
+                        ui.separator();
+                        if ui.button("Create Statement…").clicked() {
+                            ui.close();
+                            self.statement = Some(StatementForm::new(None));
                         }
                     })
                     .response,
@@ -1310,6 +1366,20 @@ impl LedgerApp {
                 }
             }
             Some(CompanyInfoOutcome::Cancel) => self.company_info = None,
+            None => {}
+        }
+
+        let chosen = match (self.statement.as_mut(), self.session.as_ref()) {
+            (Some(form), Some(session)) => statement::window(ctx, form, session.company()),
+            _ => None,
+        };
+        match chosen {
+            Some(StatementOutcome::Save { customer, from, to }) => {
+                if self.save_statement_pdf(customer, from, to) {
+                    self.statement = None;
+                }
+            }
+            Some(StatementOutcome::Cancel) => self.statement = None,
             None => {}
         }
 

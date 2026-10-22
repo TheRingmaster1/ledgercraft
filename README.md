@@ -128,6 +128,7 @@ ledgercraft-cli run books.lcbooks --cmd '{"command":"customer.create","contact":
 ledgercraft-cli report books.lcbooks pl --from 2026-01-01 --to 2026-12-31
 ledgercraft-cli report books.lcbooks balance-sheet --to 2026-12-31 --csv > bs.csv
 ledgercraft-cli invoice-pdf books.lcbooks 1001                # writes "Invoice 1001.pdf"
+ledgercraft-cli statement-pdf books.lcbooks "Maple Street Cafe" --from 2026-01-01 --to 2026-03-31
 ledgercraft-cli tax-import books.lcbooks --rates UTR2026Q4AUG11.csv \
     --boundary UTB2026Q4AUG11.csv --zip 84601-1100            # Provo: 7.45%
 ledgercraft-cli commands                                # every command and its params
@@ -141,7 +142,7 @@ ledgercraft-cli commands                                # every command and its 
 | Security | Password-protected, encrypted company files with a password strength meter; older files upgrade in place |
 | Import | Accounts, customers, vendors and products/services from IIF or CSV when creating a company |
 | Lists | Chart of accounts (15 account types, active/inactive), customers, vendors (contact, address, terms, notes) and products and services, all editable and with active/inactive |
-| Customers | Create invoices (items, qty × rate, per-line income account, due date from terms, auto-numbering), sales tax (taxes with dated rates, groups, taxable items, exempt customers, rates imported from Streamlined Sales Tax state files, a quarterly reminder to check rates, a Sales Tax Liability report and Pay Sales Tax), save invoices as PDFs to email or print, receive payments applied to open invoices, Undeposited Funds, make deposits |
+| Customers | Create invoices (items, qty × rate, per-line income account, due date from terms, auto-numbering), sales tax (taxes with dated rates, groups, taxable items, exempt customers, rates imported from Streamlined Sales Tax state files, a quarterly reminder to check rates, a Sales Tax Liability report and Pay Sales Tax), save invoices and customer statements as PDFs to email or print, receive payments applied to open invoices, Undeposited Funds, make deposits |
 | Vendors | Enter bills, pay bills applied to open bills |
 | Banking | Write checks / expenses (bank or credit card), deposits, journal entries with names on AR/AP lines |
 | Reports | Profit & Loss, Balance Sheet (retained earnings rolled forward by fiscal year), Trial Balance, A/R and A/P Aging, Transaction List, account registers; CSV and Excel export, currency symbol of your choice |

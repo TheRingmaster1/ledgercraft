@@ -666,7 +666,7 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
                     if taxes {
                         widgets::column_header(ui, "Sales tax");
                     }
-                    for _ in 0..3 {
+                    for _ in 0..4 {
                         widgets::column_header(ui, "");
                     }
                     ui.end_row();
@@ -693,6 +693,13 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
                         }
                         if ui.small_button("Receive payment").clicked() {
                             out.push(Action::PaymentFrom(x.id));
+                        }
+                        if ui
+                            .small_button("Statement")
+                            .on_hover_text("Save their statement for a period as a PDF")
+                            .clicked()
+                        {
+                            out.push(Action::Statement(Some(x.id)));
                         }
                         ui.end_row();
                     }

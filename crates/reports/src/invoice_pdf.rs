@@ -7,29 +7,29 @@
 //! the column headings; every page is numbered.
 
 use ledgercraft_core::Money;
-use ledgercraft_ledger::{Company, Invoice, Transaction, TxnBody, TxnId};
+use ledgercraft_ledger::{Company, CustomerId, Invoice, Transaction, TxnBody, TxnId};
 
 use crate::pdf::{finish, wrap, Align, Font, Page, Rgb};
 
-const LEFT: f32 = 50.0;
-const RIGHT: f32 = 562.0;
+pub(crate) const LEFT: f32 = 50.0;
+pub(crate) const RIGHT: f32 = 562.0;
 /// Content stops here; the footer sits below.
-const BOTTOM: f32 = 730.0;
+pub(crate) const BOTTOM: f32 = 730.0;
 
 const DESC_X: f32 = 58.0;
 const DESC_WIDTH: f32 = 270.0;
 const QTY_RIGHT: f32 = 380.0;
 const RATE_RIGHT: f32 = 468.0;
 const AMOUNT_RIGHT: f32 = 554.0;
-const LINE_HEIGHT: f32 = 13.0;
+pub(crate) const LINE_HEIGHT: f32 = 13.0;
 
-const ACCENT: Rgb = Rgb(0.122, 0.435, 0.545);
-const INK: Rgb = Rgb(0.13, 0.13, 0.13);
-const MUTED: Rgb = Rgb(0.42, 0.45, 0.50);
-const RULE: Rgb = Rgb(0.82, 0.84, 0.87);
-const WHITE: Rgb = Rgb(1.0, 1.0, 1.0);
-const RED: Rgb = Rgb(0.75, 0.15, 0.15);
-const GREEN: Rgb = Rgb(0.12, 0.50, 0.27);
+pub(crate) const ACCENT: Rgb = Rgb(0.122, 0.435, 0.545);
+pub(crate) const INK: Rgb = Rgb(0.13, 0.13, 0.13);
+pub(crate) const MUTED: Rgb = Rgb(0.42, 0.45, 0.50);
+pub(crate) const RULE: Rgb = Rgb(0.82, 0.84, 0.87);
+pub(crate) const WHITE: Rgb = Rgb(1.0, 1.0, 1.0);
+pub(crate) const RED: Rgb = Rgb(0.75, 0.15, 0.15);
+pub(crate) const GREEN: Rgb = Rgb(0.12, 0.50, 0.27);
 
 /// What a printed invoice line shows.
 struct PrintLine {
@@ -91,32 +91,28 @@ pub fn invoice_pdf(company: &Company, id: TxnId, currency: &str) -> Result<Vec<u
     Ok(finish(&layout(&sheet), &title))
 }
 
-fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result<Sheet, String> {
-    let money = |m: Money| m.format_with(currency);
-    let total = inv
-        .total()
-        .ok_or("The invoice total is too large to print.")?;
-    let open = if t.voided {
-        Money::ZERO
-    } else {
-        c.open_balance(t.id, None)
-    };
-    let applied = total.saturating_sub(open);
-
+/// The company's contact lines under its name: legal name (if different),
+/// address, phone and email.
+pub(crate) fn company_lines(c: &Company) -> Vec<String> {
     let info = &c.info;
-    let mut company_lines = Vec::new();
+    let mut lines = Vec::new();
     if !info.legal_name.trim().is_empty() && info.legal_name.trim() != info.name.trim() {
-        company_lines.push(info.legal_name.trim().to_string());
+        lines.push(info.legal_name.trim().to_string());
     }
-    company_lines.extend(info.address.lines());
+    lines.extend(info.address.lines());
     for extra in [&info.phone, &info.email] {
         if !extra.trim().is_empty() {
-            company_lines.push(extra.trim().to_string());
+            lines.push(extra.trim().to_string());
         }
     }
+    lines
+}
 
+/// Who a document is addressed to: the customer's company and name, address,
+/// email, and any sales tax exemption. Never empty.
+pub(crate) fn bill_to(c: &Company, customer: CustomerId) -> Vec<String> {
     let mut bill_to = Vec::new();
-    if let Some(customer) = c.customer(inv.customer) {
+    if let Some(customer) = c.customer(customer) {
         let contact = &customer.contact;
         for name in [&contact.company, &contact.name] {
             let name = name.trim();
@@ -140,6 +136,24 @@ fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result
     if bill_to.is_empty() {
         bill_to.push("Customer".into());
     }
+    bill_to
+}
+
+fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result<Sheet, String> {
+    let money = |m: Money| m.format_with(currency);
+    let total = inv
+        .total()
+        .ok_or("The invoice total is too large to print.")?;
+    let open = if t.voided {
+        Money::ZERO
+    } else {
+        c.open_balance(t.id, None)
+    };
+    let applied = total.saturating_sub(open);
+
+    let info = &c.info;
+    let company_lines = company_lines(c);
+    let bill_to = bill_to(c, inv.customer);
 
     let number = t.number.trim().to_string();
     let mut facts = Vec::new();
@@ -319,7 +333,7 @@ fn layout(s: &Sheet) -> Vec<Page> {
 }
 
 /// The last page, which `layout` always has.
-fn page_mut(pages: &mut Vec<Page>) -> &mut Page {
+pub(crate) fn page_mut(pages: &mut Vec<Page>) -> &mut Page {
     if pages.is_empty() {
         pages.push(Page::default());
     }
@@ -328,7 +342,7 @@ fn page_mut(pages: &mut Vec<Page>) -> &mut Page {
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn row_count(n: usize) -> f32 {
+pub(crate) fn row_count(n: usize) -> f32 {
     n as f32
 }
 

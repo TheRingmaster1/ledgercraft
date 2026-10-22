@@ -9,6 +9,7 @@ mod invoice_pdf;
 mod pdf;
 mod report;
 mod salestax;
+mod statement_pdf;
 mod statements;
 mod xlsx;
 
@@ -16,6 +17,7 @@ pub use aging::{ap_aging, ar_aging};
 pub use invoice_pdf::{invoice_pdf, invoice_pdf_name};
 pub use report::{Cell, Report, Row, RowKind};
 pub use salestax::sales_tax_liability;
+pub use statement_pdf::{statement_pdf, statement_pdf_name};
 pub use statements::{
     account_register, balance_sheet, profit_and_loss, reconciliation_report, transaction_list,
     trial_balance,
