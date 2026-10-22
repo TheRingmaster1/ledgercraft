@@ -578,7 +578,11 @@ impl Company {
     pub fn sales_tax_owed(&self, as_of: Date) -> Vec<AgencyOwed> {
         let mut by_agency: std::collections::BTreeMap<String, (Money, Money)> =
             std::collections::BTreeMap::new();
-        for t in self.transactions.iter().filter(|t| !t.voided && t.date <= as_of) {
+        for t in self
+            .transactions
+            .iter()
+            .filter(|t| !t.voided && t.date <= as_of)
+        {
             if let crate::TxnBody::Invoice(inv) = &t.body {
                 for l in inv.tax.iter().flat_map(|x| x.lines.iter()) {
                     let entry = by_agency.entry(self.tax_agency(l)).or_default();
@@ -588,7 +592,8 @@ impl Company {
         }
         if let Some(account) = self.sales_tax_account() {
             for e in self.ledger_entries() {
-                if e.date > as_of || e.posting.account != account || !e.posting.amount.is_positive() {
+                if e.date > as_of || e.posting.account != account || !e.posting.amount.is_positive()
+                {
                     continue;
                 }
                 let paid_to = by_agency
@@ -950,7 +955,9 @@ mod tests {
             .unwrap();
         let sales = c.account_by_name("Sales").unwrap().id;
         let date = d("2026-09-15");
-        let tax = c.invoice_tax(group, date, Money::from_dollars(100)).unwrap();
+        let tax = c
+            .invoice_tax(group, date, Money::from_dollars(100))
+            .unwrap();
         let invoice = Invoice {
             customer,
             due_date: date,
@@ -983,9 +990,15 @@ mod tests {
             }],
         });
         c.post(d("2026-10-10"), "", "", check).unwrap();
-        assert_eq!(c.sales_tax_owed(d("2026-09-30"))[0].owed, Money::from_cents(725));
+        assert_eq!(
+            c.sales_tax_owed(d("2026-09-30"))[0].owed,
+            Money::from_cents(725)
+        );
         let after = &c.sales_tax_owed(d("2026-10-31"))[0];
-        assert_eq!((after.paid, after.owed), (Money::from_dollars(5), Money::from_cents(225)));
+        assert_eq!(
+            (after.paid, after.owed),
+            (Money::from_dollars(5), Money::from_cents(225))
+        );
     }
 
     #[test]

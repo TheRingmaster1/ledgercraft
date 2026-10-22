@@ -66,8 +66,12 @@ pub fn sales_tax_liability(company: &Company, from: Date, to: Date) -> Report {
         let charged = inv.taxable_amount().unwrap_or(Money::ZERO);
         taxable = taxable.saturating_add(charged);
         let total = tax.total().unwrap_or(Money::ZERO);
-        let combined = TaxRate::from_millionths(tax.lines.iter().map(|l| l.rate.millionths()).sum());
-        by_group.entry(tax.group).or_default().add(charged, combined, total);
+        let combined =
+            TaxRate::from_millionths(tax.lines.iter().map(|l| l.rate.millionths()).sum());
+        by_group
+            .entry(tax.group)
+            .or_default()
+            .add(charged, combined, total);
         for l in &tax.lines {
             let (_, tally) = by_tax
                 .entry(l.component)
@@ -78,7 +82,13 @@ pub fn sales_tax_liability(company: &Company, from: Date, to: Date) -> Report {
 
     r.section("Sales", 0);
     r.money(RowKind::Detail, "Total sales", 1, &[sales], None);
-    r.money(RowKind::Detail, "Non-taxable sales", 1, &[sales.saturating_sub(taxable)], None);
+    r.money(
+        RowKind::Detail,
+        "Non-taxable sales",
+        1,
+        &[sales.saturating_sub(taxable)],
+        None,
+    );
     r.money(RowKind::Subtotal, "Taxable sales", 1, &[taxable], None);
 
     r.section("Tax by location (tax group)", 0);
@@ -101,7 +111,10 @@ pub fn sales_tax_liability(company: &Company, from: Date, to: Date) -> Report {
     r.section("Tax by agency", 0);
     let mut agencies: BTreeMap<&str, Vec<(TaxComponentId, &Tally)>> = BTreeMap::new();
     for (id, (agency, tally)) in &by_tax {
-        agencies.entry(agency.as_str()).or_default().push((*id, tally));
+        agencies
+            .entry(agency.as_str())
+            .or_default()
+            .push((*id, tally));
     }
     for (agency, taxes) in &agencies {
         r.section(agency, 1);
@@ -140,10 +153,26 @@ pub fn sales_tax_liability(company: &Company, from: Date, to: Date) -> Report {
         let owed = company.account_balance(account, Some(to));
         r.section("Sales Tax Payable", 0);
         let money_row = |r: &mut Report, kind, label: &str, m: Money| {
-            r.line(kind, label, 1, vec![Cell::Empty, Cell::Empty, Cell::Money(m)], Some(account));
+            r.line(
+                kind,
+                label,
+                1,
+                vec![Cell::Empty, Cell::Empty, Cell::Money(m)],
+                Some(account),
+            );
         };
-        money_row(&mut r, RowKind::Detail, "Tax charged this period", collected);
-        money_row(&mut r, RowKind::Detail, "Paid or adjusted this period", paid);
+        money_row(
+            &mut r,
+            RowKind::Detail,
+            "Tax charged this period",
+            collected,
+        );
+        money_row(
+            &mut r,
+            RowKind::Detail,
+            "Paid or adjusted this period",
+            paid,
+        );
         money_row(&mut r, RowKind::Total, &format!("Owed at {to}"), owed);
     }
     r
@@ -175,8 +204,12 @@ mod tests {
         let mut c = Company::with_default_accounts("Tax Co");
         let rate = |s: &str| TaxRate::parse(s).unwrap();
         let agency = "Utah State Tax Commission";
-        let state = c.add_tax_component("Utah State", agency, "", d("2020-01-01"), rate("4.85")).unwrap();
-        let city = c.add_tax_component("Provo City", agency, "", d("2020-01-01"), rate("0.1")).unwrap();
+        let state = c
+            .add_tax_component("Utah State", agency, "", d("2020-01-01"), rate("4.85"))
+            .unwrap();
+        let city = c
+            .add_tax_component("Provo City", agency, "", d("2020-01-01"), rate("0.1"))
+            .unwrap();
         let group = c.add_tax_group("Provo", vec![state, city]).unwrap();
         let customer = c
             .add_customer(Contact {
@@ -196,7 +229,9 @@ mod tests {
         };
         // $1,000 taxed (+ $200 not taxed), and a $300 invoice with no tax.
         let date = d("2026-10-05");
-        let tax = c.invoice_tax(group, date, Money::from_dollars(1000)).unwrap();
+        let tax = c
+            .invoice_tax(group, date, Money::from_dollars(1000))
+            .unwrap();
         let taxed = Invoice {
             customer,
             due_date: date,
@@ -228,16 +263,28 @@ mod tests {
 
         let r = sales_tax_liability(&c, d("2026-10-01"), d("2026-10-31"));
         assert_eq!(money_in(&r, "Total sales", 0), Money::from_dollars(1500));
-        assert_eq!(money_in(&r, "Non-taxable sales", 0), Money::from_dollars(500));
+        assert_eq!(
+            money_in(&r, "Non-taxable sales", 0),
+            Money::from_dollars(500)
+        );
         assert_eq!(money_in(&r, "Taxable sales", 0), Money::from_dollars(1000));
         // 4.85% + 0.1% of $1,000.
         assert_eq!(money_in(&r, "Provo", 2), Money::from_cents(4950));
         let provo = r.rows.iter().find(|row| row.label == "Provo").unwrap();
         assert_eq!(provo.cells[1], Cell::Text("4.95%".into()));
         assert_eq!(money_in(&r, "Utah State", 2), Money::from_cents(4850));
-        assert_eq!(money_in(&r, &format!("Total {agency}"), 2), Money::from_cents(4950));
-        assert_eq!(money_in(&r, "Paid or adjusted this period", 2), Money::from_dollars(20));
-        assert_eq!(money_in(&r, "Owed at 2026-10-31", 2), Money::from_cents(2950));
+        assert_eq!(
+            money_in(&r, &format!("Total {agency}"), 2),
+            Money::from_cents(4950)
+        );
+        assert_eq!(
+            money_in(&r, "Paid or adjusted this period", 2),
+            Money::from_dollars(20)
+        );
+        assert_eq!(
+            money_in(&r, "Owed at 2026-10-31", 2),
+            Money::from_cents(2950)
+        );
         // Before the invoices: nothing charged, nothing owed.
         let empty = sales_tax_liability(&c, d("2026-09-01"), d("2026-09-30"));
         assert_eq!(money_in(&empty, "Tax charged", 2), Money::ZERO);
