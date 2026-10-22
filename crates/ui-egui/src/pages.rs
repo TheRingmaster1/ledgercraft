@@ -200,75 +200,242 @@ fn title(ui: &mut Ui, text: &str) {
 
 // ----- home -------------------------------------------------------------------
 
-fn flow_button(ui: &mut Ui, label: &str, page: Page, out: &mut Vec<Action>) {
-    // One width for every button, so the columns line up.
-    let button = egui::Button::new(RichText::new(label).size(15.0))
-        .min_size(egui::vec2(FLOW_BUTTON_WIDTH, 44.0));
-    if ui.add(button).on_hover_text(page.hint()).clicked() {
-        out.push(Action::Go(page));
+/// Where a box on a Home flowchart leads.
+#[derive(Clone, Copy)]
+enum Go {
+    Page(Page),
+    /// Customers > Create Statement…
+    Statement,
+}
+
+impl Go {
+    fn hint(self) -> &'static str {
+        match self {
+            Self::Page(page) => page.hint(),
+            Self::Statement => "Save a customer's statement for a period as a PDF.",
+        }
+    }
+
+    fn action(self) -> Action {
+        match self {
+            Self::Page(page) => Action::Go(page),
+            Self::Statement => Action::Statement(None),
+        }
     }
 }
 
-/// A workflow arrow, drawn rather than typed: egui's built-in font has no
-/// arrow glyph, so "→" would show as an empty box.
-fn arrow(ui: &mut Ui) {
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(ARROW_WIDTH, 44.0), egui::Sense::hover());
-    let y = rect.center().y;
-    let stroke = egui::Stroke::new(2.0_f32, theme::MUTED);
-    let start = egui::pos2(rect.left() + 4.0, y);
-    let tip = egui::pos2(rect.right() - 4.0, y);
-    ui.painter().line_segment([start, tip], stroke);
-    ui.painter()
-        .line_segment([tip, egui::pos2(tip.x - 7.0, y - 6.0)], stroke);
-    ui.painter()
-        .line_segment([tip, egui::pos2(tip.x - 7.0, y + 6.0)], stroke);
+/// A box on a Home flowchart, placed by column and row.
+struct Step {
+    label: &'static str,
+    col: u8,
+    row: u8,
+    go: Go,
+    /// A less everyday step: a shorter box with smaller text.
+    minor: bool,
 }
 
-/// Wide enough for the longest label ("Import Transactions").
-const FLOW_BUTTON_WIDTH: f32 = 172.0;
-/// The room an arrow between two workflow buttons takes.
-const ARROW_WIDTH: f32 = 28.0;
-
-/// Where an arrow would be, left empty, so buttons line up with the
-/// columns of the rows that have arrows.
-fn no_arrow(ui: &mut Ui) {
-    ui.allocate_exact_size(egui::vec2(ARROW_WIDTH, 44.0), egui::Sense::hover());
+const fn step(label: &'static str, col: u8, row: u8, go: Go) -> Step {
+    Step {
+        label,
+        col,
+        row,
+        go,
+        minor: false,
+    }
 }
 
-/// A Home workflow section's heading, with room above it.
-fn section(ui: &mut Ui, name: &str) {
-    ui.add_space(10.0);
-    ui.label(RichText::new(name).color(theme::MUTED));
+const fn minor(label: &'static str, col: u8, row: u8, go: Go) -> Step {
+    Step {
+        label,
+        col,
+        row,
+        go,
+        minor: true,
+    }
 }
 
-/// A row of small links under a section, for its less common tasks. A link
-/// with no page opens Create Statement.
-fn more_links(ui: &mut Ui, links: &[(&str, Option<Page>)], out: &mut Vec<Action>) {
-    ui.add_space(2.0);
-    ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("More:").small().color(theme::MUTED));
-        for (i, (label, page)) in links.iter().enumerate() {
-            if i > 0 {
-                ui.label(RichText::new("·").color(theme::MUTED));
+const fn form(kind: FormKind) -> Go {
+    Go::Page(Page::Form(kind))
+}
+
+/// One area of work on Home: a card with a title, a line on what it is for,
+/// a small flowchart whose arrows show what leads to what, and links.
+struct FlowCard {
+    title: &'static str,
+    blurb: &'static str,
+    steps: &'static [Step],
+    /// Arrows, as (from, to) indices into `steps`.
+    arrows: &'static [(usize, usize)],
+    links: &'static [(&'static str, Go)],
+}
+
+const CUSTOMERS: FlowCard = FlowCard {
+    title: "Customers",
+    blurb: "Sell, get paid, and take the money to the bank.",
+    steps: &[
+        step("Create Invoices", 0, 0, form(FormKind::Invoice)),
+        step("Receive Payments", 1, 0, form(FormKind::ReceivePayment)),
+        step("Record Deposits", 2, 0, form(FormKind::Deposit)),
+        step("Sales Receipts", 0, 1, form(FormKind::SalesReceipt)),
+        minor("Credit Memos", 0, 2, form(FormKind::CreditMemo)),
+        minor("Refunds", 1, 2, form(FormKind::Refund)),
+    ],
+    // Invoices are paid, then deposited; sales receipts are paid on the
+    // spot and go straight to the deposit; credit left can be refunded.
+    arrows: &[(0, 1), (1, 2), (3, 2), (4, 5)],
+    links: &[
+        ("Statements…", Go::Statement),
+        ("Customer list", Go::Page(Page::Customers)),
+    ],
+};
+
+const VENDORS: FlowCard = FlowCard {
+    title: "Vendors",
+    blurb: "Bills to pay later, or pay on the spot by check or card.",
+    steps: &[
+        step("Enter Bills", 0, 0, form(FormKind::Bill)),
+        step("Pay Bills", 1, 0, form(FormKind::PayBills)),
+        step("Write Checks", 0, 1, form(FormKind::Check)),
+    ],
+    arrows: &[(0, 1)],
+    links: &[("Vendor list", Go::Page(Page::Vendors))],
+};
+
+const BANKING: FlowCard = FlowCard {
+    title: "Banking",
+    blurb: "Bring in your bank's transactions, then check them off against its statement.",
+    steps: &[
+        step("Import Transactions", 0, 0, Go::Page(Page::BankImport)),
+        step("Reconcile", 1, 0, Go::Page(Page::Reconcile)),
+        minor("Journal Entry", 0, 1, form(FormKind::Journal)),
+    ],
+    arrows: &[(0, 1)],
+    links: &[("Transactions", Go::Page(Page::Transactions))],
+};
+
+/// Flowchart boxes: widest and narrowest, heights, and the room between
+/// columns (where the arrows go) and from one row to the next.
+const STEP_MAX_WIDTH: f32 = 170.0;
+const STEP_MIN_WIDTH: f32 = 96.0;
+const STEP_HEIGHT: f32 = 40.0;
+const MINOR_HEIGHT: f32 = 30.0;
+const COLUMN_GAP: f32 = 36.0;
+const ROW_PITCH: f32 = 52.0;
+/// Space inside a card's border, and between cards.
+const CARD_MARGIN: f32 = 14.0;
+const CARD_GAP: f32 = 14.0;
+/// The flowchart cards' widest (three full columns) and narrowest widths
+/// before At A Glance moves below them.
+const CARDS_MAX_WIDTH: f32 = 3.0 * STEP_MAX_WIDTH + 2.0 * COLUMN_GAP + 2.0 * CARD_MARGIN + 2.0;
+const CARDS_MIN_WIDTH: f32 = 3.0 * 120.0 + 2.0 * COLUMN_GAP + 2.0 * CARD_MARGIN + 2.0;
+/// At A Glance's narrowest and widest.
+const GLANCE_MIN_WIDTH: f32 = 280.0;
+const GLANCE_MAX_WIDTH: f32 = 460.0;
+
+/// A Home card: raised from the page, with a thin border.
+fn card_frame(ui: &Ui) -> egui::Frame {
+    egui::Frame::NONE
+        .fill(ui.visuals().extreme_bg_color)
+        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+        .corner_radius(8.0)
+        .inner_margin(CARD_MARGIN)
+}
+
+/// A card's title, and the line under it.
+fn card_heading(ui: &mut Ui, title: &str, blurb: &str) {
+    ui.label(RichText::new(title).strong().size(16.0).color(theme::ACCENT));
+    if !blurb.is_empty() {
+        ui.label(RichText::new(blurb).small().color(theme::MUTED));
+    }
+    ui.add_space(8.0);
+}
+
+/// Draws an arrow from box `a` to box `b`: straight across when they share
+/// a row, otherwise across and then up or down into `b`.
+fn flow_arrow(painter: &egui::Painter, a: egui::Rect, b: egui::Rect, stroke: egui::Stroke) {
+    let start = egui::pos2(a.right() + 3.0, a.center().y);
+    let points = if (a.center().y - b.center().y).abs() < 1.0 {
+        vec![start, egui::pos2(b.left() - 3.0, b.center().y)]
+    } else {
+        let end_y = if b.center().y < a.center().y {
+            b.bottom() + 3.0
+        } else {
+            b.top() - 3.0
+        };
+        vec![
+            start,
+            egui::pos2(b.center().x, a.center().y),
+            egui::pos2(b.center().x, end_y),
+        ]
+    };
+    for pair in points.windows(2) {
+        if let [from, to] = pair {
+            painter.line_segment([*from, *to], stroke);
+        }
+    }
+    if let [.., from, tip] = points.as_slice() {
+        let dir = (*tip - *from).normalized();
+        let side = dir.rot90();
+        painter.line_segment([*tip, *tip - dir * 7.0 + side * 5.0], stroke);
+        painter.line_segment([*tip, *tip - dir * 7.0 - side * 5.0], stroke);
+    }
+}
+
+/// A Home card with its flowchart, `width` wide.
+fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
+    card_frame(ui).show(ui, |ui| {
+        let inner = width - 2.0 * CARD_MARGIN - 2.0;
+        ui.set_width(inner);
+        card_heading(ui, card.title, card.blurb);
+        let rows = card.steps.iter().map(|s| s.row).max().map_or(1, |r| r + 1);
+        let step_width =
+            ((inner - 2.0 * COLUMN_GAP) / 3.0).clamp(STEP_MIN_WIDTH, STEP_MAX_WIDTH);
+        let height = f32::from(rows) * ROW_PITCH - (ROW_PITCH - STEP_HEIGHT);
+        let (area, _) = ui.allocate_exact_size(egui::vec2(inner, height), egui::Sense::hover());
+        let rect_of = |s: &Step| {
+            let x = area.left() + f32::from(s.col) * (step_width + COLUMN_GAP);
+            let y = area.top() + f32::from(s.row) * ROW_PITCH;
+            let h = if s.minor { MINOR_HEIGHT } else { STEP_HEIGHT };
+            egui::Rect::from_min_size(
+                egui::pos2(x, y + (STEP_HEIGHT - h) / 2.0),
+                egui::vec2(step_width, h),
+            )
+        };
+        // Arrows first, so the boxes sit on top of their ends.
+        let stroke = egui::Stroke::new(2.0, theme::MUTED);
+        for &(from, to) in card.arrows {
+            if let (Some(a), Some(b)) = (card.steps.get(from), card.steps.get(to)) {
+                flow_arrow(ui.painter(), rect_of(a), rect_of(b), stroke);
             }
-            let link = egui::Button::new(RichText::new(*label).color(theme::ACCENT)).frame(false);
-            let hint = page.map_or("Save a customer's statement as a PDF", Page::hint);
-            if ui.add(link).on_hover_text(hint).clicked() {
-                out.push(match page {
-                    Some(page) => Action::Go(*page),
-                    None => Action::Statement(None),
-                });
+        }
+        for s in card.steps {
+            let size = if s.minor { 13.0 } else { 15.0 };
+            let button = egui::Button::new(RichText::new(s.label).size(size));
+            if ui
+                .put(rect_of(s), button)
+                .on_hover_text(s.go.hint())
+                .clicked()
+            {
+                out.push(s.go.action());
             }
+        }
+        if !card.links.is_empty() {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                for (i, (label, go)) in card.links.iter().enumerate() {
+                    if i > 0 {
+                        ui.label(RichText::new("·").color(theme::MUTED));
+                    }
+                    let link =
+                        egui::Button::new(RichText::new(*label).color(theme::ACCENT)).frame(false);
+                    if ui.add(link).on_hover_text(go.hint()).clicked() {
+                        out.push(go.action());
+                    }
+                }
+            });
         }
     });
 }
-
-/// Width of the divider between the Home page columns, in ui points.
-const DIVIDER_WIDTH: f32 = 5.0;
-/// Space either side of the Home page divider.
-const DIVIDER_GAP: f32 = 12.0;
-/// Narrowest the At A Glance column gets before it moves below the workflow.
-const GLANCE_MIN_WIDTH: f32 = 280.0;
 
 /// One At A Glance line: the label on the left, the amount right-aligned,
 /// on a rounded `stripe` background when one is given.
@@ -321,119 +488,63 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
         })
         .unwrap_or(Money::ZERO);
 
-    let mut workflow = |ui: &mut Ui| {
-        ui.label(RichText::new("Workflow").strong().underline());
-        ui.add_space(4.0);
-        // The main steps are big buttons in three lined-up columns, with
-        // arrows where one step leads to the next; the rest are links below.
-        section(ui, "Vendors");
-        ui.horizontal_wrapped(|ui| {
-            flow_button(ui, "Enter Bills", Page::Form(FormKind::Bill), out);
-            arrow(ui);
-            flow_button(ui, "Pay Bills", Page::Form(FormKind::PayBills), out);
-        });
-        section(ui, "Customers");
-        ui.horizontal_wrapped(|ui| {
-            flow_button(ui, "Create Invoices", Page::Form(FormKind::Invoice), out);
-            arrow(ui);
-            flow_button(
+    let glance = |ui: &mut Ui, width: f32| {
+        card_frame(ui).show(ui, |ui| {
+            ui.set_width(width - 2.0 * CARD_MARGIN - 2.0);
+            card_heading(ui, "At A Glance", "");
+            let mut shade = false;
+            let mut row = |ui: &mut Ui, label: &str, hint: bool, amount: Money| {
+                glance_row(ui, shade.then_some(stripe), label, hint, amount);
+                shade = !shade;
+            };
+            for a in c
+                .sorted_accounts()
+                .into_iter()
+                .filter(|a| a.kind == AccountType::Bank && a.active)
+            {
+                let balance = balances.get(&a.id).copied().unwrap_or(Money::ZERO);
+                row(ui, a.name.as_str(), false, balance);
+            }
+            row(
                 ui,
-                "Receive Payments",
-                Page::Form(FormKind::ReceivePayment),
-                out,
+                "Customers owe you",
+                true,
+                total_of(AccountType::AccountsReceivable),
             );
-            arrow(ui);
-            flow_button(ui, "Record Deposits", Page::Form(FormKind::Deposit), out);
+            row(
+                ui,
+                "You owe vendors",
+                true,
+                total_of(AccountType::AccountsPayable),
+            );
+            row(ui, "Credit cards", true, total_of(AccountType::CreditCard));
+            let since = format!("Net income since {fy_start}");
+            row(ui, &since, false, net_income);
         });
-        more_links(
-            ui,
-            &[
-                ("Sales Receipts", Some(Page::Form(FormKind::SalesReceipt))),
-                ("Credit Memos", Some(Page::Form(FormKind::CreditMemo))),
-                ("Refunds", Some(Page::Form(FormKind::Refund))),
-                ("Statements", None),
-            ],
-            out,
-        );
-        section(ui, "Banking");
-        ui.horizontal_wrapped(|ui| {
-            flow_button(ui, "Write Checks", Page::Form(FormKind::Check), out);
-            no_arrow(ui);
-            flow_button(ui, "Import Transactions", Page::BankImport, out);
-            no_arrow(ui);
-            flow_button(ui, "Reconcile", Page::Reconcile, out);
-        });
-        more_links(
-            ui,
-            &[("Journal Entry", Some(Page::Form(FormKind::Journal)))],
-            out,
-        );
     };
-    let glance = |ui: &mut Ui| {
-        ui.label(RichText::new("At A Glance").strong().underline());
-        ui.add_space(4.0);
-        let mut shade = false;
-        let mut row = |ui: &mut Ui, label: &str, hint: bool, amount: Money| {
-            glance_row(ui, shade.then_some(stripe), label, hint, amount);
-            shade = !shade;
-        };
-        for a in c
-            .sorted_accounts()
-            .into_iter()
-            .filter(|a| a.kind == AccountType::Bank && a.active)
-        {
-            let balance = balances.get(&a.id).copied().unwrap_or(Money::ZERO);
-            row(ui, a.name.as_str(), false, balance);
+    let mut cards = |ui: &mut Ui, width: f32| {
+        for card in [&CUSTOMERS, &VENDORS, &BANKING] {
+            flow_card(ui, card, width, out);
+            ui.add_space(CARD_GAP);
         }
-        let receivable = total_of(AccountType::AccountsReceivable);
-        let payable = total_of(AccountType::AccountsPayable);
-        let cards = total_of(AccountType::CreditCard);
-        row(ui, "Customers owe you", true, receivable);
-        row(ui, "You owe vendors", true, payable);
-        row(ui, "Credit cards", true, cards);
-        let since = format!("Net income since {fy_start}");
-        row(ui, &since, false, net_income);
     };
-
-    // Side by side, split down the middle, while At A Glance still fits next to
-    // the workflow buttons; otherwise At A Glance moves below them. The
-    // workflow's natural width is measured each frame and used on the next.
-    // The workflow needs room for its widest row, three buttons and two
-    // arrows, from the very first frame; otherwise it gets half the page.
-    let gap = ui.spacing().item_spacing.x;
-    let workflow_width = 3.0 * FLOW_BUTTON_WIDTH + 2.0 * ARROW_WIDTH + 4.0 * gap + 2.0;
+    // The cards and At A Glance side by side when both fit; otherwise At A
+    // Glance goes below them.
     let full = ui.available_width();
-    let left_width = workflow_width.max((full - DIVIDER_WIDTH) / 2.0 - DIVIDER_GAP);
-    if full - left_width - DIVIDER_WIDTH - 2.0 * DIVIDER_GAP >= GLANCE_MIN_WIDTH {
+    let cards_width = (full - CARD_GAP - GLANCE_MIN_WIDTH).min(CARDS_MAX_WIDTH);
+    if cards_width >= CARDS_MIN_WIDTH {
         ui.horizontal_top(|ui| {
-            let size = egui::vec2(left_width, ui.available_height());
-            let left = ui.allocate_ui_with_layout(
-                size,
-                egui::Layout::top_down(egui::Align::Min),
-                &mut workflow,
-            );
-            let left = left.response.rect;
-            ui.add_space((left_width - left.width()).max(0.0) + DIVIDER_GAP);
-            let x = ui.cursor().left();
-            ui.add_space(DIVIDER_WIDTH + DIVIDER_GAP);
-            let right = ui.vertical(glance).response.rect;
-            let divider = egui::Rect::from_x_y_ranges(
-                x..=x + DIVIDER_WIDTH,
-                left.top()..=left.bottom().max(right.bottom()),
-            );
-            ui.painter().rect_filled(divider, 0.0, theme::NAV_BG);
+            let size = egui::vec2(cards_width, ui.available_height());
+            ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
+                cards(ui, cards_width);
+            });
+            ui.add_space(CARD_GAP);
+            let width = ui.available_width().min(GLANCE_MAX_WIDTH);
+            ui.vertical(|ui| glance(ui, width));
         });
     } else {
-        ui.vertical(&mut workflow);
-        ui.add_space(DIVIDER_GAP);
-        let (divider, _) =
-            ui.allocate_exact_size(egui::vec2(full, DIVIDER_WIDTH), egui::Sense::hover());
-        ui.painter().rect_filled(divider, 0.0, theme::NAV_BG);
-        ui.add_space(DIVIDER_GAP);
-        ui.vertical(|ui| {
-            ui.set_max_width(full.min(2.0 * GLANCE_MIN_WIDTH));
-            glance(ui);
-        });
+        cards(ui, full.min(CARDS_MAX_WIDTH));
+        glance(ui, full.min(GLANCE_MAX_WIDTH));
     }
 }
 

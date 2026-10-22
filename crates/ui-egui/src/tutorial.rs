@@ -80,9 +80,11 @@ const LESSONS: &[Lesson] = &[
                  Reconcile, with the everyday forms under Create.",
                 "The menus along the top: File, Edit, View, Lists, Customers, Vendors, \
                  Banking, Reports and Help.",
-                "The Home page: the everyday steps as big buttons, in the order work usually \
-                 happens (arrows show what leads to what), less common tasks as More: links \
-                 under each section, and your key balances under At A Glance.",
+                "The Home page: a card each for Customers, Vendors and Banking, with a small \
+                 flowchart of the work (arrows show what leads to what: invoices are paid, \
+                 then deposited; sales receipts go straight to the deposit). Smaller boxes and \
+                 the links under each chart are the less common tasks. Your key balances are \
+                 in the At A Glance card.",
             ]),
             Text(
                 "Any window size works. Rows of buttons and fields wrap to fit, side-by-side \
@@ -532,7 +534,7 @@ const LESSONS: &[Lesson] = &[
             Text(
                 "A journal entry moves amounts between any accounts directly. Use it for \
                  opening balances, corrections and adjustments that no other form covers. \
-                 Open it from Banking > Journal Entry, or the link under Banking on Home.",
+                 Open it from Banking > Journal Entry, or its box in Home's Banking card.",
             ),
             Bullets(&[
                 "Every line has either a debit or a credit, not both.",
