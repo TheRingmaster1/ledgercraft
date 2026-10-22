@@ -158,8 +158,7 @@ fixes to a release. See docs/releasing.md.
   Create list of the everyday forms. Home shows the workflow, with Journal
   Entry as a link under Banking; its Company links, which repeated the side
   bar, are gone. Home's big buttons are all one width, so the columns line up.
-- Home is now cards with flowcharts: a card each for Customers, Vendors and
-  Banking, each with a title, a line on what it is for and a small chart of
+- Flowcards: Home is now a card each for Customers, Vendors and Banking, each with a title, a line on what it is for and a small chart of
   the work, drawn with arrows (Create Invoices → Receive Payments → Record
   Deposits, with Sales Receipts feeding straight into the deposit; Credit
   Memos → Refunds; Enter Bills → Pay Bills; Import Transactions →
