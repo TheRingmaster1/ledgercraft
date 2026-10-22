@@ -58,7 +58,10 @@ const LESSONS: &[Lesson] = &[
             Heading("The best way to learn"),
             Text(
                 "Open the sample company, Pine Ridge Woodworks, and try things as you read. It \
-                 is a small furniture shop with a few months of transactions already entered. \
+                 is a small furniture shop with January to October already entered, using \
+                 everything LedgerCraft does: sales tax in three cities and an exempt \
+                 customer, overdue and part-paid invoices, bills, a financed machine, \
+                 deposits, reconciled card and savings accounts, and voided mistakes. \
                  Nothing you do to it matters until you choose to save it.",
             ),
             Tip(
@@ -359,6 +362,11 @@ const LESSONS: &[Lesson] = &[
                 "Rate files name taxes by code (UT City 58730). Click Edit beside a tax to give \
                  it a real name, such as Payson City.",
             ),
+            Tip(
+                "The sample company charges tax in Springville, Provo and Lehi (its rates are \
+                 made up), has Harbor Design Studio as an exempt reseller, and still owes \
+                 the third quarter's tax: see Pay sales tax.",
+            ),
         ],
         try_it: &[("Open Sales Tax", Target::Page(Page::SalesTax))],
     },
@@ -605,6 +613,11 @@ const LESSONS: &[Lesson] = &[
             Tip(
                 "If the difference will not reach $0.00, look for an amount typed wrongly, \
                  a transaction entered twice, or a bank fee or interest not entered yet.",
+            ),
+            Tip(
+                "In the sample company, the credit card is reconciled through August and \
+                 Savings through September (see their reports under Previous \
+                 reconciliations). Checking has never been reconciled: practise on it.",
             ),
         ],
         try_it: &[("Open Reconcile", Target::Page(Page::Reconcile))],

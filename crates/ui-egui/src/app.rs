@@ -1739,7 +1739,7 @@ mod tests {
             .iter()
             .filter(|t| matches!(t.body, ledgercraft_ledger::TxnBody::Invoice(_)))
             .collect();
-        assert_eq!(invoices.len(), 4);
+        assert_eq!(invoices.len(), 18);
         for t in invoices {
             let pdf = ledgercraft_reports::invoice_pdf(&c, t.id, "$").unwrap();
             assert!(pdf.starts_with(b"%PDF-1.4"));
