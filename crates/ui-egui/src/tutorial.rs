@@ -76,7 +76,8 @@ const LESSONS: &[Lesson] = &[
         blocks: &[
             Heading("Three ways to get anywhere"),
             Bullets(&[
-                "The side bar on the left: your lists, reports and the everyday forms.",
+                "The side bar on the left: your lists, Transactions, Sales Tax, reports and \
+                 Reconcile, with the everyday forms under Create.",
                 "The menus along the top: File, Edit, View, Lists, Customers, Vendors, \
                  Banking, Reports and Help.",
                 "The Home page: the everyday steps as big buttons, in the order work usually \
@@ -530,7 +531,8 @@ const LESSONS: &[Lesson] = &[
         blocks: &[
             Text(
                 "A journal entry moves amounts between any accounts directly. Use it for \
-                 opening balances, corrections and adjustments that no other form covers.",
+                 opening balances, corrections and adjustments that no other form covers. \
+                 Open it from Banking > Journal Entry, or the link under Banking on Home.",
             ),
             Bullets(&[
                 "Every line has either a debit or a credit, not both.",

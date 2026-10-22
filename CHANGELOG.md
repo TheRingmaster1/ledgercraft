@@ -152,6 +152,12 @@ fixes to a release. See docs/releasing.md.
   Banking), and the rest as small More: links (Sales Receipts, Credit Memos,
   Refunds, Statements; Chart of Accounts, Products & Services, Sales Tax,
   Journal Entry, Reports). Banking gains Import Transactions and Reconcile.
+- Less duplicated navigation: each way in has one job. The menu bar lists
+  everything (Make Deposit now only under Banking). The side bar lists places
+  (Sales Tax added; Journal Entry moved out, as it is a form) and a short
+  Create list of the everyday forms. Home shows the workflow, with Journal
+  Entry as a link under Banking; its Company links, which repeated the side
+  bar, are gone. Home's big buttons are all one width, so the columns line up.
 - Reports (Profit & Loss, Balance Sheet, Trial Balance and the rest, and
   account registers) center their table under the heading, and the scroll
   area fills the page, so the scroll bars run along its edges instead of
