@@ -2031,6 +2031,7 @@ dependencies = [
  "ledgercraft-core",
  "ledgercraft-engine",
  "ledgercraft-file",
+ "ledgercraft-ledger",
  "ledgercraft-reports",
 ]
 
