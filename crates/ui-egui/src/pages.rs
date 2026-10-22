@@ -660,6 +660,14 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
                                 {
                                     out.push(Action::Open(t.id));
                                 }
+                                if ui
+                                    .small_button("Void")
+                                    .on_hover_text("Void keeps the record but removes its effect")
+                                    .clicked()
+                                {
+                                    out.push(void(t.id));
+                                }
+                                // Last, so Edit and Void line up on every row.
                                 if matches!(t.body, TxnBody::Invoice(_))
                                     && ui
                                         .small_button("PDF")
@@ -667,13 +675,6 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
                                         .clicked()
                                 {
                                     out.push(Action::InvoicePdf(t.id));
-                                }
-                                if ui
-                                    .small_button("Void")
-                                    .on_hover_text("Void keeps the record but removes its effect")
-                                    .clicked()
-                                {
-                                    out.push(void(t.id));
                                 }
                             });
                         }
