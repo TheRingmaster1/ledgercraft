@@ -195,7 +195,10 @@ fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result
     if let Some(tax) = &inv.tax {
         totals.push(TotalLine {
             label: "Subtotal".into(),
-            amount: money(inv.subtotal().ok_or("The invoice total is too large to print.")?),
+            amount: money(
+                inv.subtotal()
+                    .ok_or("The invoice total is too large to print.")?,
+            ),
             strong: false,
         });
         for l in &tax.lines {
@@ -597,11 +600,15 @@ mod tests {
         let (mut c, inv, _) = books();
         let from = Date::parse("2020-01-01").unwrap();
         let rate = ledgercraft_ledger::TaxRate::parse("4.85").unwrap();
-        let state = c.add_tax_component("Utah State", "", "", from, rate).unwrap();
+        let state = c
+            .add_tax_component("Utah State", "", "", from, rate)
+            .unwrap();
         let group = c.add_tax_group("Statewide", vec![state]).unwrap();
         let date = c.txn(inv).unwrap().date;
         // $4,950.00 taxable at 4.85% is $240.08 (240.075, rounded up).
-        let tax = c.invoice_tax(group, date, Money::from_dollars(4950)).unwrap();
+        let tax = c
+            .invoice_tax(group, date, Money::from_dollars(4950))
+            .unwrap();
         if let Some(t) = c.transactions.iter_mut().find(|t| t.id == inv) {
             if let TxnBody::Invoice(invoice) = &mut t.body {
                 invoice.tax = Some(tax);

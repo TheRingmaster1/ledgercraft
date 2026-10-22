@@ -591,25 +591,25 @@ fn total_row(ui: &mut Ui, label: &str, total: Money) {
 pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut Vec<Action>) {
     header(ui, FormKind::Invoice, f.editing);
     head_grid(ui, "inv_head", |ui, pairs| {
-            widgets::hint_label(ui, "Customer");
-            if widgets::customer_combo(ui, "inv_customer", c, &mut f.customer) {
-                set_due_from_terms(c, f);
-                f.tax_group = default_tax_group(c, f.customer);
-            }
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Invoice #");
-            let hint = widgets::next_number(c, 1001, |b| matches!(b, TxnBody::Invoice(_)));
-            field(ui, &mut f.number, 100.0, &hint);
-            pairs.end(ui, true);
-            widgets::hint_label(ui, "Date");
-            if field(ui, &mut f.date, 110.0, "YYYY-MM-DD").changed() {
-                set_due_from_terms(c, f);
-            }
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Due date");
-            field(ui, &mut f.due, 110.0, "from terms");
-            pairs.end(ui, true);
-        });
+        widgets::hint_label(ui, "Customer");
+        if widgets::customer_combo(ui, "inv_customer", c, &mut f.customer) {
+            set_due_from_terms(c, f);
+            f.tax_group = default_tax_group(c, f.customer);
+        }
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Invoice #");
+        let hint = widgets::next_number(c, 1001, |b| matches!(b, TxnBody::Invoice(_)));
+        field(ui, &mut f.number, 100.0, &hint);
+        pairs.end(ui, true);
+        widgets::hint_label(ui, "Date");
+        if field(ui, &mut f.date, 110.0, "YYYY-MM-DD").changed() {
+            set_due_from_terms(c, f);
+        }
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Due date");
+        field(ui, &mut f.due, 110.0, "from terms");
+        pairs.end(ui, true);
+    });
     if let Some(cust) = f.customer.and_then(|id| c.customer(id)) {
         let addr = cust.contact.address.lines().join(", ");
         if !addr.is_empty() {
@@ -759,7 +759,11 @@ fn tax_choice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm) {
                     ui.selectable_value(&mut f.tax_group, Some(g.id), g.name.as_str());
                 }
             });
-        if let Some(x) = f.customer.and_then(|id| c.customer(id)).filter(|x| x.tax.exempt) {
+        if let Some(x) = f
+            .customer
+            .and_then(|id| c.customer(id))
+            .filter(|x| x.tax.exempt)
+        {
             let note = if x.tax.exemption.is_empty() {
                 "This customer is tax-exempt.".to_string()
             } else {
@@ -783,7 +787,9 @@ fn invoice_totals(ui: &mut Ui, c: &Company, f: &InvoiceForm, subtotal: Money, ta
             Ok(tax) => {
                 for l in &tax.lines {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(RichText::new(format!("{} {}", l.name, l.rate)).color(theme::MUTED));
+                        ui.label(
+                            RichText::new(format!("{} {}", l.name, l.rate)).color(theme::MUTED),
+                        );
                         ui.label(currency::format(l.amount));
                     });
                 }
@@ -866,7 +872,10 @@ fn build_invoice(c: &Company, f: &InvoiceForm) -> Result<Command, String> {
             if taxable.is_zero() {
                 None
             } else {
-                Some(c.invoice_tax(group, date, taxable).map_err(|e| e.to_string())?)
+                Some(
+                    c.invoice_tax(group, date, taxable)
+                        .map_err(|e| e.to_string())?,
+                )
             }
         }
         None => None,

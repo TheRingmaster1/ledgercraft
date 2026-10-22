@@ -127,20 +127,23 @@ pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Ve
 fn new_tax(ui: &mut Ui, s: &mut SalesTaxState, out: &mut Vec<Action>) {
     egui::CollapsingHeader::new("New sales tax").show(ui, |ui| {
         let n = &mut s.new_tax;
-        egui::Grid::new("new_tax").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
-            widgets::hint_label(ui, "Name");
-            field(ui, &mut n.name, 220.0, "e.g. Utah State");
-            ui.end_row();
-            widgets::hint_label(ui, "Agency");
-            field(ui, &mut n.agency, 220.0, "who it is paid to");
-            ui.end_row();
-            widgets::hint_label(ui, "Rate %");
-            field(ui, &mut n.rate, 90.0, "e.g. 4.85");
-            ui.end_row();
-            widgets::hint_label(ui, "Starts");
-            field(ui, &mut n.from, 110.0, "YYYY-MM-DD");
-            ui.end_row();
-        });
+        egui::Grid::new("new_tax")
+            .num_columns(2)
+            .spacing([10.0, 4.0])
+            .show(ui, |ui| {
+                widgets::hint_label(ui, "Name");
+                field(ui, &mut n.name, 220.0, "e.g. Utah State");
+                ui.end_row();
+                widgets::hint_label(ui, "Agency");
+                field(ui, &mut n.agency, 220.0, "who it is paid to");
+                ui.end_row();
+                widgets::hint_label(ui, "Rate %");
+                field(ui, &mut n.rate, 90.0, "e.g. 4.85");
+                ui.end_row();
+                widgets::hint_label(ui, "Starts");
+                field(ui, &mut n.from, 110.0, "YYYY-MM-DD");
+                ui.end_row();
+            });
         if ui.button("Add sales tax").clicked() {
             let built = TaxRate::parse(&n.rate).and_then(|rate| {
                 let from = if n.from.trim().is_empty() {
@@ -170,7 +173,9 @@ fn taxes(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<Action>,
         ui.checkbox(&mut s.show_inactive, "Show inactive");
     });
     if c.tax_components.is_empty() {
-        ui.label(muted("None yet: add one above, or import your state's rates."));
+        ui.label(muted(
+            "None yet: add one above, or import your state's rates.",
+        ));
         return;
     }
     egui::Grid::new("tax_components")
@@ -181,7 +186,11 @@ fn taxes(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<Action>,
                 widgets::column_header(ui, h);
             }
             ui.end_row();
-            for t in c.tax_components.iter().filter(|t| t.active || s.show_inactive) {
+            for t in c
+                .tax_components
+                .iter()
+                .filter(|t| t.active || s.show_inactive)
+            {
                 let name = if t.active {
                     RichText::new(t.name.as_str())
                 } else {
@@ -211,7 +220,10 @@ fn taxes(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<Action>,
                     ("Make active", true)
                 };
                 if ui.small_button(label).clicked() {
-                    out.push(run(Command::TaxSetActive { id: t.id, active }, Reset::Nothing));
+                    out.push(run(
+                        Command::TaxSetActive { id: t.id, active },
+                        Reset::Nothing,
+                    ));
                 }
                 ui.end_row();
             }
@@ -229,29 +241,32 @@ fn rates_editor(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<A
             "Each rate applies to invoices dated on or after its start, until the next one. \
              Invoices already recorded keep the rate they were charged.",
         ));
-        egui::Grid::new(("tax_rates", t.id)).striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
-            for h in ["Starts", "Rate", ""] {
-                widgets::column_header(ui, h);
-            }
-            ui.end_row();
-            for r in t.rates.iter().rev() {
-                ui.label(r.from.to_string());
-                ui.label(r.rate.to_string());
-                let remove = ui
-                    .add_enabled(t.rates.len() > 1, egui::Button::new("Remove").small())
-                    .on_disabled_hover_text("A tax keeps at least one rate: change it instead");
-                if remove.clicked() {
-                    out.push(run(
-                        Command::TaxRemoveRate {
-                            id: t.id,
-                            from: r.from,
-                        },
-                        Reset::Nothing,
-                    ));
+        egui::Grid::new(("tax_rates", t.id))
+            .striped(true)
+            .spacing([18.0, 4.0])
+            .show(ui, |ui| {
+                for h in ["Starts", "Rate", ""] {
+                    widgets::column_header(ui, h);
                 }
                 ui.end_row();
-            }
-        });
+                for r in t.rates.iter().rev() {
+                    ui.label(r.from.to_string());
+                    ui.label(r.rate.to_string());
+                    let remove = ui
+                        .add_enabled(t.rates.len() > 1, egui::Button::new("Remove").small())
+                        .on_disabled_hover_text("A tax keeps at least one rate: change it instead");
+                    if remove.clicked() {
+                        out.push(run(
+                            Command::TaxRemoveRate {
+                                id: t.id,
+                                from: r.from,
+                            },
+                            Reset::Nothing,
+                        ));
+                    }
+                    ui.end_row();
+                }
+            });
         ui.horizontal_wrapped(|ui| {
             widgets::hint_label(ui, "New rate %");
             field(ui, &mut s.new_rate, 80.0, "e.g. 4.85");
@@ -260,7 +275,11 @@ fn rates_editor(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<A
             if ui.button("Set Rate").clicked() {
                 let built = TaxRate::parse(&s.new_rate).and_then(|rate| {
                     let from = Date::parse(&s.new_rate_from).map_err(|e| e.to_string())?;
-                    Ok(Command::TaxSetRate { id: t.id, from, rate })
+                    Ok(Command::TaxSetRate {
+                        id: t.id,
+                        from,
+                        rate,
+                    })
                 });
                 match built {
                     Ok(cmd) => out.push(run(cmd, Reset::NewTaxRate)),
@@ -317,45 +336,51 @@ fn groups(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<Action>
         ui.label(muted("No groups yet. Invoices charge tax through a group."));
         return;
     }
-    egui::Grid::new("tax_groups").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
-        for h in ["Name", "Taxes", "Rate today", "", ""] {
-            widgets::column_header(ui, h);
-        }
-        ui.end_row();
-        for g in c.tax_groups.iter().filter(|g| g.active || s.show_inactive) {
-            let name = if g.active {
-                RichText::new(g.name.as_str())
-            } else {
-                muted(format!("{} (inactive)", g.name))
-            };
-            ui.label(name);
-            let names: Vec<&str> = g
-                .components
-                .iter()
-                .filter_map(|id| c.tax_component(*id).map(|t| t.name.as_str()))
-                .collect();
-            ui.label(muted(names.join(" + ")));
-            ui.label(RichText::new(shown(group_rate(c, g.id, today))).strong());
-            if ui.small_button("Edit").clicked() {
-                s.editing_group = Some((
-                    g.id,
-                    GroupInput {
-                        name: g.name.clone(),
-                        members: g.components.clone(),
-                    },
-                ));
-            }
-            let (label, active) = if g.active {
-                ("Make inactive", false)
-            } else {
-                ("Make active", true)
-            };
-            if ui.small_button(label).clicked() {
-                out.push(run(Command::TaxGroupSetActive { id: g.id, active }, Reset::Nothing));
+    egui::Grid::new("tax_groups")
+        .striped(true)
+        .spacing([18.0, 4.0])
+        .show(ui, |ui| {
+            for h in ["Name", "Taxes", "Rate today", "", ""] {
+                widgets::column_header(ui, h);
             }
             ui.end_row();
-        }
-    });
+            for g in c.tax_groups.iter().filter(|g| g.active || s.show_inactive) {
+                let name = if g.active {
+                    RichText::new(g.name.as_str())
+                } else {
+                    muted(format!("{} (inactive)", g.name))
+                };
+                ui.label(name);
+                let names: Vec<&str> = g
+                    .components
+                    .iter()
+                    .filter_map(|id| c.tax_component(*id).map(|t| t.name.as_str()))
+                    .collect();
+                ui.label(muted(names.join(" + ")));
+                ui.label(RichText::new(shown(group_rate(c, g.id, today))).strong());
+                if ui.small_button("Edit").clicked() {
+                    s.editing_group = Some((
+                        g.id,
+                        GroupInput {
+                            name: g.name.clone(),
+                            members: g.components.clone(),
+                        },
+                    ));
+                }
+                let (label, active) = if g.active {
+                    ("Make inactive", false)
+                } else {
+                    ("Make active", true)
+                };
+                if ui.small_button(label).clicked() {
+                    out.push(run(
+                        Command::TaxGroupSetActive { id: g.id, active },
+                        Reset::Nothing,
+                    ));
+                }
+                ui.end_row();
+            }
+        });
     let mut close = false;
     if let Some((id, g)) = s.editing_group.as_mut() {
         ui.add_space(8.0);
@@ -403,8 +428,18 @@ pub(crate) enum Reminder {
 /// `October 1, 2026`
 fn long_date(d: Date) -> String {
     const MONTHS: [&str; 12] = [
-        "January", "February", "March", "April", "May", "June", "July", "August",
-        "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ];
     let (year, month, day) = d.ymd();
     let name = usize::try_from(month.saturating_sub(1))
@@ -529,8 +564,10 @@ fn find(rates: &Path, boundary: &Path, zip: &str, date: Date) -> Result<Vec<Foun
 }
 
 fn file_name(path: Option<&PathBuf>) -> String {
-    path.and_then(|p| p.file_name())
-        .map_or_else(|| "none chosen".to_string(), |n| n.to_string_lossy().into_owned())
+    path.and_then(|p| p.file_name()).map_or_else(
+        || "none chosen".to_string(),
+        |n| n.to_string_lossy().into_owned(),
+    )
 }
 
 fn pick_csv(title: &str) -> Option<PathBuf> {
@@ -559,7 +596,9 @@ pub(crate) fn import_window(
     let next = match &w.step {
         Step::Reading(rx) => match rx.try_recv() {
             Ok(Ok(found)) => {
-                let only = (found.len() == 1).then(|| found[0].plan.as_ref().ok().map(preview_of)).flatten();
+                let only = (found.len() == 1)
+                    .then(|| found[0].plan.as_ref().ok().map(preview_of))
+                    .flatten();
                 Some(match only {
                     Some(p) => Step::Preview(p),
                     None => Step::Choose(found),
@@ -598,7 +637,10 @@ pub(crate) fn import_window(
                  boundary file every quarter. Download your state's two files (unzip them if \
                  they come as .zip), choose them here, and give your business's ZIP+4.",
             );
-            ui.hyperlink_to("Rate and Boundary Files at streamlinedsalestax.org", SST_FILES);
+            ui.hyperlink_to(
+                "Rate and Boundary Files at streamlinedsalestax.org",
+                SST_FILES,
+            );
             ui.add_space(6.0);
             match &mut w.step {
                 Step::Ask => {
@@ -666,42 +708,49 @@ fn ask(
     error: &mut Option<String>,
 ) -> Option<Step> {
     let mut start = None;
-    egui::Grid::new("sst_files").num_columns(3).spacing([10.0, 6.0]).show(ui, |ui| {
-        ui.label("Rate file");
-        if ui.button("Choose…").clicked() {
-            if let Some(p) = pick_csv("Choose the rate file (e.g. UTR2026Q4AUG11.csv)") {
-                *rates = Some(p);
+    egui::Grid::new("sst_files")
+        .num_columns(3)
+        .spacing([10.0, 6.0])
+        .show(ui, |ui| {
+            ui.label("Rate file");
+            if ui.button("Choose…").clicked() {
+                if let Some(p) = pick_csv("Choose the rate file (e.g. UTR2026Q4AUG11.csv)") {
+                    *rates = Some(p);
+                }
             }
-        }
-        ui.label(muted(file_name(rates.as_ref())));
-        ui.end_row();
-        ui.label("Boundary file");
-        if ui.button("Choose…").clicked() {
-            if let Some(p) = pick_csv("Choose the boundary file (e.g. UTB2026Q4AUG11.csv)") {
-                *boundary = Some(p);
+            ui.label(muted(file_name(rates.as_ref())));
+            ui.end_row();
+            ui.label("Boundary file");
+            if ui.button("Choose…").clicked() {
+                if let Some(p) = pick_csv("Choose the boundary file (e.g. UTB2026Q4AUG11.csv)") {
+                    *boundary = Some(p);
+                }
             }
-        }
-        ui.label(muted(file_name(boundary.as_ref())));
-        ui.end_row();
-        ui.label("ZIP+4");
-        field(ui, zip, 120.0, "84601-1234");
-        ui.label(muted("the full ZIP+4 finds the exact location"));
-        ui.end_row();
-        ui.label("Rates as of");
-        field(ui, date, 110.0, "YYYY-MM-DD");
-        ui.label(muted("today, or the start of next quarter"));
-        ui.end_row();
-    });
+            ui.label(muted(file_name(boundary.as_ref())));
+            ui.end_row();
+            ui.label("ZIP+4");
+            field(ui, zip, 120.0, "84601-1234");
+            ui.label(muted("the full ZIP+4 finds the exact location"));
+            ui.end_row();
+            ui.label("Rates as of");
+            field(ui, date, 110.0, "YYYY-MM-DD");
+            ui.label(muted("today, or the start of next quarter"));
+            ui.end_row();
+        });
     if let Some(e) = error.as_ref() {
         ui.label(RichText::new(e.as_str()).color(theme::NEGATIVE));
     }
     ui.add_space(6.0);
     let ready = rates.is_some() && boundary.is_some() && !zip.trim().is_empty();
     let find_button = ui
-        .add_enabled(ready, egui::Button::new(RichText::new("Find Rates").strong()))
+        .add_enabled(
+            ready,
+            egui::Button::new(RichText::new("Find Rates").strong()),
+        )
         .on_disabled_hover_text("Choose both files and enter a ZIP+4");
     if find_button.clicked() {
-        let checked = sst::parse_zip(zip).and_then(|_| Date::parse(date).map_err(|e| e.to_string()));
+        let checked =
+            sst::parse_zip(zip).and_then(|_| Date::parse(date).map_err(|e| e.to_string()));
         match (checked, rates.clone(), boundary.clone()) {
             (Ok(on), Some(r), Some(b)) => {
                 *error = None;
@@ -727,31 +776,38 @@ fn choose(ui: &mut Ui, found: &[Found], zip: &str) -> Option<Step> {
         "{zip} covers more than one tax location. Go back and enter the full ZIP+4 to find \
          yours exactly, or pick it here (the most common first)."
     ));
-    egui::Grid::new("sst_locations").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
-        for h in ["Location", "Rate", "Address ranges", ""] {
-            widgets::column_header(ui, h);
-        }
-        ui.end_row();
-        for f in found {
-            let code = &f.location.location_code;
-            ui.label(if code.is_empty() { "—".to_string() } else { code.clone() });
-            match &f.plan {
-                Ok(p) => {
-                    ui.label(RichText::new(p.total_rate().to_string()).strong());
-                    ui.label(muted(f.location.rows.to_string()));
-                    if ui.small_button("Use This").clicked() {
-                        next = Some(Step::Preview(preview_of(p)));
-                    }
-                }
-                Err(e) => {
-                    ui.label(RichText::new(e.as_str()).color(theme::NEGATIVE));
-                    ui.label("");
-                    ui.label("");
-                }
+    egui::Grid::new("sst_locations")
+        .striped(true)
+        .spacing([18.0, 4.0])
+        .show(ui, |ui| {
+            for h in ["Location", "Rate", "Address ranges", ""] {
+                widgets::column_header(ui, h);
             }
             ui.end_row();
-        }
-    });
+            for f in found {
+                let code = &f.location.location_code;
+                ui.label(if code.is_empty() {
+                    "—".to_string()
+                } else {
+                    code.clone()
+                });
+                match &f.plan {
+                    Ok(p) => {
+                        ui.label(RichText::new(p.total_rate().to_string()).strong());
+                        ui.label(muted(f.location.rows.to_string()));
+                        if ui.small_button("Use This").clicked() {
+                            next = Some(Step::Preview(preview_of(p)));
+                        }
+                    }
+                    Err(e) => {
+                        ui.label(RichText::new(e.as_str()).color(theme::NEGATIVE));
+                        ui.label("");
+                        ui.label("");
+                    }
+                }
+                ui.end_row();
+            }
+        });
     if ui.button("Back").clicked() {
         next = Some(Step::Ask);
     }
@@ -769,27 +825,34 @@ fn preview(ui: &mut Ui, c: &Company, p: &mut Preview) -> (bool, bool) {
         "Rate files carry codes, not place names: rename the taxes if you like. Taxes already \
          in your books (same code) keep their names and get the file's rates.",
     ));
-    egui::Grid::new("sst_preview").striped(true).spacing([14.0, 4.0]).show(ui, |ui| {
-        for h in ["Name", "Rate", "Code", ""] {
-            widgets::column_header(ui, h);
-        }
-        ui.end_row();
-        for t in &mut p.taxes {
-            let existing = c.tax_components.iter().find(|x| x.code == t.code);
-            match existing {
-                Some(x) => {
-                    ui.label(x.name.as_str());
-                }
-                None => {
-                    field(ui, &mut t.name, 200.0, "");
-                }
+    egui::Grid::new("sst_preview")
+        .striped(true)
+        .spacing([14.0, 4.0])
+        .show(ui, |ui| {
+            for h in ["Name", "Rate", "Code", ""] {
+                widgets::column_header(ui, h);
             }
-            ui.label(t.rate.to_string());
-            ui.label(muted(t.code.as_str()));
-            ui.label(muted(if existing.is_some() { "updates your tax" } else { "new" }));
             ui.end_row();
-        }
-    });
+            for t in &mut p.taxes {
+                let existing = c.tax_components.iter().find(|x| x.code == t.code);
+                match existing {
+                    Some(x) => {
+                        ui.label(x.name.as_str());
+                    }
+                    None => {
+                        field(ui, &mut t.name, 200.0, "");
+                    }
+                }
+                ui.label(t.rate.to_string());
+                ui.label(muted(t.code.as_str()));
+                ui.label(muted(if existing.is_some() {
+                    "updates your tax"
+                } else {
+                    "new"
+                }));
+                ui.end_row();
+            }
+        });
     ui.add_space(6.0);
     let mut import = false;
     let mut back = false;
@@ -809,10 +872,19 @@ mod tests {
         let mut c = Company::with_default_accounts("Tax Co");
         let from = Date::parse("2020-01-01").unwrap();
         let state = c
-            .add_tax_component("Utah State", "Utah State Tax Commission", "", from, TaxRate::parse("4.85").unwrap())
+            .add_tax_component(
+                "Utah State",
+                "Utah State Tax Commission",
+                "",
+                from,
+                TaxRate::parse("4.85").unwrap(),
+            )
             .unwrap();
         let group = c.add_tax_group("Statewide", vec![state]).unwrap();
-        assert_eq!(group_rate(&c, group, Date::today()), Some(TaxRate::parse("4.85").unwrap()));
+        assert_eq!(
+            group_rate(&c, group, Date::today()),
+            Some(TaxRate::parse("4.85").unwrap())
+        );
         let mut s = SalesTaxState {
             rates_for: Some(state),
             ..SalesTaxState::default()
@@ -850,7 +922,9 @@ mod tests {
         crate::theme::apply(&ctx);
         let mut out = Vec::new();
         let mut open = false;
-        crate::theme::test_frame(&ctx, |ui| open = import_window(ui.ctx(), &mut w, &c, &mut out));
+        crate::theme::test_frame(&ctx, |ui| {
+            open = import_window(ui.ctx(), &mut w, &c, &mut out)
+        });
         assert!(open && out.is_empty());
     }
 }

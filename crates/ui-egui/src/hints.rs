@@ -90,8 +90,12 @@ pub(crate) fn field(label: &str) -> Option<&'static str> {
         }
         "Agency" => "Who this tax is paid to, such as the state tax commission.",
         "Rate %" => "A percentage, such as 4.85 for 4.85%.",
-        "Starts" => "The first day the rate applies. Invoices dated before it use the earlier rate.",
-        "Taxable" => "Charge sales tax on it. Many services are not taxed; check your state's rules.",
+        "Starts" => {
+            "The first day the rate applies. Invoices dated before it use the earlier rate."
+        }
+        "Taxable" => {
+            "Charge sales tax on it. Many services are not taxed; check your state's rules."
+        }
         "Ref no." => "The vendor's invoice or account number, so you can match it later.",
         "Due date" => "Filled in from the payment terms. You can change it.",
         "Pay from" => {

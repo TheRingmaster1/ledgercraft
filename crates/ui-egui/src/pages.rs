@@ -578,7 +578,8 @@ fn customer_tax(
             .selected_text(shown)
             .width(150.0)
             .show_ui(ui, |ui| {
-                if ui.add(egui::Button::selectable(
+                if ui
+                    .add(egui::Button::selectable(
                         !current.exempt && current.group.is_none(),
                         "— (choose on each invoice)",
                     ))
@@ -586,9 +587,16 @@ fn customer_tax(
                 {
                     out.push(set(CustomerTax::default()));
                 }
-                for g in c.tax_groups.iter().filter(|g| g.active || current.group == Some(g.id)) {
+                for g in c
+                    .tax_groups
+                    .iter()
+                    .filter(|g| g.active || current.group == Some(g.id))
+                {
                     let on = !current.exempt && current.group == Some(g.id);
-                    if ui.add(egui::Button::selectable(on, g.name.as_str())).clicked() {
+                    if ui
+                        .add(egui::Button::selectable(on, g.name.as_str()))
+                        .clicked()
+                    {
                         out.push(set(CustomerTax {
                             group: Some(g.id),
                             exempt: false,
@@ -596,7 +604,8 @@ fn customer_tax(
                         }));
                     }
                 }
-                if ui.add(egui::Button::selectable(current.exempt, "Exempt"))
+                if ui
+                    .add(egui::Button::selectable(current.exempt, "Exempt"))
                     .on_hover_text("Not charged sales tax, e.g. a reseller or nonprofit")
                     .clicked()
                 {
@@ -608,7 +617,9 @@ fn customer_tax(
                 }
             });
         if current.exempt {
-            let note = notes.entry(x.id).or_insert_with(|| current.exemption.clone());
+            let note = notes
+                .entry(x.id)
+                .or_insert_with(|| current.exemption.clone());
             let typed = field(ui, note, 110.0, "certificate #");
             if typed.lost_focus() && note.trim() != current.exemption {
                 out.push(set(CustomerTax {
@@ -665,7 +676,9 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                     let mut taxable = !n.not_taxable;
                     if ui
                         .checkbox(&mut taxable, "")
-                        .on_hover_text("Charge sales tax on it (most goods are taxed; many services are not)")
+                        .on_hover_text(
+                            "Charge sales tax on it (most goods are taxed; many services are not)",
+                        )
                         .changed()
                     {
                         n.not_taxable = !taxable;
@@ -699,7 +712,14 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
         .striped(true)
         .spacing([18.0, 4.0])
         .show(ui, |ui| {
-            for h in ["Name", "Type", "Description", "Rate", "Income account", "Taxable"] {
+            for h in [
+                "Name",
+                "Type",
+                "Description",
+                "Rate",
+                "Income account",
+                "Taxable",
+            ] {
                 widgets::column_header(ui, h);
             }
             ui.end_row();
@@ -712,7 +732,9 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                 let mut taxable = x.spec.taxable;
                 if ui
                     .checkbox(&mut taxable, "")
-                    .on_hover_text("Charge sales tax on it. Invoices already recorded keep their tax.")
+                    .on_hover_text(
+                        "Charge sales tax on it. Invoices already recorded keep their tax.",
+                    )
                     .changed()
                 {
                     out.push(Action::Run {
