@@ -13,6 +13,7 @@ use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
 use crate::recent::{AppState, WindowState};
 use crate::reconcile::{self, ReconcileState};
+use crate::salestax::{self, SalesTaxState};
 use crate::security::{
     self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice,
 };
@@ -42,6 +43,11 @@ pub struct LedgerApp {
     password: Option<PasswordForm>,
     /// File > Company Information…, while open.
     company_info: Option<CompanyInfoForm>,
+    /// Lists > Sales Tax, and its import window.
+    sales_tax: SalesTaxState,
+    /// The quarterly "check your sales tax rates" reminder was put off until
+    /// the company is next opened.
+    tax_reminder_later: bool,
     /// Offer to protect the unprotected file just opened.
     offer_protection: bool,
     /// What the last import brought in, shown until closed.
@@ -160,6 +166,8 @@ impl LedgerApp {
             unlock: None,
             password: None,
             company_info: None,
+            sales_tax: SalesTaxState::default(),
+            tax_reminder_later: false,
             offer_protection: false,
             start: StartPage::default(),
             page: Page::Home,
@@ -433,6 +441,8 @@ impl LedgerApp {
         self.reconcile = ReconcileState::default();
         self.bank_import = ImportState::default();
         self.company_info = None;
+        self.sales_tax = SalesTaxState::default();
+        self.tax_reminder_later = false;
         self.page = Page::Home;
     }
 
@@ -446,6 +456,8 @@ impl LedgerApp {
         self.reconcile = ReconcileState::default();
         self.bank_import = ImportState::default();
         self.company_info = None;
+        self.sales_tax = SalesTaxState::default();
+        self.tax_reminder_later = false;
         self.page = Page::Home;
     }
 
@@ -570,6 +582,10 @@ impl LedgerApp {
             }
             Action::InvoiceFor(id) => {
                 self.forms.invoice.customer = Some(id);
+                self.forms.invoice.tax_group = self
+                    .session
+                    .as_ref()
+                    .and_then(|s| forms::default_tax_group(s.company(), Some(id)));
                 let terms = self
                     .session
                     .as_ref()
@@ -656,6 +672,7 @@ impl LedgerApp {
                     self.forms.reset(kind);
                 }
                 self.lists.reset(reset);
+                self.sales_tax.reset(reset);
                 if was_edit {
                     self.info(format!(
                         "{label}: changes saved. Edit > Undo puts the original back."
@@ -947,6 +964,7 @@ impl LedgerApp {
                             ("Customers", Page::Customers),
                             ("Vendors", Page::Vendors),
                             ("Products and Services", Page::Items),
+                            ("Sales Tax", Page::SalesTax),
                         ] {
                             if ui.button(label).clicked() {
                                 ui.close();
@@ -1265,6 +1283,42 @@ impl LedgerApp {
             None => {}
         }
 
+        // Lists > Sales Tax > Import Rates from State Files…
+        let mut tax_actions = Vec::new();
+        let keep = match (self.sales_tax.import.as_mut(), self.session.as_ref()) {
+            (Some(w), Some(session)) => {
+                salestax::import_window(ctx, w, session.company(), &mut tax_actions)
+            }
+            _ => false,
+        };
+        if !keep {
+            self.sales_tax.import = None;
+        }
+        for action in tax_actions {
+            self.apply(action);
+        }
+
+        // The quarterly reminder to check the sales tax rates.
+        let today = ledgercraft_ledger::Date::today();
+        let review = self
+            .session
+            .as_ref()
+            .and_then(|s| s.company().tax_review_due(today))
+            .filter(|_| !self.tax_reminder_later && self.unlock.is_none() && self.create.is_none());
+        if let Some(review) = review {
+            match salestax::reminder_window(ctx, &review) {
+                Some(salestax::Reminder::Review) => {
+                    self.page = Page::SalesTax;
+                    self.tax_reminder_later = true;
+                }
+                Some(salestax::Reminder::UpToDate) => {
+                    self.run(Command::TaxMarkChecked { on: today }, Reset::Nothing);
+                }
+                Some(salestax::Reminder::Later) => self.tax_reminder_later = true,
+                None => {}
+            }
+        }
+
         let changed = match (self.password.as_mut(), self.session.as_ref()) {
             (Some(form), Some(session)) => security::password_window(ctx, form, session),
             (Some(_), None) => Some(PasswordOutcome::Cancel),
@@ -1501,6 +1555,9 @@ impl eframe::App for LedgerApp {
                         .show(ui, |ui| match page {
                             Page::Home => pages::home(ui, company, stripe, &mut actions),
                             Page::Items => pages::items(ui, company, &mut self.lists, &mut actions),
+                            Page::SalesTax => {
+                                salestax::page(ui, company, &mut self.sales_tax, &mut actions)
+                            }
                             Page::Form(FormKind::Invoice) => {
                                 forms::invoice(ui, company, &mut self.forms.invoice, &mut actions)
                             }

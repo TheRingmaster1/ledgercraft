@@ -61,6 +61,10 @@ impl Page {
                 "Bring in a download from your bank or card website and match it to the \
                  books, adding what is missing."
             }
+            Self::SalesTax => {
+                "The sales taxes you charge, their rates and when each starts, and the tax \
+                 groups invoices use."
+            }
             Self::Reconcile => {
                 "Check a bank or credit card account against its statement, item by item, \
                  so you know the books match the bank."
@@ -80,6 +84,14 @@ pub(crate) fn field(label: &str) -> Option<&'static str> {
         }
         "Method / ref" => "How they paid, such as a check number or ACH. For your reference.",
         "Received from" => "The customer who paid you. Their open invoices appear below.",
+        "Sales tax" => {
+            "The tax group this invoice charges, at the rates in force on its date. It \
+             starts with the customer's group."
+        }
+        "Agency" => "Who this tax is paid to, such as the state tax commission.",
+        "Rate %" => "A percentage, such as 4.85 for 4.85%.",
+        "Starts" => "The first day the rate applies. Invoices dated before it use the earlier rate.",
+        "Taxable" => "Charge sales tax on it. Many services are not taxed; check your state's rules.",
         "Ref no." => "The vendor's invoice or account number, so you can match it later.",
         "Due date" => "Filled in from the payment terms. You can change it.",
         "Pay from" => {

@@ -43,7 +43,7 @@ struct PrintLine {
 
 /// One line of the totals block.
 struct TotalLine {
-    label: &'static str,
+    label: String,
     amount: String,
     strong: bool,
 }
@@ -128,6 +128,14 @@ fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result
         if !contact.email.trim().is_empty() {
             bill_to.push(contact.email.trim().to_string());
         }
+        if customer.tax.exempt {
+            let cert = customer.tax.exemption.trim();
+            bill_to.push(if cert.is_empty() {
+                "Sales tax exempt".to_string()
+            } else {
+                format!("Sales tax exempt: {cert}")
+            });
+        }
     }
     if bill_to.is_empty() {
         bill_to.push("Customer".into());
@@ -183,21 +191,36 @@ fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result
         })
         .collect();
 
-    let mut totals = vec![TotalLine {
-        label: "Total",
+    let mut totals = Vec::new();
+    if let Some(tax) = &inv.tax {
+        totals.push(TotalLine {
+            label: "Subtotal".into(),
+            amount: money(inv.subtotal().ok_or("The invoice total is too large to print.")?),
+            strong: false,
+        });
+        for l in &tax.lines {
+            totals.push(TotalLine {
+                label: format!("{} ({})", l.name, l.rate),
+                amount: money(l.amount),
+                strong: false,
+            });
+        }
+    }
+    totals.push(TotalLine {
+        label: "Total".into(),
         amount: money(total),
         strong: t.voided,
-    }];
+    });
     if !t.voided {
         if !applied.is_zero() {
             totals.push(TotalLine {
-                label: "Payments applied",
+                label: "Payments applied".into(),
                 amount: money(applied.saturating_neg()),
                 strong: false,
             });
         }
         totals.push(TotalLine {
-            label: "Balance due",
+            label: "Balance due".into(),
             amount: money(open),
             strong: true,
         });
@@ -420,11 +443,11 @@ fn totals(p: &mut Page, s: &Sheet, top: f32) {
             p.rule(QTY_RIGHT - 60.0, RIGHT, y - 12.0, INK, 0.8);
             y += 4.0;
             let font = Font::bold(11.5);
-            p.text(label_right, y, t.label, font, INK, Align::Right);
+            p.text(label_right, y, &t.label, font, INK, Align::Right);
             p.text(AMOUNT_RIGHT, y, &t.amount, font, INK, Align::Right);
         } else {
             let font = Font::regular(10.0);
-            p.text(label_right, y, t.label, font, MUTED, Align::Right);
+            p.text(label_right, y, &t.label, font, MUTED, Align::Right);
             p.text(AMOUNT_RIGHT, y, &t.amount, font, INK, Align::Right);
         }
         y += 18.0;
@@ -567,6 +590,28 @@ mod tests {
         assert!(text.contains("(Invoice 1001 \\(continued\\)) Tj"));
         // € is byte 0x80 in WinAnsi, written as an octal escape.
         assert!(text.contains("\\200"));
+    }
+
+    #[test]
+    fn sales_tax_prints_under_the_subtotal() {
+        let (mut c, inv, _) = books();
+        let from = Date::parse("2020-01-01").unwrap();
+        let rate = ledgercraft_ledger::TaxRate::parse("4.85").unwrap();
+        let state = c.add_tax_component("Utah State", "", "", from, rate).unwrap();
+        let group = c.add_tax_group("Statewide", vec![state]).unwrap();
+        let date = c.txn(inv).unwrap().date;
+        // $4,950.00 taxable at 4.85% is $240.08 (240.075, rounded up).
+        let tax = c.invoice_tax(group, date, Money::from_dollars(4950)).unwrap();
+        if let Some(t) = c.transactions.iter_mut().find(|t| t.id == inv) {
+            if let TxnBody::Invoice(invoice) = &mut t.body {
+                invoice.tax = Some(tax);
+            }
+        }
+        let text = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        assert!(text.contains("(Subtotal) Tj"));
+        assert!(text.contains("(Utah State \\(4.85%\\)) Tj"));
+        assert!(text.contains("($240.08) Tj"));
+        assert!(text.contains("($5,190.08) Tj"));
     }
 
     #[test]

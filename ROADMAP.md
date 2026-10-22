@@ -112,6 +112,10 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
      - Downloaded transactions go through the same matching and rules as
        file import, then reconcile as usual.
 4. M2.4 Sales tax: tax items, rates, groups, Sales Tax Payable and liability report
+   - ~~Taxes with dated rates, groups, taxable items, exempt customers, tax on
+     invoices and their PDFs, Streamlined Sales Tax rate import, quarterly
+     reminder~~ (done)
+   - Sales Tax Liability report; Pay Sales Tax form
 5. M2.5 Printable and PDF invoices and statements (original templates)
    - ~~PDF invoices~~ (done: Save as PDF… on the invoice form, PDF in
      Transactions, `ledgercraft-cli invoice-pdf`)

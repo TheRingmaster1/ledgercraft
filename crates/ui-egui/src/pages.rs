@@ -5,7 +5,8 @@ use eframe::egui::{self, Color32, RichText, Ui};
 use ledgercraft_core::{Date, Money};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
-    AccountId, AccountType, Address, Company, Contact, ItemKind, ItemSpec, TxnBody, TxnId,
+    AccountId, AccountType, Address, Company, Contact, Customer, CustomerId, CustomerTax, ItemKind,
+    ItemSpec, TxnBody, TxnId,
 };
 use ledgercraft_reports::{account_register, ReportKind};
 
@@ -80,6 +81,8 @@ pub(crate) struct NewItem {
     pub kind: ItemKind,
     pub rate: String,
     pub account: Option<AccountId>,
+    /// Not charged sales tax (most items are).
+    pub not_taxable: bool,
 }
 
 #[derive(Default)]
@@ -89,6 +92,8 @@ pub(crate) struct ListState {
     pub new_vendor: ContactInput,
     pub new_item: NewItem,
     pub show_inactive: bool,
+    /// Exemption certificate numbers being typed, by customer.
+    pub exemption_notes: std::collections::BTreeMap<CustomerId, String>,
 }
 
 impl ListState {
@@ -98,7 +103,11 @@ impl ListState {
             Reset::NewCustomer => self.new_customer = ContactInput::default(),
             Reset::NewVendor => self.new_vendor = ContactInput::default(),
             Reset::NewItem => self.new_item = NewItem::default(),
-            Reset::Nothing | Reset::Form(_) => {}
+            Reset::Nothing
+            | Reset::Form(_)
+            | Reset::NewTax
+            | Reset::NewTaxGroup
+            | Reset::NewTaxRate => {}
         }
     }
 }
@@ -462,9 +471,17 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
                 .striped(true)
                 .spacing([18.0, 4.0])
                 .show(ui, |ui| {
-                    for h in ["Name", "Email", "Phone", "Terms", "Balance", "", ""] {
+                    // The Sales tax column appears once there is sales tax.
+                    let taxes = !c.tax_groups.is_empty()
+                        || c.customers.iter().any(|x| x.tax != CustomerTax::default());
+                    for h in ["Name", "Email", "Phone", "Terms", "Balance"] {
                         widgets::column_header(ui, h);
                     }
+                    if taxes {
+                        widgets::column_header(ui, "Sales tax");
+                    }
+                    widgets::column_header(ui, "");
+                    widgets::column_header(ui, "");
                     ui.end_row();
                     for x in c.customers.iter().filter(|x| x.active || s.show_inactive) {
                         ui.label(x.contact.name.as_str());
@@ -472,6 +489,9 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
                         ui.label(x.contact.phone.as_str());
                         ui.label(terms_label(x.contact.terms_days));
                         money_label(ui, c.customer_balance(x.id), false);
+                        if taxes {
+                            customer_tax(ui, c, x, &mut s.exemption_notes, out);
+                        }
                         if ui.small_button("Invoice").clicked() {
                             out.push(Action::InvoiceFor(x.id));
                         }
@@ -531,6 +551,76 @@ pub(crate) fn vendors(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
         });
 }
 
+/// A customer's sales tax: the group their invoices start with, or Exempt
+/// with their certificate number.
+fn customer_tax(
+    ui: &mut Ui,
+    c: &Company,
+    x: &Customer,
+    notes: &mut std::collections::BTreeMap<CustomerId, String>,
+    out: &mut Vec<Action>,
+) {
+    let current = &x.tax;
+    let shown = if current.exempt {
+        "Exempt".to_string()
+    } else {
+        current
+            .group
+            .and_then(|g| c.tax_group(g))
+            .map_or_else(|| "—".to_string(), |g| g.name.clone())
+    };
+    let set = |tax: CustomerTax| Action::Run {
+        cmd: Command::CustomerSetTax { id: x.id, tax },
+        reset: Reset::Nothing,
+    };
+    ui.horizontal(|ui| {
+        egui::ComboBox::from_id_salt(("customer_tax", x.id))
+            .selected_text(shown)
+            .width(150.0)
+            .show_ui(ui, |ui| {
+                if ui.add(egui::Button::selectable(
+                        !current.exempt && current.group.is_none(),
+                        "— (choose on each invoice)",
+                    ))
+                    .clicked()
+                {
+                    out.push(set(CustomerTax::default()));
+                }
+                for g in c.tax_groups.iter().filter(|g| g.active || current.group == Some(g.id)) {
+                    let on = !current.exempt && current.group == Some(g.id);
+                    if ui.add(egui::Button::selectable(on, g.name.as_str())).clicked() {
+                        out.push(set(CustomerTax {
+                            group: Some(g.id),
+                            exempt: false,
+                            exemption: current.exemption.clone(),
+                        }));
+                    }
+                }
+                if ui.add(egui::Button::selectable(current.exempt, "Exempt"))
+                    .on_hover_text("Not charged sales tax, e.g. a reseller or nonprofit")
+                    .clicked()
+                {
+                    out.push(set(CustomerTax {
+                        group: current.group,
+                        exempt: true,
+                        exemption: current.exemption.clone(),
+                    }));
+                }
+            });
+        if current.exempt {
+            let note = notes.entry(x.id).or_insert_with(|| current.exemption.clone());
+            let typed = field(ui, note, 110.0, "certificate #");
+            if typed.lost_focus() && note.trim() != current.exemption {
+                out.push(set(CustomerTax {
+                    group: current.group,
+                    exempt: true,
+                    exemption: note.trim().to_string(),
+                }));
+            }
+        }
+    });
+}
+
 fn terms_label(days: u32) -> String {
     if days == 0 {
         "Due on receipt".into()
@@ -571,6 +661,15 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                     widgets::account_combo(ui, "new_item_acct", c, &mut n.account, |k| {
                         matches!(k, AccountType::Income | AccountType::OtherIncome)
                     });
+                    widgets::hint_label(ui, "Taxable");
+                    let mut taxable = !n.not_taxable;
+                    if ui
+                        .checkbox(&mut taxable, "")
+                        .on_hover_text("Charge sales tax on it (most goods are taxed; many services are not)")
+                        .changed()
+                    {
+                        n.not_taxable = !taxable;
+                    }
                     ui.end_row();
                 });
             if ui.button("Add item").clicked() {
@@ -583,7 +682,7 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                         kind: n.kind,
                         rate,
                         income_account,
-                        taxable: true,
+                        taxable: !n.not_taxable,
                     }),
                 };
                 match built {
@@ -600,7 +699,7 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
         .striped(true)
         .spacing([18.0, 4.0])
         .show(ui, |ui| {
-            for h in ["Name", "Type", "Description", "Rate", "Income account"] {
+            for h in ["Name", "Type", "Description", "Rate", "Income account", "Taxable"] {
                 widgets::column_header(ui, h);
             }
             ui.end_row();
@@ -610,6 +709,17 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                 ui.label(x.spec.description.as_str());
                 money_label(ui, x.spec.rate, false);
                 ui.label(c.account_name(x.spec.income_account));
+                let mut taxable = x.spec.taxable;
+                if ui
+                    .checkbox(&mut taxable, "")
+                    .on_hover_text("Charge sales tax on it. Invoices already recorded keep their tax.")
+                    .changed()
+                {
+                    out.push(Action::Run {
+                        cmd: Command::ItemSetTaxable { id: x.id, taxable },
+                        reset: Reset::Nothing,
+                    });
+                }
                 ui.end_row();
             }
         });

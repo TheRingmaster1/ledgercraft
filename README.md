@@ -141,11 +141,11 @@ ledgercraft-cli commands                                # every command and its 
 | Security | Password-protected, encrypted company files with a password strength meter; older files upgrade in place |
 | Import | Accounts, customers, vendors and products/services from IIF or CSV when creating a company |
 | Lists | Chart of accounts (15 account types, active/inactive), customers, vendors (contact, address, terms), products and services |
-| Customers | Create invoices (items, qty × rate, per-line income account, due date from terms, auto-numbering), save invoices as PDFs to email or print, receive payments applied to open invoices, Undeposited Funds, make deposits |
+| Customers | Create invoices (items, qty × rate, per-line income account, due date from terms, auto-numbering), sales tax (taxes with dated rates, groups, taxable items, exempt customers, rates imported from Streamlined Sales Tax state files, a quarterly reminder to check rates), save invoices as PDFs to email or print, receive payments applied to open invoices, Undeposited Funds, make deposits |
 | Vendors | Enter bills, pay bills applied to open bills |
 | Banking | Write checks / expenses (bank or credit card), deposits, journal entries with names on AR/AP lines |
 | Reports | Profit & Loss, Balance Sheet (retained earnings rolled forward by fiscal year), Trial Balance, A/R and A/P Aging, Transaction List, account registers; CSV and Excel export, currency symbol of your choice |
-| Help | Fifteen-lesson tutorial with "Try it" buttons, hover help, Preferences (row shading, hover menus, currency, text font and size, reopen last company) |
+| Help | Sixteen-lesson tutorial with "Try it" buttons, hover help, Preferences (row shading, hover menus, currency, text font and size, reopen last company) |
 | Banking | Import bank and card downloads (OFX, QFX, QBO, CSV) with matching, categories and rules; reconcile bank and credit card accounts against statements, with a reconciliation report; reconciled items are marked R and protected |
 | Editing | Open any recorded transaction from the Transactions page, a register or the Transaction List and change it in its form; payments stay applied, Undo restores the original |
 | Safety | Void instead of delete (audit trail), payments block voiding the invoices they pay, all-or-nothing commands, atomic saves |
