@@ -261,6 +261,7 @@ fn run(args: &[String]) -> Result<(), String> {
                     taxes,
                     group: plan.group_name.clone(),
                     on: Date::today(),
+                    customer: None,
                 })
                 .map_err(|e| e.to_string())?;
             session.save().map_err(|e| e.to_string())

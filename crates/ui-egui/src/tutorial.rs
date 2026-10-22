@@ -314,6 +314,11 @@ const LESSONS: &[Lesson] = &[
                 "In Products and Services, untick Taxable for anything not taxed (many \
                  services). In Customers, choose each customer's group, or Exempt with their \
                  certificate number.",
+                "For a customer elsewhere, choose Find from address (ZIP+4)… in their Sales \
+                 tax column: LedgerCraft looks up their location in the rate files you last \
+                 imported for their state (from their address) and assigns its group, adding \
+                 it if needed. Whether a sale is taxed where you are or where the customer is \
+                 depends on the state's rules: check with your state.",
             ]),
             Heading("On an invoice"),
             Bullets(&[
