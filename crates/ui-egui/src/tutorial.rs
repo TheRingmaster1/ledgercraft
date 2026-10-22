@@ -243,12 +243,19 @@ const LESSONS: &[Lesson] = &[
                 "Each list shows what every customer owes you, or what you owe every vendor.",
                 "The Invoice / Receive payment and Enter bill / Pay buttons beside each name \
                  open the right form with that name already chosen.",
+                "Edit beside a name changes it, its address, terms or notes. Make inactive \
+                 there leaves someone you no longer deal with off the forms; their history \
+                 and balance stay, and Show inactive lists them again.",
             ]),
             Heading("Products and services"),
             Text(
                 "Items are the things you sell. Give each one a name, a type, a usual rate \
                  and the income account its sales count toward. Choosing an item on an \
                  invoice fills in its description, price and income account for you.",
+            ),
+            Text(
+                "Edit beside an item changes it (a new price, say) for invoices from now on; \
+                 invoices already recorded keep the lines they were saved with.",
             ),
         ],
         try_it: &[

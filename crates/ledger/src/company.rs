@@ -416,6 +416,71 @@ impl Company {
         Ok(id)
     }
 
+    /// Changes an item. Invoices already recorded keep their own lines.
+    pub fn update_item(&mut self, id: ItemId, spec: ItemSpec) -> LedgerResult<()> {
+        let name = spec.name.trim();
+        if name.is_empty() {
+            return Err(LedgerError::Required("An item name"));
+        }
+        if self
+            .items
+            .iter()
+            .any(|i| i.id != id && i.spec.name.eq_ignore_ascii_case(name))
+        {
+            return Err(LedgerError::Duplicate(format!("An item named {name:?}")));
+        }
+        let acct = self.require_account(spec.income_account)?;
+        if acct.kind.needs_party() {
+            return Err(LedgerError::WrongAccountType {
+                account: acct.display_name(),
+                expected: "an income or other non-AR/AP account",
+            });
+        }
+        let item = self
+            .items
+            .iter_mut()
+            .find(|i| i.id == id)
+            .ok_or_else(|| LedgerError::NotFound(format!("Item {id}")))?;
+        item.spec = spec;
+        Ok(())
+    }
+
+    /// An inactive item is left off the item lists on forms; invoices
+    /// already recorded keep it.
+    pub fn set_item_active(&mut self, id: ItemId, active: bool) -> LedgerResult<()> {
+        let item = self
+            .items
+            .iter_mut()
+            .find(|i| i.id == id)
+            .ok_or_else(|| LedgerError::NotFound(format!("Item {id}")))?;
+        item.active = active;
+        Ok(())
+    }
+
+    /// An inactive customer is left off the customer lists on forms; their
+    /// transactions and balance stay.
+    pub fn set_customer_active(&mut self, id: CustomerId, active: bool) -> LedgerResult<()> {
+        let c = self
+            .customers
+            .iter_mut()
+            .find(|c| c.id == id)
+            .ok_or_else(|| LedgerError::NotFound(format!("Customer {id}")))?;
+        c.active = active;
+        Ok(())
+    }
+
+    /// An inactive vendor is left off the vendor lists on forms; their
+    /// transactions and balance stay.
+    pub fn set_vendor_active(&mut self, id: VendorId, active: bool) -> LedgerResult<()> {
+        let v = self
+            .vendors
+            .iter_mut()
+            .find(|v| v.id == id)
+            .ok_or_else(|| LedgerError::NotFound(format!("Vendor {id}")))?;
+        v.active = active;
+        Ok(())
+    }
+
     // ----- transactions ---------------------------------------------------
 
     fn require_account(&self, id: AccountId) -> LedgerResult<&Account> {
@@ -1000,6 +1065,51 @@ mod tests {
                 account: acct(c, "Service Income"),
             }],
         })
+    }
+
+    #[test]
+    fn items_can_be_changed_and_made_inactive() {
+        let mut c = Company::with_default_accounts("Item Co");
+        let sales = acct(&c, "Sales");
+        let spec = |name: &str| ItemSpec {
+            name: name.into(),
+            description: String::new(),
+            kind: crate::ItemKind::Service,
+            rate: Money::from_dollars(50),
+            income_account: sales,
+            taxable: true,
+        };
+        let a = c.add_item(spec("Repair")).unwrap();
+        c.add_item(spec("Install")).unwrap();
+        let mut changed = spec("Repair, hourly");
+        changed.rate = Money::from_dollars(65);
+        changed.taxable = false;
+        c.update_item(a, changed).unwrap();
+        let item = c.item(a).unwrap();
+        assert_eq!(item.spec.name, "Repair, hourly");
+        assert_eq!(item.spec.rate, Money::from_dollars(65));
+        assert!(!item.spec.taxable);
+        // Names stay unique; the item keeps its own name.
+        assert!(c.update_item(a, spec("install")).is_err());
+        assert!(c.update_item(a, spec("Repair, hourly")).is_ok());
+        let ar = acct(&c, "Accounts Receivable");
+        let mut bad = spec("Repair");
+        bad.income_account = ar;
+        assert!(c.update_item(a, bad).is_err());
+        c.set_item_active(a, false).unwrap();
+        assert!(!c.item(a).unwrap().active);
+    }
+
+    #[test]
+    fn customers_and_vendors_can_be_made_inactive() {
+        let (mut c, cust, vend) = setup();
+        c.set_customer_active(cust, false).unwrap();
+        c.set_vendor_active(vend, false).unwrap();
+        assert!(!c.customer(cust).unwrap().active);
+        assert!(c.vendors.iter().all(|v| !v.active));
+        c.set_customer_active(cust, true).unwrap();
+        assert!(c.customer(cust).unwrap().active);
+        assert!(c.set_customer_active(CustomerId(999_999), false).is_err());
     }
 
     #[test]
