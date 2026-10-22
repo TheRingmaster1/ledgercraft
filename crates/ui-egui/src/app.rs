@@ -738,7 +738,9 @@ impl LedgerApp {
             .map(ledgercraft_file::sst::state_abbr);
         let files = match state {
             Some(abbr) => self.state.sst_files.get(abbr).cloned(),
-            None if self.state.sst_files.len() == 1 => self.state.sst_files.values().next().cloned(),
+            None if self.state.sst_files.len() == 1 => {
+                self.state.sst_files.values().next().cloned()
+            }
             None => None,
         };
         let name = customer.contact.name.clone();

@@ -833,7 +833,11 @@ pub(crate) fn import_window(
         Step::Reading(rx) => match rx.try_recv() {
             Ok(Ok(found)) => {
                 let only = match found.as_slice() {
-                    [one] => one.plan.as_ref().ok().map(|p| preview_of(p, &one.location.state)),
+                    [one] => one
+                        .plan
+                        .as_ref()
+                        .ok()
+                        .map(|p| preview_of(p, &one.location.state)),
                     _ => None,
                 };
                 Some(match only {
@@ -875,7 +879,10 @@ pub(crate) fn import_window(
                  they come as .zip), choose them here, and give your business's ZIP+4. Other \
                  states do not publish such files: enter their rates by hand.",
             );
-            ui.hyperlink_to("Rate and Boundary Files at streamlinedsalestax.org", SST_FILES);
+            ui.hyperlink_to(
+                "Rate and Boundary Files at streamlinedsalestax.org",
+                SST_FILES,
+            );
             if let Some((_, name)) = &w.customer {
                 ui.add_space(4.0);
                 ui.label(
@@ -933,9 +940,11 @@ pub(crate) fn import_window(
                         });
                         // Remember the files for this state, for next time.
                         let state = sst::state_abbr(&p.state);
-                        if let (false, Some(rates), Some(boundary)) =
-                            (state.is_empty(), w.rates_path.clone(), w.boundary_path.clone())
-                        {
+                        if let (false, Some(rates), Some(boundary)) = (
+                            state.is_empty(),
+                            w.rates_path.clone(),
+                            w.boundary_path.clone(),
+                        ) {
                             out.push(Action::SstFilesUsed {
                                 state: state.to_string(),
                                 rates,
@@ -1025,27 +1034,12 @@ fn choose(ui: &mut Ui, found: &[Found], zip: &str) -> Option<Step> {
         "{zip} covers more than one tax location. Go back and enter the full ZIP+4 to find \
          yours exactly, or pick it here (the most common first)."
     ));
-    egui::Grid::new("sst_locations").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
-        for h in ["Location", "Rate", "Address ranges", ""] {
-            widgets::column_header(ui, h);
-        }
-        ui.end_row();
-        for f in found {
-            let code = &f.location.location_code;
-            ui.label(if code.is_empty() { "—".to_string() } else { code.clone() });
-            match &f.plan {
-                Ok(p) => {
-                    ui.label(RichText::new(p.total_rate().to_string()).strong());
-                    ui.label(muted(f.location.rows.to_string()));
-                    if ui.small_button("Use This").clicked() {
-                        next = Some(Step::Preview(preview_of(p, &f.location.state)));
-                    }
-                }
-                Err(e) => {
-                    ui.label(RichText::new(e.as_str()).color(theme::NEGATIVE));
-                    ui.label("");
-                    ui.label("");
-                }
+    egui::Grid::new("sst_locations")
+        .striped(true)
+        .spacing([18.0, 4.0])
+        .show(ui, |ui| {
+            for h in ["Location", "Rate", "Address ranges", ""] {
+                widgets::column_header(ui, h);
             }
             ui.end_row();
             for f in found {
@@ -1060,7 +1054,7 @@ fn choose(ui: &mut Ui, found: &[Found], zip: &str) -> Option<Step> {
                         ui.label(RichText::new(p.total_rate().to_string()).strong());
                         ui.label(muted(f.location.rows.to_string()));
                         if ui.small_button("Use This").clicked() {
-                            next = Some(Step::Preview(preview_of(p)));
+                            next = Some(Step::Preview(preview_of(p, &f.location.state)));
                         }
                     }
                     Err(e) => {
@@ -1182,12 +1176,19 @@ mod tests {
     fn finding_a_customers_group_starts_from_their_zip() {
         let id = CustomerId(7);
         let w = ImportWindow::for_customer(id, "Maple Street Cafe", " 84601-1100 ", None);
-        assert!(matches!(w.step, Step::Ask), "no files remembered: ask for them");
+        assert!(
+            matches!(w.step, Step::Ask),
+            "no files remembered: ask for them"
+        );
         assert_eq!(w.zip, "84601-1100");
         assert_eq!(w.customer.as_ref().map(|(c, _)| *c), Some(id));
         // With the state's files remembered, the search starts at once.
-        let files = (PathBuf::from("missing-rates.csv"), PathBuf::from("missing-boundary.csv"));
-        let w = ImportWindow::for_customer(id, "Maple Street Cafe", "84601-1100", Some(files.clone()));
+        let files = (
+            PathBuf::from("missing-rates.csv"),
+            PathBuf::from("missing-boundary.csv"),
+        );
+        let w =
+            ImportWindow::for_customer(id, "Maple Street Cafe", "84601-1100", Some(files.clone()));
         assert!(matches!(w.step, Step::Reading(_)));
         // Without a usable ZIP it waits for one.
         let w = ImportWindow::for_customer(id, "Maple Street Cafe", "", Some(files));

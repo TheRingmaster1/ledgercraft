@@ -158,9 +158,10 @@ mod tests {
             ..AppState::default()
         };
         state.remember(&std::env::temp_dir().join("a.lcbooks"));
-        state
-            .sst_files
-            .insert("UT".into(), (PathBuf::from("UTR.csv"), PathBuf::from("UTB.csv")));
+        state.sst_files.insert(
+            "UT".into(),
+            (PathBuf::from("UTR.csv"), PathBuf::from("UTB.csv")),
+        );
         state.save_to(&path).unwrap();
         assert_eq!(AppState::load_from(&path), state);
         std::fs::write(&path, "{ not json").unwrap();

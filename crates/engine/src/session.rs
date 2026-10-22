@@ -334,7 +334,11 @@ mod tests {
         );
         s.execute_json(&find).unwrap();
         let c = s.company();
-        let group = c.customers[0].tax.group.and_then(|g| c.tax_group(g)).map(|g| g.name.clone());
+        let group = c.customers[0]
+            .tax
+            .group
+            .and_then(|g| c.tax_group(g))
+            .map(|g| g.name.clone());
         assert_eq!(group.as_deref(), Some("Utah location 25-090"));
         assert_eq!(s.undo().as_deref(), Some("Find Tax Group"));
         assert_eq!(s.company().customers[0].tax.group, None);

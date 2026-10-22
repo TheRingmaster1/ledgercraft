@@ -465,10 +465,9 @@ impl Command {
             } => {
                 let group = c.import_taxes(taxes, &group, on)?;
                 if let Some(id) = customer {
-                    let mut tax = c
-                        .customer(id)
-                        .map(|x| x.tax.clone())
-                        .ok_or_else(|| ledgercraft_ledger::LedgerError::NotFound(format!("Customer {id}")))?;
+                    let mut tax = c.customer(id).map(|x| x.tax.clone()).ok_or_else(|| {
+                        ledgercraft_ledger::LedgerError::NotFound(format!("Customer {id}"))
+                    })?;
                     tax.group = Some(group);
                     c.set_customer_tax(id, tax)?;
                 }
