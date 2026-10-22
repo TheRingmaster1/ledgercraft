@@ -23,6 +23,16 @@ fixes to a release. See docs/releasing.md.
   March, June, September or December 1 has passed since the rates were last
   checked, a review is due. Adding a tax or a rate counts as checking;
   `tax.markChecked` records a check.
+- Sales tax rates from the Streamlined Sales Tax files (the free quarterly
+  rate and boundary files the 24 SST states publish): a ZIP+4 gives its
+  state, county, city and district taxes with their full dated rate history
+  (a gap in a history is a 0% rate); a bare ZIP lists the locations within
+  it. Importing adds the taxes and a group, or brings existing ones up to
+  date (matched by jurisdiction code), and counts as checking the rates.
+  `ledgercraft-cli tax-import FILE --rates CSV --boundary CSV --zip ZIP+4`
+  and the `tax.import` command; the import window comes with the screens.
+  Checked against Utah's October 2026 files: for all 350 Utah locations the
+  imported rates add up to the combined rate in Utah's published list.
 - PDF invoices. Save as PDF… on the invoice form records the invoice (or the
   changes to it) and saves it as a PDF to email or print; recorded invoices
   also have a PDF button in Transactions, and `ledgercraft-cli invoice-pdf

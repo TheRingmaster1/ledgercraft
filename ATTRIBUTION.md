@@ -24,6 +24,10 @@ Notes
   long as the licence text travels with it (assets/fonts/OFL.txt, also shown
   in Help > Licenses) and the font is not sold on its own. egui's built-in
   fonts remain as a fallback and for monospace.
+* `crates/file/testdata/utah-*-sample.csv` are a few rows copied unchanged
+  from Utah's Streamlined Sales Tax rate and boundary files for October 2026
+  (public government data published at streamlinedsalestax.org), used only
+  by the tests.
 * PDF invoices name the standard Helvetica fonts that PDF readers supply;
   no font is embedded. The character widths used to lay out the text
   (`crates/reports/src/pdf.rs`) come from Adobe's Core 14 AFM font metrics,

@@ -128,6 +128,8 @@ ledgercraft-cli run books.lcbooks --cmd '{"command":"customer.create","contact":
 ledgercraft-cli report books.lcbooks pl --from 2026-01-01 --to 2026-12-31
 ledgercraft-cli report books.lcbooks balance-sheet --to 2026-12-31 --csv > bs.csv
 ledgercraft-cli invoice-pdf books.lcbooks 1001                # writes "Invoice 1001.pdf"
+ledgercraft-cli tax-import books.lcbooks --rates UTR2026Q4AUG11.csv \
+    --boundary UTB2026Q4AUG11.csv --zip 84601-1100            # Provo: 7.45%
 ledgercraft-cli commands                                # every command and its params
 ```
 

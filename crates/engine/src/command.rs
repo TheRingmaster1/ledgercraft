@@ -1,7 +1,8 @@
 use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
-    AccountId, AccountType, Address, Company, Contact, CustomerId, CustomerTax, FeedEntry, ItemId,
-    ItemSpec, LedgerResult, TaxComponentId, TaxGroupId, TaxRate, TxnBody, TxnId, VendorId,
+    AccountId, AccountType, Address, Company, Contact, CustomerId, CustomerTax, FeedEntry,
+    ImportedTax, ItemId, ItemSpec, LedgerResult, TaxComponentId, TaxGroupId, TaxRate, TxnBody,
+    TxnId, VendorId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -150,6 +151,14 @@ pub enum Command {
     /// The sales tax rates were checked and are current as of `on`.
     #[serde(rename = "tax.markChecked")]
     TaxMarkChecked { on: Date },
+    /// Taxes read from a state rate file, added or brought up to date, and
+    /// grouped; the rates count as checked on `on`.
+    #[serde(rename = "tax.import")]
+    TaxImport {
+        taxes: Vec<ImportedTax>,
+        group: String,
+        on: Date,
+    },
 }
 
 /// One row of the command catalog shown by `ledgercraft-cli commands`.
@@ -187,6 +196,7 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "taxGroup.setActive", summary: "Make a tax group active or inactive. {id, active}" },
     CommandInfo { id: "customer.setTax", summary: "A customer's tax group and exemption. {id, tax:{group?, exempt?, exemption?}}" },
     CommandInfo { id: "item.setTaxable", summary: "Mark an item taxable or not. {id, taxable}" },
+    CommandInfo { id: "tax.import", summary: "Add or update sales taxes read from a state rate file (matched by code) and group them. {taxes:[{code, name, agency?, rates:[{from, rate}]}], group, on}" },
     CommandInfo { id: "tax.markChecked", summary: "Record that the sales tax rates were checked on a date (stops the quarterly reminder). {on}" },
 ];
 
@@ -222,6 +232,7 @@ impl Command {
             Self::CustomerSetTax { .. } => "customer.setTax",
             Self::ItemSetTaxable { .. } => "item.setTaxable",
             Self::TaxMarkChecked { .. } => "tax.markChecked",
+            Self::TaxImport { .. } => "tax.import",
         }
     }
 
@@ -257,6 +268,7 @@ impl Command {
             Self::CustomerSetTax { .. } => "Customer Sales Tax".into(),
             Self::ItemSetTaxable { .. } => "Item Taxable".into(),
             Self::TaxMarkChecked { .. } => "Sales Tax Rates Checked".into(),
+            Self::TaxImport { .. } => "Import Sales Tax Rates".into(),
         }
     }
 
@@ -440,6 +452,9 @@ impl Command {
             Self::TaxMarkChecked { on } => {
                 c.mark_tax_rates_checked(on);
                 None
+            }
+            Self::TaxImport { taxes, group, on } => {
+                Some(c.import_taxes(taxes, &group, on)?.to_string())
             }
         })
     }

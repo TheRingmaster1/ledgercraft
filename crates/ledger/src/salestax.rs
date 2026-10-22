@@ -251,6 +251,19 @@ pub struct TaxGroup {
     pub active: bool,
 }
 
+/// A tax read from a state rate file, to add or bring up to date.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedTax {
+    /// The jurisdiction's code in the file, e.g. `49/01/62470`: matched
+    /// against existing taxes so a later import updates them.
+    pub code: String,
+    pub name: String,
+    #[serde(default)]
+    pub agency: String,
+    /// Oldest first.
+    pub rates: Vec<DatedRate>,
+}
+
 /// How a customer is taxed.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -566,6 +579,56 @@ impl Company {
         }
     }
 
+    /// Adds the taxes from a rate file, or updates those already here (same
+    /// code) with the file's rates, and puts them in the group `group`
+    /// (made, or updated, by name). The rates count as checked on
+    /// `checked_on`. Invoices already recorded keep the tax they charged.
+    pub fn import_taxes(
+        &mut self,
+        taxes: Vec<ImportedTax>,
+        group: &str,
+        checked_on: Date,
+    ) -> LedgerResult<TaxGroupId> {
+        if taxes.is_empty() {
+            return Err(LedgerError::Required("At least one sales tax to import"));
+        }
+        let mut ids = Vec::new();
+        for t in taxes {
+            let Some(first) = t.rates.first().copied() else {
+                return Err(LedgerError::Required("At least one rate for each sales tax"));
+            };
+            let code = t.code.trim();
+            let existing = (!code.is_empty())
+                .then(|| self.tax_components.iter().find(|c| c.code == code).map(|c| c.id))
+                .flatten();
+            let id = match existing {
+                Some(id) => id,
+                None => self.add_tax_component(&t.name, &t.agency, code, first.from, first.rate)?,
+            };
+            for r in &t.rates {
+                self.set_tax_rate(id, r.from, r.rate)?;
+            }
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        let name = group.trim();
+        let existing = self
+            .tax_groups
+            .iter()
+            .find(|g| g.name.eq_ignore_ascii_case(name))
+            .map(|g| g.id);
+        let group = match existing {
+            Some(g) => {
+                self.update_tax_group(g, name, ids)?;
+                g
+            }
+            None => self.add_tax_group(name, ids)?,
+        };
+        self.mark_tax_rates_checked(checked_on);
+        Ok(group)
+    }
+
     /// Marks an item taxable or not. Invoices already recorded keep the tax
     /// they charged.
     pub fn set_item_taxable(&mut self, id: ItemId, taxable: bool) -> LedgerResult<()> {
@@ -822,6 +885,42 @@ mod tests {
         let (mut c, _, city) = books();
         c.remove_tax_rate(city, d("2026-10-01")).unwrap();
         assert!(c.remove_tax_rate(city, d("2020-01-01")).is_err());
+    }
+
+    #[test]
+    fn importing_again_updates_the_same_taxes() {
+        let mut c = Company::with_default_accounts("Import Co");
+        let tax = |code: &str, name: &str, rates: &[(&str, &str)]| ImportedTax {
+            code: code.into(),
+            name: name.into(),
+            agency: "Utah State Tax Commission".into(),
+            rates: rates
+                .iter()
+                .map(|(from, r)| DatedRate {
+                    from: d(from),
+                    rate: rate(r),
+                })
+                .collect(),
+        };
+        let q3 = vec![
+            tax("49/45/49", "Utah State", &[("2019-04-01", "4.85")]),
+            tax("49/01/62470", "Provo City", &[("2016-07-01", "0.1")]),
+        ];
+        let g = c.import_taxes(q3, "Provo", d("2026-07-01")).unwrap();
+        assert_eq!(c.tax_components.len(), 2);
+        assert_eq!(c.tax_rates_checked, Some(d("2026-07-01")));
+        // Next quarter's file: Provo's rate changes on October 1.
+        let q4 = vec![
+            tax("49/45/49", "Utah State", &[("2019-04-01", "4.85")]),
+            tax("49/01/62470", "Provo City", &[("2016-07-01", "0.1"), ("2026-10-01", "0.2")]),
+        ];
+        assert_eq!(c.import_taxes(q4, "provo", d("2026-10-01")).unwrap(), g);
+        assert_eq!(c.tax_components.len(), 2);
+        assert_eq!(c.tax_groups.len(), 1);
+        let provo = c.tax_components.iter().find(|t| t.code == "49/01/62470").unwrap();
+        assert_eq!(provo.rate_on(d("2026-09-30")), Some(rate("0.1")));
+        assert_eq!(provo.rate_on(d("2026-10-01")), Some(rate("0.2")));
+        assert!(c.import_taxes(vec![], "Empty", d("2026-10-01")).is_err());
     }
 
     #[test]
