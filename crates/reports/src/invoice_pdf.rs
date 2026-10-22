@@ -538,7 +538,9 @@ fn totals(p: &mut Page, s: &Sheet, top: f32) {
 mod tests {
     use super::*;
     use ledgercraft_core::{Date, Qty};
-    use ledgercraft_ledger::{AccountLine, Address, Check, Contact, ItemKind, ItemSpec, SalesLine};
+    use ledgercraft_ledger::{
+        AccountLine, Address, Check, Contact, Invoice, ItemKind, ItemSpec, SalesLine,
+    };
 
     /// Books with one invoice (an item line and a plain line) and one check.
     fn books() -> (Company, TxnId, TxnId) {
