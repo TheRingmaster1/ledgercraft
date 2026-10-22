@@ -46,11 +46,21 @@ pub struct Location {
     pub rows: usize,
 }
 
+/// One row of a rate file: the rate, from a day, to a day (or open-ended).
+type RatePeriod = (Date, Option<Date>, TaxRate);
+
+/// Locations seen in a boundary file, by (state, location code,
+/// jurisdictions), with how many rows point at each.
+type Seen = BTreeMap<(String, String, Vec<Jurisdiction>), usize>;
+
+/// A jurisdiction in the rate file: (type, code).
+type JurisdictionKey = (String, String);
+
 /// The rate file: each jurisdiction's rate history.
 #[derive(Clone, Debug, Default)]
 pub struct Rates {
-    /// (type, code) to (from, to, rate), in file order.
-    history: BTreeMap<(String, String), Vec<(Date, Option<Date>, TaxRate)>>,
+    /// Each jurisdiction's rate periods, in file order.
+    history: BTreeMap<JurisdictionKey, Vec<RatePeriod>>,
 }
 
 /// One tax to create or update: a jurisdiction with its dated rates.
@@ -159,8 +169,8 @@ fn plus4(text: &str) -> Option<u32> {
 pub fn locations(boundary: impl BufRead, zip: &str, date: Date) -> Result<Vec<Location>, String> {
     let (zip5, ext) = parse_zip(zip)?;
     let ext = ext.as_deref().and_then(plus4);
-    let mut exact: BTreeMap<(String, String, Vec<Jurisdiction>), usize> = BTreeMap::new();
-    let mut whole: BTreeMap<(String, String, Vec<Jurisdiction>), usize> = BTreeMap::new();
+    let mut exact = Seen::new();
+    let mut whole = Seen::new();
     let mut address_only = false;
     for (n, line) in boundary.lines().enumerate() {
         let line = line.map_err(|e| format!("boundary file line {}: {e}", n + 1))?;
