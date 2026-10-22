@@ -420,12 +420,100 @@ mod tests {
         .unwrap();
         assert_eq!(s.company().reconciled_balance(checking), ending);
         assert_eq!(s.undo().as_deref(), Some("Reconcile"));
-        assert!(s.company().reconciliations.is_empty());
+        assert!(s.company().reconciliations_for(checking).is_empty());
     }
 
     #[test]
     fn sample_company_is_valid() {
         let c = crate::sample_company().unwrap();
         assert!(c.transactions.len() > 10);
+    }
+
+    /// The sample is meant to show off every feature: if one goes missing
+    /// (or stops adding up), this says which.
+    #[test]
+    fn sample_company_shows_every_feature() {
+        use ledgercraft_core::{Date, Money};
+        use ledgercraft_ledger::{Party, TxnBody};
+        let c = crate::sample_company().unwrap();
+        let account = |name: &str| c.account_by_name(name).unwrap().id;
+        let today = Date::parse("2026-10-22").unwrap();
+
+        // Sales tax: taxed invoices, an exempt customer, a dated rate change,
+        // a payment, and tax still owed.
+        let taxed = c
+            .transactions
+            .iter()
+            .filter(|t| matches!(&t.body, TxnBody::Invoice(i) if i.tax.is_some()))
+            .count();
+        assert!(taxed >= 8, "{taxed} taxed invoices");
+        assert!(c.customers.iter().any(|x| x.tax.exempt));
+        assert!(c.tax_components.iter().any(|t| t.rates.len() > 1));
+        let owed = c.sales_tax_owed(today);
+        assert!(owed.iter().any(|o| o.paid.is_positive() && o.owed.is_positive()));
+        assert!(c.tax_review_due(today).is_none());
+
+        // Every aging column has something in it, on both sides.
+        let ar = aging_buckets(&c, today, true);
+        assert!(ar.iter().all(|m| m.is_positive()), "A/R aging {ar:?}");
+        let ap = aging_buckets(&c, today, false);
+        assert!(ap[0].is_positive() && ap[1].is_positive(), "A/P aging {ap:?}");
+
+        // Money waiting to be deposited, and reconciled card and savings
+        // accounts, but Checking left for the Reconcile lesson.
+        assert!(c.account_balance(account("Undeposited Funds"), None).is_positive());
+        assert_eq!(c.reconciliations_for(account("Business Credit Card")).len(), 1);
+        assert_eq!(c.reconciliations_for(account("Savings")).len(), 1);
+        assert!(c.reconciliations_for(account("Checking")).is_empty());
+        assert!(c.account_balance(account("Checking"), None).is_positive());
+
+        // Mistakes voided, things retired, rules for the bank download.
+        assert!(c.transactions.iter().any(|t| t.voided && matches!(t.body, TxnBody::Check(_))));
+        assert!(c.transactions.iter().any(|t| t.voided && matches!(t.body, TxnBody::Invoice(_))));
+        assert!(c.customers.iter().any(|x| !x.active));
+        assert!(c.vendors.iter().any(|x| !x.active));
+        assert!(c.items.iter().any(|x| !x.active));
+        assert!(!c.bank_rules.is_empty());
+        assert!(!c.info.legal_name.is_empty() && !c.info.phone.is_empty());
+
+        // A loan, partly repaid, and depreciation.
+        let loan = c.account_balance(account("Loan Payable"), None);
+        assert!(loan.is_positive() && loan < Money::from_dollars(12_000), "{loan}");
+        assert!(!c
+            .account_balance(account("Accumulated Depreciation"), None)
+            .is_zero());
+        assert!(c
+            .transactions
+            .iter()
+            .any(|t| matches!(t.body.party(), Some(Party::Vendor(_)))
+                && matches!(t.body, TxnBody::PayBill(_))));
+    }
+
+    /// Open invoices (or bills) on `as_of`, by how late: current, 1-30,
+    /// 31-60, 61-90, over 90 days.
+    fn aging_buckets(
+        c: &ledgercraft_ledger::Company,
+        as_of: ledgercraft_core::Date,
+        receivable: bool,
+    ) -> [ledgercraft_core::Money; 5] {
+        use ledgercraft_ledger::TxnBody;
+        let mut buckets = [ledgercraft_core::Money::ZERO; 5];
+        for t in c.transactions.iter().filter(|t| !t.voided) {
+            let due = match (&t.body, receivable) {
+                (TxnBody::Invoice(i), true) => i.due_date,
+                (TxnBody::Bill(b), false) => b.due_date,
+                _ => continue,
+            };
+            let open = c.open_balance(t.id, Some(as_of));
+            let i = match due.days_until(as_of) {
+                i64::MIN..=0 => 0,
+                1..=30 => 1,
+                31..=60 => 2,
+                61..=90 => 3,
+                _ => 4,
+            };
+            buckets[i] = buckets[i].saturating_add(open);
+        }
+        buckets
     }
 }

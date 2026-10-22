@@ -138,8 +138,8 @@ impl StartPage {
                     if ui
                         .add_sized(size, big("Explore the Sample Company"))
                         .on_hover_text(
-                            "Pine Ridge Woodworks: a small business with a few months of \
-                             transactions, to practise on.",
+                            "Pine Ridge Woodworks: a small furniture shop with January to \
+                             October entered, using every feature, to practise on.",
                         )
                         .clicked()
                     {

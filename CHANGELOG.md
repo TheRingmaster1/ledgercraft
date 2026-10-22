@@ -8,6 +8,17 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- The sample company now runs January to October 2026 and uses every
+  feature: full contact details, sales tax in three cities with a dated rate
+  change, an exempt reseller, a quarterly tax payment with the next one still
+  owed, invoices open in every aging column (and part-paid ones), bills paid
+  in parts and one overdue, a financed machine with loan payments,
+  depreciation, an owner's draw, savings with interest, a payment waiting in
+  Undeposited Funds, reconciled card and savings accounts (Checking is left
+  for the Reconcile lesson), bank rules, a voided check and invoice, and
+  inactive customers, vendors and items. The first quarter is unchanged, so
+  the bank download in docs/samples still matches. A test checks that every
+  feature stays in it.
 - Customer statements as PDFs: Statement beside each customer, or Customers >
   Create Statement…, picks a period and saves what they owed at its start,
   every invoice and payment with a running balance, the amount due and an
