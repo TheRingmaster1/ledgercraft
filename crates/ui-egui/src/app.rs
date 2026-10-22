@@ -1245,6 +1245,14 @@ impl LedgerApp {
                         self.page = Page::Form(kind);
                     }
                 }
+                let text = RichText::new("Create Statement…").color(theme::NAV_TEXT);
+                if ui
+                    .selectable_label(self.statement.is_some(), text)
+                    .on_hover_text("Save a customer's statement for a period as a PDF.")
+                    .clicked()
+                {
+                    self.statement = Some(StatementForm::new(None));
+                }
             });
         // The panel can be dragged open or shut; keep the setting in step.
         if has_company {

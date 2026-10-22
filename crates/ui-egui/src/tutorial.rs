@@ -82,9 +82,9 @@ const LESSONS: &[Lesson] = &[
                  Banking, Reports and Help.",
                 "The Home page's flowcards: a card each for Customers, Vendors and Banking, \
                  with a small flowchart of the work (arrows show what leads to what: invoices are paid, \
-                 then deposited; sales receipts go straight to the deposit). Smaller boxes and \
-                 the links under each chart are the less common tasks. Your key balances are \
-                 in the At A Glance card.",
+                 then deposited; sales receipts go straight to the deposit). Smaller boxes are \
+                 the less common tasks, and a card's title (Customers, Vendors) opens its list. \
+                 Your key balances are in the At A Glance card.",
             ]),
             Text(
                 "Any window size works. Rows of buttons and fields wrap to fit, side-by-side \
@@ -413,7 +413,8 @@ const LESSONS: &[Lesson] = &[
             ),
             Steps(&[
                 "Click Statement beside the customer on the Customers page, or choose \
-                 Customers > Create Statement… and pick them.",
+                 Create Statement… (under Create in the side bar, or on the Customers menu) \
+                 and pick them.",
                 "Set From and To (this month so far to start with).",
                 "Click Save as PDF… and choose where to save it, ready to email or print.",
             ]),
