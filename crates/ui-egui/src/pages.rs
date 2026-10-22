@@ -348,7 +348,8 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
     ui.checkbox(&mut s.show_inactive, "Show inactive accounts");
     ui.add_space(6.0);
     let balances = widgets::balances(c);
-    egui::ScrollArea::both().id_salt("accounts_scroll").show(ui, |ui| {
+    egui::ScrollArea::both().id_salt("accounts_scroll")
+        .auto_shrink([false, true]).show(ui, |ui| {
         egui::Grid::new("accounts").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
             for h in ["Number", "Name", "Type", "Balance", ""] {
                 widgets::column_header(ui, h);
@@ -455,6 +456,7 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
     ui.add_space(6.0);
     egui::ScrollArea::both()
         .id_salt("customers_scroll")
+        .auto_shrink([false, true])
         .show(ui, |ui| {
             egui::Grid::new("customers")
                 .striped(true)
@@ -501,6 +503,7 @@ pub(crate) fn vendors(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
     ui.add_space(6.0);
     egui::ScrollArea::both()
         .id_salt("vendors_scroll")
+        .auto_shrink([false, true])
         .show(ui, |ui| {
             egui::Grid::new("vendors")
                 .striped(true)
@@ -619,6 +622,7 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
     txns.sort_by_key(|t| std::cmp::Reverse((t.date, t.id)));
     egui::ScrollArea::both()
         .id_salt("txn_scroll")
+        .auto_shrink([false, true])
         .show(ui, |ui| {
             egui::Grid::new("txns")
                 .striped(true)

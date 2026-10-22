@@ -52,6 +52,11 @@ fixes to a release. See docs/releasing.md.
   (older files open with none). A new tutorial lesson explains it.
 
 ### Changed
+- Scroll bars sit beside what they scroll instead of floating over it, so
+  they no longer cover the right-hand column (such as Make inactive in the
+  Chart of Accounts). The Chart of Accounts, Customers, Vendors and
+  Transactions lists span the page, with the bar at its right edge.
+- In Transactions, PDF comes after Void, so Edit and Void line up on every row.
 - Nothing is left off screen in a small window. Every page scrolls sideways
   as well as down when it has to; toolbars, button rows and memo and total
   lines wrap onto the next line; Reconcile stacks its two lists when the
