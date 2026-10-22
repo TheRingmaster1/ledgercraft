@@ -84,6 +84,9 @@ pub(crate) enum Reset {
     NewTaxGroup,
     NewTaxRate,
     PayTax,
+    EditedCustomer,
+    EditedVendor,
+    EditedItem,
 }
 
 // `Run` carries a whole `Command` (contacts are large); a handful per frame is fine.

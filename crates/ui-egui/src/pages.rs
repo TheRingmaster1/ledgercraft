@@ -5,8 +5,8 @@ use eframe::egui::{self, Color32, RichText, Ui};
 use ledgercraft_core::{Date, Money};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
-    AccountId, AccountType, Address, Company, Contact, Customer, CustomerId, CustomerTax, ItemKind,
-    ItemSpec, TxnBody, TxnId,
+    AccountId, AccountType, Address, Company, Contact, Customer, CustomerId, CustomerTax, Item,
+    ItemId, ItemKind, ItemSpec, TxnBody, TxnId, VendorId,
 };
 use ledgercraft_reports::{account_register, ReportKind};
 
@@ -40,13 +40,39 @@ pub(crate) struct ContactInput {
     pub email: String,
     pub phone: String,
     pub line1: String,
+    pub line2: String,
     pub city: String,
     pub region: String,
     pub postal_code: String,
+    pub country: String,
     pub terms: String,
+    pub notes: String,
 }
 
 impl ContactInput {
+    /// The fields filled in from a customer or vendor, to edit.
+    pub(crate) fn from_contact(c: &Contact) -> Self {
+        let a = &c.address;
+        Self {
+            name: c.name.clone(),
+            company: c.company.clone(),
+            email: c.email.clone(),
+            phone: c.phone.clone(),
+            line1: a.line1.clone(),
+            line2: a.line2.clone(),
+            city: a.city.clone(),
+            region: a.region.clone(),
+            postal_code: a.postal_code.clone(),
+            country: a.country.clone(),
+            terms: if c.terms_days == 0 {
+                String::new()
+            } else {
+                c.terms_days.to_string()
+            },
+            notes: c.notes.clone(),
+        }
+    }
+
     fn build(&self) -> Result<Contact, String> {
         let terms_days = if self.terms.trim().is_empty() {
             0
@@ -63,13 +89,14 @@ impl ContactInput {
             phone: self.phone.trim().to_string(),
             address: Address {
                 line1: self.line1.trim().to_string(),
+                line2: self.line2.trim().to_string(),
                 city: self.city.trim().to_string(),
                 region: self.region.trim().to_string(),
                 postal_code: self.postal_code.trim().to_string(),
-                ..Address::default()
+                country: self.country.trim().to_string(),
             },
             terms_days,
-            notes: String::new(),
+            notes: self.notes.trim().to_string(),
         })
     }
 }
@@ -85,6 +112,34 @@ pub(crate) struct NewItem {
     pub not_taxable: bool,
 }
 
+impl NewItem {
+    /// The fields filled in from an item, to edit.
+    pub(crate) fn from_item(item: &Item) -> Self {
+        let s = &item.spec;
+        Self {
+            name: s.name.clone(),
+            description: s.description.clone(),
+            kind: s.kind,
+            rate: s.rate.to_plain_string(),
+            account: Some(s.income_account),
+            not_taxable: !s.taxable,
+        }
+    }
+
+    fn build(&self) -> Result<ItemSpec, String> {
+        let income_account = self.account.ok_or("Choose an income account")?;
+        let rate = Money::parse_or_zero(&self.rate).map_err(|e| e.to_string())?;
+        Ok(ItemSpec {
+            name: self.name.trim().to_string(),
+            description: self.description.clone(),
+            kind: self.kind,
+            rate,
+            income_account,
+            taxable: !self.not_taxable,
+        })
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct ListState {
     pub new_account: NewAccount,
@@ -92,6 +147,10 @@ pub(crate) struct ListState {
     pub new_vendor: ContactInput,
     pub new_item: NewItem,
     pub show_inactive: bool,
+    /// The customer, vendor or item being edited, with its fields.
+    pub editing_customer: Option<(CustomerId, ContactInput)>,
+    pub editing_vendor: Option<(VendorId, ContactInput)>,
+    pub editing_item: Option<(ItemId, NewItem)>,
     /// Exemption certificate numbers being typed, by customer.
     pub exemption_notes: std::collections::BTreeMap<CustomerId, String>,
 }
@@ -103,6 +162,9 @@ impl ListState {
             Reset::NewCustomer => self.new_customer = ContactInput::default(),
             Reset::NewVendor => self.new_vendor = ContactInput::default(),
             Reset::NewItem => self.new_item = NewItem::default(),
+            Reset::EditedCustomer => self.editing_customer = None,
+            Reset::EditedVendor => self.editing_vendor = None,
+            Reset::EditedItem => self.editing_item = None,
             Reset::Nothing
             | Reset::Form(_)
             | Reset::NewTax
@@ -436,19 +498,142 @@ fn contact_editor(ui: &mut Ui, salt: &str, n: &mut ContactInput) {
             widgets::hint_label(ui, "City");
             field(ui, &mut n.city, 200.0, "");
             ui.end_row();
+            widgets::hint_label(ui, "Address line 2");
+            field(ui, &mut n.line2, 200.0, "Suite, unit or PO box");
             widgets::hint_label(ui, "State / region");
             field(ui, &mut n.region, 80.0, "");
+            ui.end_row();
             widgets::hint_label(ui, "Postal code");
-            field(ui, &mut n.postal_code, 100.0, "");
+            field(ui, &mut n.postal_code, 100.0, "ZIP+4, e.g. 84601-1234");
+            widgets::hint_label(ui, "Country");
+            field(ui, &mut n.country, 160.0, "if not your own");
             ui.end_row();
             widgets::hint_label(ui, "Terms (days)");
             field(ui, &mut n.terms, 60.0, "30");
+            widgets::hint_label(ui, "Notes");
+            field(ui, &mut n.notes, 200.0, "");
             ui.end_row();
         });
 }
 
+/// What was clicked under an edit panel.
+enum EditChoice {
+    Nothing,
+    Save,
+    Cancel,
+    SetActive(bool),
+}
+
+/// Save Changes, Cancel, and Make inactive (or active), under an edit panel.
+fn edit_buttons(ui: &mut Ui, active: bool) -> EditChoice {
+    let mut choice = EditChoice::Nothing;
+    ui.horizontal_wrapped(|ui| {
+        if ui.button(RichText::new("Save Changes").strong()).clicked() {
+            choice = EditChoice::Save;
+        }
+        if ui.button("Cancel").clicked() {
+            choice = EditChoice::Cancel;
+        }
+        let (label, hover) = if active {
+            (
+                "Make inactive",
+                "Leave it off the lists on forms. Its transactions and balance stay.",
+            )
+        } else {
+            ("Make active", "List it on forms again.")
+        };
+        if ui.button(label).on_hover_text(hover).clicked() {
+            choice = EditChoice::SetActive(!active);
+        }
+    });
+    choice
+}
+
+/// A name in a list, greyed out with "(inactive)" when it is.
+fn list_name(ui: &mut Ui, name: &str, active: bool) {
+    if active {
+        ui.label(name);
+    } else {
+        ui.label(RichText::new(format!("{name} (inactive)")).color(theme::MUTED));
+    }
+}
+
+/// The panel editing a customer, above the list.
+fn edit_customer(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
+    let Some((id, input)) = s.editing_customer.as_mut() else {
+        return;
+    };
+    let id = *id;
+    let Some(x) = c.customer(id) else {
+        s.editing_customer = None;
+        return;
+    };
+    let mut close = false;
+    egui::Frame::group(ui.style()).show(ui, |ui| {
+        ui.label(RichText::new(format!("Edit customer: {}", x.contact.name)).strong());
+        contact_editor(ui, "edit_customer", input);
+        match edit_buttons(ui, x.active) {
+            EditChoice::Save => match input.build() {
+                Ok(contact) => out.push(Action::Run {
+                    cmd: Command::CustomerUpdate { id, contact },
+                    reset: Reset::EditedCustomer,
+                }),
+                Err(e) => out.push(Action::Error(e)),
+            },
+            EditChoice::Cancel => close = true,
+            EditChoice::SetActive(active) => out.push(Action::Run {
+                cmd: Command::CustomerSetActive { id, active },
+                reset: Reset::Nothing,
+            }),
+            EditChoice::Nothing => {}
+        }
+    });
+    if close {
+        s.editing_customer = None;
+    }
+    ui.add_space(6.0);
+}
+
+/// The panel editing a vendor, above the list.
+fn edit_vendor(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
+    let Some((id, input)) = s.editing_vendor.as_mut() else {
+        return;
+    };
+    let id = *id;
+    let Some(x) = c.vendors.iter().find(|v| v.id == id) else {
+        s.editing_vendor = None;
+        return;
+    };
+    let mut close = false;
+    egui::Frame::group(ui.style()).show(ui, |ui| {
+        ui.label(RichText::new(format!("Edit vendor: {}", x.contact.name)).strong());
+        contact_editor(ui, "edit_vendor", input);
+        match edit_buttons(ui, x.active) {
+            EditChoice::Save => match input.build() {
+                Ok(contact) => out.push(Action::Run {
+                    cmd: Command::VendorUpdate { id, contact },
+                    reset: Reset::EditedVendor,
+                }),
+                Err(e) => out.push(Action::Error(e)),
+            },
+            EditChoice::Cancel => close = true,
+            EditChoice::SetActive(active) => out.push(Action::Run {
+                cmd: Command::VendorSetActive { id, active },
+                reset: Reset::Nothing,
+            }),
+            EditChoice::Nothing => {}
+        }
+    });
+    if close {
+        s.editing_vendor = None;
+    }
+    ui.add_space(6.0);
+}
+
 pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
     title(ui, "Customers");
+    ui.checkbox(&mut s.show_inactive, "Show inactive");
+    edit_customer(ui, c, s, out);
     egui::CollapsingHeader::new("New customer")
         .default_open(c.customers.is_empty())
         .show(ui, |ui| {
@@ -481,17 +666,26 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
                     if taxes {
                         widgets::column_header(ui, "Sales tax");
                     }
-                    widgets::column_header(ui, "");
-                    widgets::column_header(ui, "");
+                    for _ in 0..3 {
+                        widgets::column_header(ui, "");
+                    }
                     ui.end_row();
-                    for x in c.customers.iter().filter(|x| x.active || s.show_inactive) {
-                        ui.label(x.contact.name.as_str());
+                    let show_inactive = s.show_inactive;
+                    for x in c.customers.iter().filter(|x| x.active || show_inactive) {
+                        list_name(ui, &x.contact.name, x.active);
                         ui.label(x.contact.email.as_str());
                         ui.label(x.contact.phone.as_str());
                         ui.label(terms_label(x.contact.terms_days));
                         money_label(ui, c.customer_balance(x.id), false);
                         if taxes {
                             customer_tax(ui, c, x, &mut s.exemption_notes, out);
+                        }
+                        if ui
+                            .small_button("Edit")
+                            .on_hover_text("Change their name, address, terms or notes")
+                            .clicked()
+                        {
+                            s.editing_customer = Some((x.id, ContactInput::from_contact(&x.contact)));
                         }
                         if ui.small_button("Invoice").clicked() {
                             out.push(Action::InvoiceFor(x.id));
@@ -507,6 +701,8 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
 
 pub(crate) fn vendors(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
     title(ui, "Vendors");
+    ui.checkbox(&mut s.show_inactive, "Show inactive");
+    edit_vendor(ui, c, s, out);
     egui::CollapsingHeader::new("New vendor")
         .default_open(c.vendors.is_empty())
         .show(ui, |ui| {
@@ -530,16 +726,24 @@ pub(crate) fn vendors(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
                 .striped(true)
                 .spacing([18.0, 4.0])
                 .show(ui, |ui| {
-                    for h in ["Name", "Email", "Phone", "Terms", "Balance", "", ""] {
+                    for h in ["Name", "Email", "Phone", "Terms", "Balance", "", "", ""] {
                         widgets::column_header(ui, h);
                     }
                     ui.end_row();
-                    for x in c.vendors.iter().filter(|x| x.active || s.show_inactive) {
-                        ui.label(x.contact.name.as_str());
+                    let show_inactive = s.show_inactive;
+                    for x in c.vendors.iter().filter(|x| x.active || show_inactive) {
+                        list_name(ui, &x.contact.name, x.active);
                         ui.label(x.contact.email.as_str());
                         ui.label(x.contact.phone.as_str());
                         ui.label(terms_label(x.contact.terms_days));
                         money_label(ui, c.vendor_balance(x.id), false);
+                        if ui
+                            .small_button("Edit")
+                            .on_hover_text("Change their name, address, terms or notes")
+                            .clicked()
+                        {
+                            s.editing_vendor = Some((x.id, ContactInput::from_contact(&x.contact)));
+                        }
                         if ui.small_button("Enter bill").clicked() {
                             out.push(Action::BillFrom(x.id));
                         }
@@ -653,63 +857,97 @@ fn terms_label(days: u32) -> String {
 
 // ----- items -------------------------------------------------------------------------
 
+/// An item's fields, for New item and Edit.
+fn item_fields(ui: &mut Ui, c: &Company, salt: &str, n: &mut NewItem) {
+    egui::Grid::new(salt)
+        .num_columns(4)
+        .spacing([10.0, 4.0])
+        .show(ui, |ui| {
+            widgets::hint_label(ui, "Name");
+            field(ui, &mut n.name, 200.0, "");
+            widgets::hint_label(ui, "Type");
+            egui::ComboBox::from_id_salt((salt, "kind"))
+                .selected_text(n.kind.label())
+                .show_ui(ui, |ui| {
+                    for k in ItemKind::ALL {
+                        ui.selectable_value(&mut n.kind, k, k.label());
+                    }
+                });
+            ui.end_row();
+            widgets::hint_label(ui, "Description");
+            field(ui, &mut n.description, 200.0, "");
+            widgets::hint_label(ui, "Rate");
+            field(ui, &mut n.rate, 90.0, "0.00");
+            ui.end_row();
+            widgets::hint_label(ui, "Income account");
+            widgets::account_combo(ui, (salt, "acct"), c, &mut n.account, |k| {
+                matches!(k, AccountType::Income | AccountType::OtherIncome)
+            });
+            widgets::hint_label(ui, "Taxable");
+            let mut taxable = !n.not_taxable;
+            if ui
+                .checkbox(&mut taxable, "")
+                .on_hover_text("Charge sales tax on it (most goods are taxed; many services are not)")
+                .changed()
+            {
+                n.not_taxable = !taxable;
+            }
+            ui.end_row();
+        });
+}
+
+/// The panel editing an item, above the list.
+fn edit_item(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
+    let Some((id, input)) = s.editing_item.as_mut() else {
+        return;
+    };
+    let id = *id;
+    let Some(x) = c.item(id) else {
+        s.editing_item = None;
+        return;
+    };
+    let mut close = false;
+    egui::Frame::group(ui.style()).show(ui, |ui| {
+        ui.label(RichText::new(format!("Edit item: {}", x.spec.name)).strong());
+        ui.label(
+            RichText::new(
+                "Changes apply to new invoices; invoices already recorded keep their lines.",
+            )
+            .color(theme::MUTED),
+        );
+        item_fields(ui, c, "edit_item", input);
+        match edit_buttons(ui, x.active) {
+            EditChoice::Save => match input.build() {
+                Ok(spec) => out.push(Action::Run {
+                    cmd: Command::ItemUpdate { id, spec },
+                    reset: Reset::EditedItem,
+                }),
+                Err(e) => out.push(Action::Error(e)),
+            },
+            EditChoice::Cancel => close = true,
+            EditChoice::SetActive(active) => out.push(Action::Run {
+                cmd: Command::ItemSetActive { id, active },
+                reset: Reset::Nothing,
+            }),
+            EditChoice::Nothing => {}
+        }
+    });
+    if close {
+        s.editing_item = None;
+    }
+    ui.add_space(6.0);
+}
+
 pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
     title(ui, "Products and Services");
+    ui.checkbox(&mut s.show_inactive, "Show inactive");
+    edit_item(ui, c, s, out);
     egui::CollapsingHeader::new("New item")
         .default_open(c.items.is_empty())
         .show(ui, |ui| {
-            let n = &mut s.new_item;
-            egui::Grid::new("new_item")
-                .num_columns(4)
-                .spacing([10.0, 4.0])
-                .show(ui, |ui| {
-                    widgets::hint_label(ui, "Name");
-                    field(ui, &mut n.name, 200.0, "");
-                    widgets::hint_label(ui, "Type");
-                    egui::ComboBox::from_id_salt("new_item_kind")
-                        .selected_text(n.kind.label())
-                        .show_ui(ui, |ui| {
-                            for k in ItemKind::ALL {
-                                ui.selectable_value(&mut n.kind, k, k.label());
-                            }
-                        });
-                    ui.end_row();
-                    widgets::hint_label(ui, "Description");
-                    field(ui, &mut n.description, 200.0, "");
-                    widgets::hint_label(ui, "Rate");
-                    field(ui, &mut n.rate, 90.0, "0.00");
-                    ui.end_row();
-                    widgets::hint_label(ui, "Income account");
-                    widgets::account_combo(ui, "new_item_acct", c, &mut n.account, |k| {
-                        matches!(k, AccountType::Income | AccountType::OtherIncome)
-                    });
-                    widgets::hint_label(ui, "Taxable");
-                    let mut taxable = !n.not_taxable;
-                    if ui
-                        .checkbox(&mut taxable, "")
-                        .on_hover_text(
-                            "Charge sales tax on it (most goods are taxed; many services are not)",
-                        )
-                        .changed()
-                    {
-                        n.not_taxable = !taxable;
-                    }
-                    ui.end_row();
-                });
+            item_fields(ui, c, "new_item", &mut s.new_item);
             if ui.button("Add item").clicked() {
-                let built = match (n.account, Money::parse_or_zero(&n.rate)) {
-                    (None, _) => Err("Choose an income account".to_string()),
-                    (_, Err(e)) => Err(e.to_string()),
-                    (Some(income_account), Ok(rate)) => Ok(ItemSpec {
-                        name: n.name.trim().to_string(),
-                        description: n.description.clone(),
-                        kind: n.kind,
-                        rate,
-                        income_account,
-                        taxable: !n.not_taxable,
-                    }),
-                };
-                match built {
+                match s.new_item.build() {
                     Ok(spec) => out.push(Action::Run {
                         cmd: Command::ItemCreate { spec },
                         reset: Reset::NewItem,
@@ -730,12 +968,14 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                 "Rate",
                 "Income account",
                 "Taxable",
+                "",
             ] {
                 widgets::column_header(ui, h);
             }
             ui.end_row();
-            for x in c.items.iter().filter(|x| x.active) {
-                ui.label(x.spec.name.as_str());
+            let show_inactive = s.show_inactive;
+            for x in c.items.iter().filter(|x| x.active || show_inactive) {
+                list_name(ui, &x.spec.name, x.active);
                 ui.label(x.spec.kind.label());
                 ui.label(x.spec.description.as_str());
                 money_label(ui, x.spec.rate, false);
@@ -752,6 +992,13 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                         cmd: Command::ItemSetTaxable { id: x.id, taxable },
                         reset: Reset::Nothing,
                     });
+                }
+                if ui
+                    .small_button("Edit")
+                    .on_hover_text("Change its name, description, price, account or tax")
+                    .clicked()
+                {
+                    s.editing_item = Some((x.id, NewItem::from_item(x)));
                 }
                 ui.end_row();
             }
@@ -902,4 +1149,63 @@ pub(crate) fn reports(ui: &mut Ui, c: &Company, s: &mut ReportState, out: &mut V
 
     ui.separator();
     widgets::report_view(ui, &report, out);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn editing_a_contact_keeps_every_field() {
+        let contact = Contact {
+            name: "Dana Ortiz".into(),
+            company: "Maple Street Cafe".into(),
+            email: "orders@maple.example".into(),
+            phone: "801-555-0100".into(),
+            address: Address {
+                line1: "12 Maple Street".into(),
+                line2: "Suite 4".into(),
+                city: "Provo".into(),
+                region: "UT".into(),
+                postal_code: "84601-1100".into(),
+                country: "USA".into(),
+            },
+            terms_days: 30,
+            notes: "Delivers on Fridays".into(),
+        };
+        assert_eq!(ContactInput::from_contact(&contact).build(), Ok(contact));
+    }
+
+    #[test]
+    fn editing_an_item_keeps_every_field() {
+        let c = ledgercraft_engine::sample_company().unwrap();
+        for item in &c.items {
+            assert_eq!(NewItem::from_item(item).build(), Ok(item.spec.clone()));
+        }
+    }
+
+    #[test]
+    fn the_lists_draw_with_their_editors_open() {
+        let c = ledgercraft_engine::sample_company().unwrap();
+        let customer = &c.customers[0];
+        let vendor = &c.vendors[0];
+        let item = &c.items[0];
+        let mut s = ListState {
+            show_inactive: true,
+            editing_customer: Some((customer.id, ContactInput::from_contact(&customer.contact))),
+            editing_vendor: Some((vendor.id, ContactInput::from_contact(&vendor.contact))),
+            editing_item: Some((item.id, NewItem::from_item(item))),
+            ..ListState::default()
+        };
+        let ctx = egui::Context::default();
+        crate::theme::apply(&ctx);
+        let mut out = Vec::new();
+        crate::theme::test_frame(&ctx, |ui| {
+            customers(ui, &c, &mut s, &mut out);
+            vendors(ui, &c, &mut s, &mut out);
+            items(ui, &c, &mut s, &mut out);
+        });
+        assert!(out.is_empty());
+        assert!(s.editing_customer.is_some() && s.editing_item.is_some());
+    }
 }

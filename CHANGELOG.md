@@ -8,6 +8,12 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Edit customers, vendors and items: Edit beside each one opens its fields
+  (now with address line 2, country and notes) with Save Changes, Cancel and
+  Make inactive / Make active. Inactive ones are left off the forms but keep
+  their history; Show inactive lists them. New engine commands
+  `item.update`, `item.setActive`, `customer.setActive` and
+  `vendor.setActive`.
 - docs/sales-tax.md: which states rate import supports (the 24 Streamlined
   Sales Tax states, until a comparable free source for the others is
   published), getting and unzipping the files, sourcing, the quarterly

@@ -56,8 +56,16 @@ pub enum Command {
     VendorCreate { contact: Contact },
     #[serde(rename = "vendor.update")]
     VendorUpdate { id: VendorId, contact: Contact },
+    #[serde(rename = "customer.setActive")]
+    CustomerSetActive { id: CustomerId, active: bool },
+    #[serde(rename = "vendor.setActive")]
+    VendorSetActive { id: VendorId, active: bool },
     #[serde(rename = "item.create")]
     ItemCreate { spec: ItemSpec },
+    #[serde(rename = "item.update")]
+    ItemUpdate { id: ItemId, spec: ItemSpec },
+    #[serde(rename = "item.setActive")]
+    ItemSetActive { id: ItemId, active: bool },
     #[serde(rename = "txn.post")]
     TxnPost {
         date: Date,
@@ -181,7 +189,11 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "customer.update", summary: "Edit a customer. {id, contact}" },
     CommandInfo { id: "vendor.create", summary: "Add a vendor. {contact}" },
     CommandInfo { id: "vendor.update", summary: "Edit a vendor. {id, contact}" },
-    CommandInfo { id: "item.create", summary: "Add a product or service. {spec:{name, rate, income_account, kind?}}" },
+    CommandInfo { id: "customer.setActive", summary: "Make a customer active or inactive (inactive ones are left off forms). {id, active}" },
+    CommandInfo { id: "vendor.setActive", summary: "Make a vendor active or inactive (inactive ones are left off forms). {id, active}" },
+    CommandInfo { id: "item.create", summary: "Add a product or service. {spec:{name, rate, income_account, kind?, taxable?}}" },
+    CommandInfo { id: "item.update", summary: "Change a product or service; recorded invoices keep their lines. {id, spec}" },
+    CommandInfo { id: "item.setActive", summary: "Make an item active or inactive (inactive ones are left off forms). {id, active}" },
     CommandInfo { id: "txn.post", summary: "Record a transaction. {date, number?, memo?, body:{type: invoice|receive_payment|bill|pay_bill|check|deposit|journal, …}}" },
     CommandInfo { id: "txn.update", summary: "Edit a recorded transaction; it keeps its id and type. {id, date, number?, memo?, body}" },
     CommandInfo { id: "txn.void", summary: "Void a transaction (it stays on file). {id}" },
@@ -216,7 +228,11 @@ impl Command {
             Self::CustomerUpdate { .. } => "customer.update",
             Self::VendorCreate { .. } => "vendor.create",
             Self::VendorUpdate { .. } => "vendor.update",
+            Self::CustomerSetActive { .. } => "customer.setActive",
+            Self::VendorSetActive { .. } => "vendor.setActive",
             Self::ItemCreate { .. } => "item.create",
+            Self::ItemUpdate { .. } => "item.update",
+            Self::ItemSetActive { .. } => "item.setActive",
             Self::TxnPost { .. } => "txn.post",
             Self::TxnUpdate { .. } => "txn.update",
             Self::TxnVoid { .. } => "txn.void",
@@ -253,7 +269,11 @@ impl Command {
             Self::CustomerUpdate { contact, .. } => format!("Edit Customer {}", contact.name),
             Self::VendorCreate { contact } => format!("New Vendor {}", contact.name),
             Self::VendorUpdate { contact, .. } => format!("Edit Vendor {}", contact.name),
+            Self::CustomerSetActive { .. } => "Customer Status".into(),
+            Self::VendorSetActive { .. } => "Vendor Status".into(),
             Self::ItemCreate { spec } => format!("New Item {}", spec.name),
+            Self::ItemUpdate { spec, .. } => format!("Edit Item {}", spec.name),
+            Self::ItemSetActive { .. } => "Item Status".into(),
             Self::TxnPost { body, .. } => body.label().to_string(),
             Self::TxnUpdate { body, .. } => format!("Edit {}", body.label()),
             Self::TxnVoid { id } => format!("Void {id}"),
@@ -354,7 +374,23 @@ impl Command {
                 c.update_vendor(id, contact)?;
                 None
             }
+            Self::CustomerSetActive { id, active } => {
+                c.set_customer_active(id, active)?;
+                None
+            }
+            Self::VendorSetActive { id, active } => {
+                c.set_vendor_active(id, active)?;
+                None
+            }
             Self::ItemCreate { spec } => Some(c.add_item(spec)?.to_string()),
+            Self::ItemUpdate { id, spec } => {
+                c.update_item(id, spec)?;
+                None
+            }
+            Self::ItemSetActive { id, active } => {
+                c.set_item_active(id, active)?;
+                None
+            }
             Self::TxnPost {
                 date,
                 number,
