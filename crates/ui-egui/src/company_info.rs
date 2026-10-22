@@ -69,7 +69,10 @@ impl CompanyInfoForm {
     }
 }
 
-pub(crate) fn window(ctx: &egui::Context, form: &mut CompanyInfoForm) -> Option<CompanyInfoOutcome> {
+pub(crate) fn window(
+    ctx: &egui::Context,
+    form: &mut CompanyInfoForm,
+) -> Option<CompanyInfoOutcome> {
     let mut outcome = None;
     let mut open = true;
     egui::Window::new("Company Information")
@@ -89,7 +92,11 @@ pub(crate) fn window(ctx: &egui::Context, form: &mut CompanyInfoForm) -> Option<
                 .show(ui, |ui| {
                     let rows: [(&str, &mut String, &str); 10] = [
                         ("Company name", &mut form.name, "e.g. Acme Repair"),
-                        ("Legal name", &mut form.legal_name, "if different, e.g. Acme Repair LLC"),
+                        (
+                            "Legal name",
+                            &mut form.legal_name,
+                            "if different, e.g. Acme Repair LLC",
+                        ),
                         ("Email", &mut form.email, ""),
                         ("Phone", &mut form.phone, ""),
                         ("Street", &mut form.line1, ""),
@@ -97,7 +104,11 @@ pub(crate) fn window(ctx: &egui::Context, form: &mut CompanyInfoForm) -> Option<
                         ("City", &mut form.city, ""),
                         ("State / region", &mut form.region, ""),
                         ("Postal code", &mut form.postal_code, ""),
-                        ("Country", &mut form.country, "leave empty for your own country"),
+                        (
+                            "Country",
+                            &mut form.country,
+                            "leave empty for your own country",
+                        ),
                     ];
                     for (label, value, hint) in rows {
                         ui.label(label);

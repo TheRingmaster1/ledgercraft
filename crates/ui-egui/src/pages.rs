@@ -663,7 +663,9 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
                                 if matches!(t.body, TxnBody::Invoice(_))
                                     && ui
                                         .small_button("PDF")
-                                        .on_hover_text("Save this invoice as a PDF to email or print")
+                                        .on_hover_text(
+                                            "Save this invoice as a PDF to email or print",
+                                        )
                                         .clicked()
                                 {
                                     out.push(Action::InvoicePdf(t.id));

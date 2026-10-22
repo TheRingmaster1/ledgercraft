@@ -707,7 +707,11 @@ impl LedgerApp {
             return;
         };
         let name = ledgercraft_reports::invoice_pdf_name(company, id);
-        let bytes = match ledgercraft_reports::invoice_pdf(company, id, crate::currency::current().symbol()) {
+        let bytes = match ledgercraft_reports::invoice_pdf(
+            company,
+            id,
+            crate::currency::current().symbol(),
+        ) {
             Ok(bytes) => bytes,
             Err(e) => {
                 self.error(e);

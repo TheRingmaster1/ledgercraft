@@ -195,9 +195,12 @@ fn run(args: &[String]) -> Result<(), String> {
                         && t.number.trim() == number.trim()
                 })
                 .ok_or_else(|| format!("invoice-pdf: no invoice numbered {number:?}"))?;
-            let bytes = ledgercraft_reports::invoice_pdf(c, invoice.id, currency_symbol(&c.info.currency))?;
-            let out = flag_value(rest, "--out")
-                .map_or_else(|| PathBuf::from(ledgercraft_reports::invoice_pdf_name(c, invoice.id)), PathBuf::from);
+            let bytes =
+                ledgercraft_reports::invoice_pdf(c, invoice.id, currency_symbol(&c.info.currency))?;
+            let out = flag_value(rest, "--out").map_or_else(
+                || PathBuf::from(ledgercraft_reports::invoice_pdf_name(c, invoice.id)),
+                PathBuf::from,
+            );
             std::fs::write(&out, bytes).map_err(|e| format!("{}: {e}", out.display()))?;
             println!("{}", out.display());
             Ok(())

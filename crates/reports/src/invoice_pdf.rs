@@ -81,7 +81,10 @@ pub fn invoice_pdf(company: &Company, id: TxnId, currency: &str) -> Result<Vec<u
     };
     let sheet = gather(company, t, invoice, currency)?;
     let title = if sheet.number.is_empty() {
-        format!("Invoice for {}", sheet.bill_to.first().map_or("", String::as_str))
+        format!(
+            "Invoice for {}",
+            sheet.bill_to.first().map_or("", String::as_str)
+        )
     } else {
         format!("Invoice {}", sheet.number)
     };
@@ -90,7 +93,9 @@ pub fn invoice_pdf(company: &Company, id: TxnId, currency: &str) -> Result<Vec<u
 
 fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result<Sheet, String> {
     let money = |m: Money| m.format_with(currency);
-    let total = inv.total().ok_or("The invoice total is too large to print.")?;
+    let total = inv
+        .total()
+        .ok_or("The invoice total is too large to print.")?;
     let open = if t.voided {
         Money::ZERO
     } else {
@@ -164,7 +169,11 @@ fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result
             PrintLine {
                 head,
                 description,
-                qty: if note { String::new() } else { l.qty.to_string() },
+                qty: if note {
+                    String::new()
+                } else {
+                    l.qty.to_string()
+                },
                 rate: if note { String::new() } else { money(l.rate) },
                 amount: match amount {
                     Some(a) if !note => money(a),
@@ -229,7 +238,14 @@ fn layout(s: &Sheet) -> Vec<Page> {
         let body = Font::regular(10.0);
         p.text(QTY_RIGHT, baseline, &line.qty, body, INK, Align::Right);
         p.text(RATE_RIGHT, baseline, &line.rate, body, INK, Align::Right);
-        p.text(AMOUNT_RIGHT, baseline, &line.amount, body, INK, Align::Right);
+        p.text(
+            AMOUNT_RIGHT,
+            baseline,
+            &line.amount,
+            body,
+            INK,
+            Align::Right,
+        );
         y += height;
         p.rule(LEFT, RIGHT, y, RULE, 0.6);
     }
@@ -262,7 +278,14 @@ fn layout(s: &Sheet) -> Vec<Page> {
     for (i, page) in pages.iter_mut().enumerate() {
         page.rule(LEFT, RIGHT, 752.0, RULE, 0.6);
         let small = Font::regular(8.5);
-        page.text(LEFT, 766.0, "Thank you for your business.", small, MUTED, Align::Left);
+        page.text(
+            LEFT,
+            766.0,
+            "Thank you for your business.",
+            small,
+            MUTED,
+            Align::Left,
+        );
         let n = format!("Page {} of {count}", i + 1);
         page.text(RIGHT, 766.0, &n, small, MUTED, Align::Right);
     }
@@ -289,7 +312,11 @@ fn line_rows(line: &PrintLine) -> Vec<(String, Font, Rgb)> {
     let mut rows = Vec::new();
     if !line.head.is_empty() {
         let font = Font::bold(10.0);
-        rows.extend(wrap(&line.head, font, DESC_WIDTH).into_iter().map(|t| (t, font, INK)));
+        rows.extend(
+            wrap(&line.head, font, DESC_WIDTH)
+                .into_iter()
+                .map(|t| (t, font, INK)),
+        );
     }
     if !line.description.is_empty() {
         // Under an item name the description is the smaller, quieter text.
@@ -321,14 +348,28 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
     }
     let left_bottom = y;
 
-    p.text(RIGHT, 66.0, "INVOICE", Font::bold(24.0), ACCENT, Align::Right);
+    p.text(
+        RIGHT,
+        66.0,
+        "INVOICE",
+        Font::bold(24.0),
+        ACCENT,
+        Align::Right,
+    );
     let mut ry = 90.0;
     if s.void {
         p.text(RIGHT, ry, "VOID", Font::bold(12.0), RED, Align::Right);
         ry += 16.0;
     }
     for (label, value) in &s.facts {
-        p.text(RIGHT - 110.0, ry, label, Font::regular(9.0), MUTED, Align::Right);
+        p.text(
+            RIGHT - 110.0,
+            ry,
+            label,
+            Font::regular(9.0),
+            MUTED,
+            Align::Right,
+        );
         p.text(RIGHT, ry, value, Font::bold(9.5), INK, Align::Right);
         ry += 14.0;
     }
@@ -390,7 +431,14 @@ fn totals(p: &mut Page, s: &Sheet, top: f32) {
     }
     if s.paid {
         let font = Font::bold(9.5);
-        p.text(AMOUNT_RIGHT, y + 2.0, "Paid in full. Thank you!", font, GREEN, Align::Right);
+        p.text(
+            AMOUNT_RIGHT,
+            y + 2.0,
+            "Paid in full. Thank you!",
+            font,
+            GREEN,
+            Align::Right,
+        );
     }
 }
 
@@ -449,7 +497,9 @@ mod tests {
                 },
             ],
         });
-        let inv = c.post(date, "1001", "Thanks for the order!", invoice).unwrap();
+        let inv = c
+            .post(date, "1001", "Thanks for the order!", invoice)
+            .unwrap();
         let check = TxnBody::Check(Check {
             payee: None,
             pay_from: account(&c, "Checking"),

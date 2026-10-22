@@ -47,7 +47,15 @@ pub(crate) struct Page {
 impl Page {
     /// Draws text with its baseline at `y`; `x` is its left edge, or its
     /// right edge when aligned right.
-    pub(crate) fn text(&mut self, x: f32, y: f32, text: &str, font: Font, color: Rgb, align: Align) {
+    pub(crate) fn text(
+        &mut self,
+        x: f32,
+        y: f32,
+        text: &str,
+        font: Font,
+        color: Rgb,
+        align: Align,
+    ) {
         let x = match align {
             Align::Left => x,
             Align::Right => x - width(text, font),
@@ -150,7 +158,11 @@ fn literal(text: &str) -> String {
 
 /// How wide `text` is when drawn, in points.
 pub(crate) fn width(text: &str, font: Font) -> f32 {
-    let table: &[u16] = if font.bold { &HELVETICA_BOLD } else { &HELVETICA };
+    let table: &[u16] = if font.bold {
+        &HELVETICA_BOLD
+    } else {
+        &HELVETICA
+    };
     let units: u32 = encode(text)
         .iter()
         .map(|&b| {
@@ -207,14 +219,23 @@ pub(crate) fn wrap(text: &str, font: Font, max: f32) -> Vec<String> {
 pub(crate) fn finish(pages: &[Page], title: &str) -> Vec<u8> {
     let mut objects: Vec<Vec<u8>> = Vec::new();
     objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
-    let kids: Vec<String> = (0..pages.len()).map(|i| format!("{} 0 R", 6 + 2 * i)).collect();
+    let kids: Vec<String> = (0..pages.len())
+        .map(|i| format!("{} 0 R", 6 + 2 * i))
+        .collect();
     objects.push(
-        format!("<< /Type /Pages /Kids [{}] /Count {} >>", kids.join(" "), pages.len()).into_bytes(),
+        format!(
+            "<< /Type /Pages /Kids [{}] /Count {} >>",
+            kids.join(" "),
+            pages.len()
+        )
+        .into_bytes(),
     );
     for base in ["Helvetica", "Helvetica-Bold"] {
         objects.push(
-            format!("<< /Type /Font /Subtype /Type1 /BaseFont /{base} /Encoding /WinAnsiEncoding >>")
-                .into_bytes(),
+            format!(
+                "<< /Type /Font /Subtype /Type1 /BaseFont /{base} /Encoding /WinAnsiEncoding >>"
+            )
+            .into_bytes(),
         );
     }
     objects.push(
@@ -250,7 +271,9 @@ pub(crate) fn finish(pages: &[Page], title: &str) -> Vec<u8> {
         out.extend_from_slice(b"\nendobj\n");
     }
     let xref = out.len();
-    out.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes());
+    out.extend_from_slice(
+        format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes(),
+    );
     for offset in offsets {
         out.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
     }
@@ -336,7 +359,14 @@ mod tests {
     fn the_cross_reference_table_points_at_each_object() {
         let mut page = Page::default();
         let black = Rgb(0.0, 0.0, 0.0);
-        page.text(50.0, 60.0, "Hi (there)", Font::bold(12.0), black, Align::Left);
+        page.text(
+            50.0,
+            60.0,
+            "Hi (there)",
+            Font::bold(12.0),
+            black,
+            Align::Left,
+        );
         page.rule(50.0, 100.0, 70.0, Rgb(0.5, 0.5, 0.5), 1.0);
         let pdf = finish(&[page, Page::default()], "Test");
         let text = String::from_utf8(pdf).unwrap();
@@ -349,7 +379,11 @@ mod tests {
             .take_while(|l| l.ends_with(" n "))
             .map(|l| l[..10].parse().unwrap())
             .collect();
-        assert_eq!(entries.len(), 9, "catalog, pages, 2 fonts, info, 2 x (page, content)");
+        assert_eq!(
+            entries.len(),
+            9,
+            "catalog, pages, 2 fonts, info, 2 x (page, content)"
+        );
         for (i, at) in entries.iter().enumerate() {
             assert!(text[*at..].starts_with(&format!("{} 0 obj", i + 1)));
         }
