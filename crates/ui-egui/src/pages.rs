@@ -204,22 +204,18 @@ fn title(ui: &mut Ui, text: &str) {
 #[derive(Clone, Copy)]
 enum Go {
     Page(Page),
-    /// Customers > Create Statement…
-    Statement,
 }
 
 impl Go {
     fn hint(self) -> &'static str {
         match self {
             Self::Page(page) => page.hint(),
-            Self::Statement => "Save a customer's statement for a period as a PDF.",
         }
     }
 
     fn action(self) -> Action {
         match self {
             Self::Page(page) => Action::Go(page),
-            Self::Statement => Action::Statement(None),
         }
     }
 }
@@ -263,6 +259,8 @@ const fn form(kind: FormKind) -> Go {
 /// and links.
 struct FlowCard {
     title: &'static str,
+    /// Where clicking the title goes (the card's list), if anywhere.
+    title_go: Option<Go>,
     blurb: &'static str,
     steps: &'static [Step],
     /// Arrows, as (from, to) indices into `steps`.
@@ -272,6 +270,7 @@ struct FlowCard {
 
 const CUSTOMERS: FlowCard = FlowCard {
     title: "Customers",
+    title_go: Some(Go::Page(Page::Customers)),
     blurb: "Sell, get paid, and take the money to the bank.",
     steps: &[
         step("Create Invoices", 0, 0, form(FormKind::Invoice)),
@@ -284,14 +283,12 @@ const CUSTOMERS: FlowCard = FlowCard {
     // Invoices are paid, then deposited; sales receipts are paid on the
     // spot and go straight to the deposit; credit left can be refunded.
     arrows: &[(0, 1), (1, 2), (3, 2), (4, 5)],
-    links: &[
-        ("Statements…", Go::Statement),
-        ("Customer list", Go::Page(Page::Customers)),
-    ],
+    links: &[],
 };
 
 const VENDORS: FlowCard = FlowCard {
     title: "Vendors",
+    title_go: Some(Go::Page(Page::Vendors)),
     blurb: "Bills to pay later, or pay on the spot by check or card.",
     steps: &[
         step("Enter Bills", 0, 0, form(FormKind::Bill)),
@@ -299,11 +296,12 @@ const VENDORS: FlowCard = FlowCard {
         step("Write Checks", 0, 1, form(FormKind::Check)),
     ],
     arrows: &[(0, 1)],
-    links: &[("Vendor list", Go::Page(Page::Vendors))],
+    links: &[],
 };
 
 const BANKING: FlowCard = FlowCard {
     title: "Banking",
+    title_go: None,
     blurb: "Bring in your bank's transactions, then check them off against its statement.",
     steps: &[
         step("Import Transactions", 0, 0, Go::Page(Page::BankImport)),
@@ -392,7 +390,23 @@ fn flow_card(ui: &mut Ui, card: &FlowCard, width: f32, out: &mut Vec<Action>) {
     card_frame(ui).show(ui, |ui| {
         let inner = width - 2.0 * CARD_MARGIN - 2.0;
         ui.set_width(inner);
-        card_heading(ui, card.title, card.blurb);
+        match card.title_go {
+            Some(go) => {
+                // The title is a link to the card's list.
+                let title = RichText::new(card.title)
+                    .strong()
+                    .size(16.0)
+                    .color(theme::ACCENT);
+                let link = egui::Button::new(title).frame(false);
+                let hover = format!("Open the {} list", card.title.to_lowercase());
+                if ui.add(link).on_hover_text(hover).clicked() {
+                    out.push(go.action());
+                }
+                ui.label(RichText::new(card.blurb).small().color(theme::MUTED));
+                ui.add_space(8.0);
+            }
+            None => card_heading(ui, card.title, card.blurb),
+        }
         let rows = card.steps.iter().map(|s| s.row).max().map_or(1, |r| r + 1);
         let step_width = ((inner - 2.0 * COLUMN_GAP) / 3.0).clamp(STEP_MIN_WIDTH, STEP_MAX_WIDTH);
         let height = f32::from(rows) * ROW_PITCH - (ROW_PITCH - STEP_HEIGHT);
