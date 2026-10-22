@@ -17,7 +17,7 @@ use ledgercraft_core::{Date, Money};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AccountId, AccountType, Company, CustomerId, Invoice, ItemId, LedgerError, LedgerResult,
+    AccountId, AccountType, Company, CustomerId, ItemId, LedgerError, LedgerResult, Sale,
     TaxComponentId, TaxGroupId,
 };
 
@@ -583,11 +583,15 @@ impl Company {
             .iter()
             .filter(|t| !t.voided && t.date <= as_of)
         {
-            if let crate::TxnBody::Invoice(inv) = &t.body {
-                for l in inv.tax.iter().flat_map(|x| x.lines.iter()) {
-                    let entry = by_agency.entry(self.tax_agency(l)).or_default();
-                    entry.0 = entry.0.saturating_add(l.amount);
-                }
+            // Invoices and sales receipts collect tax; credit memos give it back.
+            let credit = t.body.sales_sign() < 0;
+            for l in t.body.sale().iter().flat_map(|s| s.tax).flat_map(|x| &x.lines) {
+                let entry = by_agency.entry(self.tax_agency(l)).or_default();
+                entry.0 = if credit {
+                    entry.0.saturating_sub(l.amount)
+                } else {
+                    entry.0.saturating_add(l.amount)
+                };
             }
         }
         if let Some(account) = self.sales_tax_account() {
@@ -757,8 +761,8 @@ impl Company {
 
     /// Checks the tax stored on an invoice adds up: each line taxes the
     /// invoice's taxable lines at its own rate.
-    pub(crate) fn validate_invoice_tax(&self, inv: &Invoice) -> LedgerResult<()> {
-        let Some(tax) = &inv.tax else {
+    pub(crate) fn validate_sale_tax(&self, sale: &Sale<'_>) -> LedgerResult<()> {
+        let Some(tax) = sale.tax else {
             return Ok(());
         };
         if self.tax_group(tax.group).is_none() {
@@ -774,7 +778,7 @@ impl Company {
             },
             "a liability account for sales tax",
         )?;
-        let taxable = inv.taxable_amount().ok_or(LedgerError::Overflow)?;
+        let taxable = sale.taxable_amount().ok_or(LedgerError::Overflow)?;
         for l in &tax.lines {
             if self.tax_component(l.component).is_none() {
                 return Err(LedgerError::NotFound(format!("Sales tax {}", l.component)));
@@ -799,7 +803,7 @@ impl Company {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Contact, Qty, SalesLine, TxnBody};
+    use crate::{Contact, Invoice, Qty, SalesLine, TxnBody};
 
     fn d(s: &str) -> Date {
         Date::parse(s).unwrap()

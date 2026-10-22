@@ -56,6 +56,9 @@ pub(crate) enum FormKind {
     Check,
     Deposit,
     Journal,
+    SalesReceipt,
+    CreditMemo,
+    Refund,
 }
 
 impl FormKind {
@@ -68,6 +71,9 @@ impl FormKind {
             Self::Check => "Write Check / Expense",
             Self::Deposit => "Make Deposit",
             Self::Journal => "Journal Entry",
+            Self::SalesReceipt => "Enter Sales Receipt",
+            Self::CreditMemo => "Create Credit Memo",
+            Self::Refund => "Refund a Credit",
         }
     }
 }
@@ -140,7 +146,7 @@ pub(crate) enum Action {
         rates: std::path::PathBuf,
         boundary: std::path::PathBuf,
     },
-    /// Save the invoice on the form (new, or changes to a recorded one),
-    /// then save it as a PDF.
-    SaveInvoicePdf(Command),
+    /// Save the invoice, sales receipt or credit memo on the form (new, or
+    /// changes to a recorded one), then save it as a PDF.
+    SaveInvoicePdf(FormKind, Command),
 }

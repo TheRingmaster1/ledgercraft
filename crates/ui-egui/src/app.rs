@@ -648,16 +648,16 @@ impl LedgerApp {
                 self.state.sst_files.insert(state, (rates, boundary));
                 self.save_state();
             }
-            Action::SaveInvoicePdf(cmd) => {
+            Action::SaveInvoicePdf(kind, cmd) => {
                 let editing = match &cmd {
                     Command::TxnUpdate { id, .. } => Some(*id),
                     _ => None,
                 };
-                let reset = Reset::Form(FormKind::Invoice);
+                let reset = Reset::Form(kind);
                 let id = match editing {
                     // Nothing changed: no edit to record (or undo), just the PDF.
                     Some(id) if self.changes_nothing(&cmd) => {
-                        self.forms.reset(FormKind::Invoice);
+                        self.forms.reset(kind);
                         if let Some(page) = self.edit_return.take() {
                             self.page = page;
                         }
@@ -1062,7 +1062,10 @@ impl LedgerApp {
                         }
                         for kind in [
                             FormKind::Invoice,
+                            FormKind::SalesReceipt,
                             FormKind::ReceivePayment,
+                            FormKind::CreditMemo,
+                            FormKind::Refund,
                             FormKind::Deposit,
                         ] {
                             if ui.button(kind.title()).clicked() {
@@ -1224,7 +1227,9 @@ impl LedgerApp {
                 ui.label(RichText::new("Create").color(theme::NAV_TEXT).small());
                 for kind in [
                     FormKind::Invoice,
+                    FormKind::SalesReceipt,
                     FormKind::ReceivePayment,
+                    FormKind::CreditMemo,
                     FormKind::Bill,
                     FormKind::PayBills,
                     FormKind::Check,
@@ -1684,6 +1689,21 @@ impl eframe::App for LedgerApp {
                             }
                             Page::Form(FormKind::Journal) => {
                                 forms::journal(ui, company, &mut self.forms.journal, &mut actions)
+                            }
+                            Page::Form(FormKind::SalesReceipt) => forms::sales_receipt(
+                                ui,
+                                company,
+                                &mut self.forms.sales_receipt,
+                                &mut actions,
+                            ),
+                            Page::Form(FormKind::CreditMemo) => forms::credit_memo(
+                                ui,
+                                company,
+                                &mut self.forms.credit_memo,
+                                &mut actions,
+                            ),
+                            Page::Form(FormKind::Refund) => {
+                                forms::refund(ui, company, &mut self.forms.refund, &mut actions)
                             }
                             _ => {}
                         });

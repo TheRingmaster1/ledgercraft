@@ -15,9 +15,10 @@
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_ledger::{
     tax_payment_memo, AccountId, AccountLine, AccountType, Address, Applied, BankRule, Bill, Check,
-    Company, Contact, CustomerId, CustomerTax, Deposit, Invoice, ItemId, ItemKind, ItemSpec,
-    JournalEntry, JournalLine, LedgerError, LedgerResult, Party, PayBill, ReceivePayment,
-    SalesLine, TaxGroupId, TaxRate, TxnBody, TxnId, VendorId,
+    Company, Contact, CreditMemo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
+    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Party, PayBill,
+    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, TaxRate, TxnBody, TxnId,
+    VendorId,
 };
 
 fn d(y: i32, m: u32, day: u32) -> LedgerResult<Date> {
@@ -117,11 +118,34 @@ fn invoice(
     group: Option<TaxGroupId>,
     lines: &[(ItemId, &str, i64, Money)],
 ) -> LedgerResult<TxnId> {
+    let (lines, tax) = sale_lines(c, date, group, lines)?;
+    let ar_account = acct(c, "Accounts Receivable")?;
+    c.post(
+        date,
+        number,
+        memo,
+        TxnBody::Invoice(Invoice {
+            customer,
+            due_date: date.add_days(terms),
+            ar_account,
+            tax,
+            lines,
+        }),
+    )
+}
+
+/// The lines of a sale, and `group`'s tax on the taxable ones (none when
+/// nothing is taxable), the way the forms work it out.
+fn sale_lines(
+    c: &Company,
+    date: Date,
+    group: Option<TaxGroupId>,
+    lines: &[(ItemId, &str, i64, Money)],
+) -> LedgerResult<(Vec<SalesLine>, Option<InvoiceTax>)> {
     let lines = lines
         .iter()
         .map(|(item, desc, qty, rate)| sale(c, *item, desc, *qty, *rate))
         .collect::<LedgerResult<Vec<_>>>()?;
-    let ar_account = acct(c, "Accounts Receivable")?;
     let tax = match group {
         Some(g) => {
             let taxable = lines
@@ -137,26 +161,95 @@ fn invoice(
         }
         None => None,
     };
+    Ok((lines, tax))
+}
+
+/// A sale paid on the spot; `customer` is `None` for a walk-in.
+#[allow(clippy::too_many_arguments)]
+fn sales_receipt(
+    c: &mut Company,
+    date: Date,
+    number: &str,
+    customer: Option<CustomerId>,
+    deposit_to: AccountId,
+    method: &str,
+    group: Option<TaxGroupId>,
+    lines: &[(ItemId, &str, i64, Money)],
+) -> LedgerResult<TxnId> {
+    let (lines, tax) = sale_lines(c, date, group, lines)?;
     c.post(
         date,
         number,
-        memo,
-        TxnBody::Invoice(Invoice {
+        "",
+        TxnBody::SalesReceipt(SalesReceipt {
             customer,
-            due_date: date.add_days(terms),
-            ar_account,
-            tax,
+            deposit_to,
+            method: method.into(),
             lines,
+            tax,
         }),
     )
 }
 
-/// What an invoice comes to, tax included.
-fn total(c: &Company, id: TxnId) -> LedgerResult<Money> {
-    match c.txn(id).map(|t| &t.body) {
-        Some(TxnBody::Invoice(i)) => i.total().ok_or(LedgerError::Overflow),
-        _ => Err(LedgerError::NotFound(format!("Invoice {id}"))),
+/// A credit memo, all of it applied to `apply_to` if given.
+#[allow(clippy::too_many_arguments)]
+fn credit_memo(
+    c: &mut Company,
+    date: Date,
+    number: &str,
+    memo: &str,
+    customer: CustomerId,
+    group: Option<TaxGroupId>,
+    lines: &[(ItemId, &str, i64, Money)],
+    apply_to: Option<TxnId>,
+) -> LedgerResult<TxnId> {
+    let (lines, tax) = sale_lines(c, date, group, lines)?;
+    let ar_account = acct(c, "Accounts Receivable")?;
+    let mut body = CreditMemo {
+        customer,
+        ar_account,
+        lines,
+        tax,
+        applied: Vec::new(),
+    };
+    if let Some(txn) = apply_to {
+        let amount = body.total().ok_or(LedgerError::Overflow)?;
+        body.applied.push(Applied { txn, amount });
     }
+    c.post(date, number, memo, TxnBody::CreditMemo(body))
+}
+
+/// Pays back credit memos (`None`: all the credit left on one).
+fn refund(
+    c: &mut Company,
+    date: Date,
+    customer: CustomerId,
+    pay_from: AccountId,
+    method: &str,
+    list: &[(TxnId, Option<Money>)],
+) -> LedgerResult<TxnId> {
+    let ar_account = acct(c, "Accounts Receivable")?;
+    let (amount, applied) = applied(c, list);
+    c.post(
+        date,
+        "",
+        "",
+        TxnBody::Refund(Refund {
+            customer,
+            pay_from,
+            ar_account,
+            amount,
+            method: method.into(),
+            applied,
+        }),
+    )
+}
+
+/// What a sale or payment comes to, tax included.
+fn total(c: &Company, id: TxnId) -> LedgerResult<Money> {
+    c.txn(id)
+        .and_then(|t| t.body.total())
+        .ok_or_else(|| LedgerError::NotFound(format!("Transaction {id}")))
 }
 
 /// Payments applied to invoices or bills: an amount, or `None` for all that
@@ -1228,7 +1321,7 @@ fn rest_of_year(
             line(undeposited, "Harbor Design Studio check #5120", harbor_pay),
         ],
     )?;
-    invoice(
+    let inv1009 = invoice(
         c,
         d(2026, 6, 10)?,
         "1009",
@@ -1256,6 +1349,38 @@ fn rest_of_year(
         power,
         20,
         vec![line(utilities, "Shop power, May", cents(36_204))],
+    )?;
+    // A weekend craft fair: walk-in sales, paid on the spot.
+    let fair_cash = sales_receipt(
+        c,
+        d(2026, 6, 13)?,
+        "1001",
+        None,
+        undeposited,
+        "Cash",
+        Some(springville),
+        &[(chair, "Matching hardwood chair", 2, dollars(325))],
+    )?;
+    let fair_card = sales_receipt(
+        c,
+        d(2026, 6, 13)?,
+        "1002",
+        None,
+        undeposited,
+        "Visa",
+        Some(springville),
+        &[(bookshelf, "Five-shelf bookcase, solid oak", 1, dollars(890))],
+    )?;
+    let (cash, card_sale) = (total(c, fair_cash)?, total(c, fair_card)?);
+    deposit(
+        c,
+        d(2026, 6, 15)?,
+        "Craft fair takings",
+        checking,
+        vec![
+            line(undeposited, "Craft fair cash", cash),
+            line(undeposited, "Craft fair card sales", card_sale),
+        ],
     )?;
     let inv1010 = invoice(
         c,
@@ -1332,6 +1457,29 @@ fn rest_of_year(
         vec![line(rent, "Shop rent", dollars(1_800))],
     )?;
     pay_bills(c, d(2026, 7, 2)?, "1017", power, &[(power_jun, None)])?;
+    // One of Alpine Lodge's chairs arrived scratched: a credit against 1009.
+    credit_memo(
+        c,
+        d(2026, 7, 2)?,
+        "1001",
+        "Scratched chair",
+        alpine,
+        Some(provo),
+        &[(chair, "Credit for one scratched chair", 1, dollars(325))],
+        Some(inv1009),
+    )?;
+    // Dana Lin returned a chair she had paid for, and was refunded.
+    let returned = credit_memo(
+        c,
+        d(2026, 7, 8)?,
+        "1002",
+        "Returned chair",
+        lin,
+        Some(lehi),
+        &[(chair, "Returned chair", 1, dollars(325))],
+        None,
+    )?;
+    refund(c, d(2026, 7, 10)?, lin, checking, "Refund to Visa", &[(returned, None)])?;
     check(
         c,
         d(2026, 7, 6)?,
@@ -1491,6 +1639,20 @@ fn rest_of_year(
         20,
         vec![line(utilities, "Shop power, July", cents(44_190))],
     )?;
+    // Paid on the spot when the work was picked up.
+    sales_receipt(
+        c,
+        d(2026, 8, 20)?,
+        "1003",
+        Some(maple),
+        checking,
+        "Visa",
+        Some(provo),
+        &[
+            (refinish, "Refinish two cafe tables", 3, dollars(65)),
+            (delivery, "Delivery and set-up", 1, dollars(75)),
+        ],
+    )?;
     check(
         c,
         d(2026, 8, 21)?,
@@ -1607,13 +1769,17 @@ fn rest_of_year(
         ],
     )?;
     // Alpine Lodge pays a little of what they owe.
-    receive(
+    receive(c, d(2026, 9, 20)?, alpine, checking, "Check #388", &[(cabins, Some(dollars(1_000)))])?;
+    // An allowance for a late delivery, not used yet.
+    credit_memo(
         c,
-        d(2026, 9, 20)?,
-        alpine,
-        checking,
-        "Check #388",
-        &[(cabins, Some(dollars(1_000)))],
+        d(2026, 9, 25)?,
+        "1003",
+        "Allowance for a late delivery",
+        harbor,
+        None,
+        &[(design, "Allowance for a late delivery", 2, dollars(85))],
+        None,
     )?;
     check(
         c,

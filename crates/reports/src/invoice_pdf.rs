@@ -1,4 +1,5 @@
-//! An invoice as a PDF, ready to email or print.
+//! An invoice, sales receipt or credit memo as a PDF, ready to email or
+//! print.
 //!
 //! The layout: the company's name and contact details at the top left, the
 //! word INVOICE and the invoice's number, dates and terms at the top right,
@@ -7,7 +8,7 @@
 //! the column headings; every page is numbered.
 
 use ledgercraft_core::Money;
-use ledgercraft_ledger::{Company, CustomerId, Invoice, Transaction, TxnBody, TxnId};
+use ledgercraft_ledger::{Company, CustomerId, Sale, Transaction, TxnBody, TxnId};
 
 use crate::pdf::{finish, wrap, Align, Font, Page, Rgb};
 
@@ -50,6 +51,12 @@ struct TotalLine {
 
 /// Everything the page shows, gathered from the books first.
 struct Sheet {
+    /// INVOICE, SALES RECEIPT or CREDIT MEMO.
+    heading: &'static str,
+    /// Invoice, Sales Receipt or Credit Memo, for "continued" lines.
+    kind: &'static str,
+    /// BILL TO, SOLD TO or CREDIT TO.
+    to_label: &'static str,
     company: String,
     company_lines: Vec<String>,
     number: String,
@@ -62,31 +69,44 @@ struct Sheet {
     memo: String,
 }
 
-/// A suggested file name: `Invoice 1001.pdf`.
+/// Whether a transaction prints as a PDF: invoices, sales receipts and
+/// credit memos do.
+pub fn has_pdf(body: &TxnBody) -> bool {
+    body.sale().is_some()
+}
+
+/// A suggested file name: `Invoice 1001.pdf`, `Credit Memo 12.pdf`.
 pub fn invoice_pdf_name(company: &Company, id: TxnId) -> String {
     match company.txn(id) {
-        Some(t) if !t.number.trim().is_empty() => format!("Invoice {}.pdf", t.number.trim()),
-        _ => "Invoice.pdf".into(),
+        Some(t) if !t.number.trim().is_empty() => {
+            format!("{} {}.pdf", t.body.label(), t.number.trim())
+        }
+        Some(t) => format!("{}.pdf", t.body.label()),
+        None => "Invoice.pdf".into(),
     }
 }
 
-/// The invoice as a PDF file. `currency` is the symbol amounts are shown
-/// with, such as `$` or `€`.
+/// An invoice, sales receipt or credit memo as a PDF file. `currency` is the
+/// symbol amounts are shown with, such as `$` or `€`.
 pub fn invoice_pdf(company: &Company, id: TxnId, currency: &str) -> Result<Vec<u8>, String> {
     let t = company
         .txn(id)
         .ok_or_else(|| format!("Transaction {id} was not found."))?;
-    let TxnBody::Invoice(invoice) = &t.body else {
-        return Err(format!("{} is not an invoice.", t.body.label()));
+    let Some(sale) = t.body.sale() else {
+        return Err(format!(
+            "A {} has no PDF; invoices, sales receipts and credit memos do.",
+            t.body.label()
+        ));
     };
-    let sheet = gather(company, t, invoice, currency)?;
+    let sheet = gather(company, t, &sale, currency)?;
     let title = if sheet.number.is_empty() {
         format!(
-            "Invoice for {}",
+            "{} for {}",
+            sheet.kind,
             sheet.bill_to.first().map_or("", String::as_str)
         )
     } else {
-        format!("Invoice {}", sheet.number)
+        format!("{} {}", sheet.kind, sheet.number)
     };
     Ok(finish(&layout(&sheet), &title))
 }
@@ -139,40 +159,57 @@ pub(crate) fn bill_to(c: &Company, customer: CustomerId) -> Vec<String> {
     bill_to
 }
 
-fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result<Sheet, String> {
+fn gather(c: &Company, t: &Transaction, sale: &Sale<'_>, currency: &str) -> Result<Sheet, String> {
     let money = |m: Money| m.format_with(currency);
-    let total = inv
-        .total()
-        .ok_or("The invoice total is too large to print.")?;
-    let open = if t.voided {
-        Money::ZERO
-    } else {
-        c.open_balance(t.id, None)
+    let too_large = || format!("The {} total is too large to print.", t.body.label());
+    let total = sale.total().ok_or_else(too_large)?;
+    // What is still owed on an invoice, or left of a credit; nothing on a
+    // sales receipt, which is paid when it is made.
+    let open = match &t.body {
+        _ if t.voided => Money::ZERO,
+        TxnBody::SalesReceipt(_) => Money::ZERO,
+        _ => c.open_balance(t.id, None),
     };
     let applied = total.saturating_sub(open);
 
     let info = &c.info;
     let company_lines = company_lines(c);
-    let bill_to = bill_to(c, inv.customer);
+    let bill_to = match sale.customer {
+        Some(customer) => bill_to(c, customer),
+        None => Vec::new(),
+    };
 
     let number = t.number.trim().to_string();
     let mut facts = Vec::new();
+    let (heading, to_label, number_label) = match &t.body {
+        TxnBody::SalesReceipt(_) => ("SALES RECEIPT", "SOLD TO", "Receipt #"),
+        TxnBody::CreditMemo(_) => ("CREDIT MEMO", "CREDIT TO", "Credit memo #"),
+        _ => ("INVOICE", "BILL TO", "Invoice #"),
+    };
     if !number.is_empty() {
-        facts.push(("Invoice #", number.clone()));
+        facts.push((number_label, number.clone()));
     }
     facts.push(("Date", t.date.to_string()));
-    facts.push(("Due date", inv.due_date.to_string()));
-    let days = t.date.days_until(inv.due_date);
-    facts.push((
-        "Terms",
-        if days <= 0 {
-            "Due on receipt".to_string()
-        } else {
-            format!("Net {days}")
-        },
-    ));
+    match &t.body {
+        TxnBody::Invoice(inv) => {
+            facts.push(("Due date", inv.due_date.to_string()));
+            let days = t.date.days_until(inv.due_date);
+            facts.push((
+                "Terms",
+                if days <= 0 {
+                    "Due on receipt".to_string()
+                } else {
+                    format!("Net {days}")
+                },
+            ));
+        }
+        TxnBody::SalesReceipt(r) if !r.method.trim().is_empty() => {
+            facts.push(("Paid by", r.method.trim().to_string()));
+        }
+        _ => {}
+    }
 
-    let lines = inv
+    let lines = sale
         .lines
         .iter()
         .map(|l| {
@@ -206,13 +243,10 @@ fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result
         .collect();
 
     let mut totals = Vec::new();
-    if let Some(tax) = &inv.tax {
+    if let Some(tax) = sale.tax {
         totals.push(TotalLine {
             label: "Subtotal".into(),
-            amount: money(
-                inv.subtotal()
-                    .ok_or("The invoice total is too large to print.")?,
-            ),
+            amount: money(sale.subtotal().ok_or_else(too_large)?),
             strong: false,
         });
         for l in &tax.lines {
@@ -223,32 +257,43 @@ fn gather(c: &Company, t: &Transaction, inv: &Invoice, currency: &str) -> Result
             });
         }
     }
+    let credit = matches!(t.body, TxnBody::CreditMemo(_));
+    let receipt = matches!(t.body, TxnBody::SalesReceipt(_));
     totals.push(TotalLine {
-        label: "Total".into(),
+        label: if credit { "Total credit" } else { "Total" }.into(),
         amount: money(total),
-        strong: t.voided,
+        strong: t.voided || receipt,
     });
-    if !t.voided {
+    if !t.voided && !receipt {
         if !applied.is_zero() {
             totals.push(TotalLine {
-                label: "Payments applied".into(),
+                label: if credit {
+                    "Applied or refunded"
+                } else {
+                    "Payments applied"
+                }
+                .into(),
                 amount: money(applied.saturating_neg()),
                 strong: false,
             });
         }
         totals.push(TotalLine {
-            label: "Balance due".into(),
+            label: if credit { "Credit remaining" } else { "Balance due" }.into(),
             amount: money(open),
             strong: true,
         });
     }
 
     Ok(Sheet {
+        heading,
+        kind: t.body.label(),
+        to_label,
         company: info.name.trim().to_string(),
         company_lines,
         number,
         void: t.voided,
-        paid: !t.voided && open.is_zero() && total.is_positive(),
+        // A sales receipt is paid; a used-up credit memo is not "paid".
+        paid: !t.voided && !credit && open.is_zero() && total.is_positive(),
         facts,
         bill_to,
         lines,
@@ -391,7 +436,7 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
     p.text(
         RIGHT,
         66.0,
-        "INVOICE",
+        s.heading,
         Font::bold(24.0),
         ACCENT,
         Align::Right,
@@ -415,8 +460,10 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
     }
 
     let mut y = left_bottom.max(ry) + 18.0;
-    p.text(LEFT, y, "BILL TO", Font::bold(8.5), ACCENT, Align::Left);
-    y += 15.0;
+    if !s.bill_to.is_empty() {
+        p.text(LEFT, y, s.to_label, Font::bold(8.5), ACCENT, Align::Left);
+        y += 15.0;
+    }
     for (i, l) in s.bill_to.iter().enumerate() {
         let (font, color) = if i == 0 {
             (Font::bold(10.5), INK)
@@ -433,9 +480,9 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
 fn continued_top(p: &mut Page, s: &Sheet) -> f32 {
     p.text(LEFT, 60.0, &s.company, Font::bold(11.0), INK, Align::Left);
     let label = if s.number.is_empty() {
-        "Invoice (continued)".to_string()
+        format!("{} (continued)", s.kind)
     } else {
-        format!("Invoice {} (continued)", s.number)
+        format!("{} {} (continued)", s.kind, s.number)
     };
     p.text(RIGHT, 60.0, &label, Font::regular(9.5), MUTED, Align::Right);
     column_headings(p, 76.0)
@@ -643,6 +690,71 @@ mod tests {
         }
         let text = text_of(&invoice_pdf(&c, inv, "$").unwrap());
         assert!(text.contains("(VOID) Tj"));
+        assert!(!text.contains("(Balance due) Tj"));
+    }
+
+    #[test]
+    fn credit_memos_and_sales_receipts_print_with_their_own_headings() {
+        let (mut c, inv, _) = books();
+        let sales = c.account_by_name("Sales").unwrap().id;
+        let line = SalesLine {
+            item: None,
+            description: "Returned chair".into(),
+            qty: Qty::ONE,
+            rate: Money::from_dollars(150),
+            taxable: false,
+            account: sales,
+        };
+        let customer = match &c.txn(inv).unwrap().body {
+            TxnBody::Invoice(i) => i.customer,
+            _ => CustomerId(0),
+        };
+        // $150 credited, $100 of it against invoice 1001.
+        let memo = ledgercraft_ledger::CreditMemo {
+            customer,
+            ar_account: c.account_by_name("Accounts Receivable").unwrap().id,
+            lines: vec![line.clone()],
+            tax: None,
+            applied: vec![ledgercraft_ledger::Applied {
+                txn: inv,
+                amount: Money::from_dollars(100),
+            }],
+        };
+        let date = Date::parse("2026-01-20").unwrap();
+        let memo = c
+            .post(date, "CM-7", "", TxnBody::CreditMemo(memo))
+            .unwrap();
+        let text = text_of(&invoice_pdf(&c, memo, "$").unwrap());
+        for shown in [
+            "(CREDIT MEMO) Tj",
+            "(CREDIT TO) Tj",
+            "(Total credit) Tj",
+            "(Credit remaining) Tj",
+            "($50.00) Tj",
+        ] {
+            assert!(text.contains(shown), "missing {shown}");
+        }
+        assert_eq!(invoice_pdf_name(&c, memo), "Credit Memo CM-7.pdf");
+        // The invoice shows the credit among what was applied to it.
+        let text = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        assert!(text.contains("($4,850.00) Tj"));
+
+        // A walk-in sale: no customer block, paid in full.
+        let receipt = ledgercraft_ledger::SalesReceipt {
+            customer: None,
+            deposit_to: c.account_by_name("Checking").unwrap().id,
+            method: "Cash".into(),
+            lines: vec![line],
+            tax: None,
+        };
+        let receipt = c
+            .post(date, "SR-1", "", TxnBody::SalesReceipt(receipt))
+            .unwrap();
+        let text = text_of(&invoice_pdf(&c, receipt, "$").unwrap());
+        assert!(text.contains("(SALES RECEIPT) Tj"));
+        assert!(text.contains("(Cash) Tj"));
+        assert!(text.contains("(Paid in full. Thank you!) Tj"));
+        assert!(!text.contains("(SOLD TO) Tj"));
         assert!(!text.contains("(Balance due) Tj"));
     }
 }

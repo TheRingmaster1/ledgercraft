@@ -7,7 +7,10 @@ postings of every transaction sum to zero.
 | Form | Debit | Credit |
 |------|-------|--------|
 | Invoice | Accounts Receivable (total), name = customer | each line's income account |
+| Sales Receipt | Deposit-to account (bank or Undeposited Funds), total | each line's income account; Sales Tax Payable |
 | Receive Payment | Deposit-to account (bank or Undeposited Funds) | Accounts Receivable |
+| Credit Memo | each line's income account; Sales Tax Payable | Accounts Receivable (total), name = customer |
+| Refund | Accounts Receivable, name = customer | Bank or credit card |
 | Make Deposit | Bank (total) | each line's account (often Undeposited Funds) |
 | Enter Bill | each line's expense/asset account | Accounts Payable (total), name = vendor |
 | Pay Bills | Accounts Payable | Bank or credit card |
@@ -23,9 +26,20 @@ bank balance is money you have and a positive Accounts Payable is money you owe.
 ## Open balances and payments
 
 An invoice's open balance is its total less amounts applied to it by
-non-voided payments dated on or before the report date. A payment cannot apply
-more than is open, and cannot apply more than its own amount; any unapplied
-remainder stays on the customer's A/R as a credit.
+non-voided payments and credit memos dated on or before the report date. A
+payment cannot apply more than is open, and cannot apply more than its own
+amount; any unapplied remainder stays on the customer's A/R as a credit.
+
+A credit memo's credit left is its total less what it applies to invoices and
+what refunds pay out of it. Applying a credit memo to an invoice moves no
+money (both are already on Accounts Receivable); it only says which invoice
+the credit settles. A refund must be applied in full to credit memos, and a
+credit memo with a refund against it cannot be voided, or edited below what it
+has applied and refunded, until the refund is voided.
+
+Sales receipts and credit memos carry sales tax the same way invoices do:
+receipts collect it, credit memos give it back, and both count on the Sales
+Tax Liability report and in what Pay Sales Tax says is owed.
 
 ## Voiding
 

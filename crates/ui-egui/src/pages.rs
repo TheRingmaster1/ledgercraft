@@ -6,7 +6,7 @@ use ledgercraft_core::{Date, Money};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
     AccountId, AccountType, Address, Company, Contact, Customer, CustomerId, CustomerTax, Item,
-    ItemId, ItemKind, ItemSpec, TxnBody, TxnId, VendorId,
+    ItemId, ItemKind, ItemSpec, TxnId, VendorId,
 };
 use ledgercraft_reports::{account_register, ReportKind};
 
@@ -303,6 +303,12 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
             );
             arrow(ui);
             flow_button(ui, "Record Deposits", Page::Form(FormKind::Deposit), out);
+        });
+        ui.add_space(4.0);
+        ui.horizontal_wrapped(|ui| {
+            flow_button(ui, "Sales Receipts", Page::Form(FormKind::SalesReceipt), out);
+            flow_button(ui, "Credit Memos", Page::Form(FormKind::CreditMemo), out);
+            flow_button(ui, "Refunds", Page::Form(FormKind::Refund), out);
         });
         ui.add_space(10.0);
         ui.label(RichText::new("Banking and company").color(theme::MUTED));
@@ -1073,12 +1079,10 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
                                     out.push(void(t.id));
                                 }
                                 // Last, so Edit and Void line up on every row.
-                                if matches!(t.body, TxnBody::Invoice(_))
+                                if ledgercraft_reports::has_pdf(&t.body)
                                     && ui
                                         .small_button("PDF")
-                                        .on_hover_text(
-                                            "Save this invoice as a PDF to email or print",
-                                        )
+                                        .on_hover_text("Save it as a PDF to email or print")
                                         .clicked()
                                 {
                                     out.push(Action::InvoicePdf(t.id));

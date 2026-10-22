@@ -8,6 +8,18 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Sales receipts, credit memos and refunds (M2.6). Customers > Enter Sales
+  Receipt records a sale paid on the spot (customer optional, deposited to a
+  bank or Undeposited Funds). Create Credit Memo credits a customer for a
+  return or allowance, taking back the sale and its sales tax; the credit can
+  pay down their open invoices or be kept. Refund a Credit pays credit back
+  from a bank or credit card account. All three are on the Customers menu, the
+  side bar and Home, edit like other transactions, and receipts and credit
+  memos save as PDFs (SALES RECEIPT / CREDIT MEMO). Credit left shows on
+  statements and as a negative in A/R Aging; the Sales Tax Liability report
+  and Pay Sales Tax count receipts and subtract credits. A tutorial lesson
+  covers them, and the sample company has a craft fair's sales, a credit
+  applied to an invoice, a refunded return and an unused credit.
 - The sample company now runs January to October 2026 and uses every
   feature: full contact details, sales tax in three cities with a dated rate
   change, an exempt reseller, a quarterly tax payment with the next one still

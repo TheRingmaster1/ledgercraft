@@ -34,6 +34,17 @@ impl FormKind {
                 "Advanced: move amounts between any accounts directly, for corrections and \
                  adjustments. Debits must equal credits."
             }
+            Self::SalesReceipt => {
+                "Record a sale paid for on the spot (cash, card or check): no invoice, and \
+                 nothing owed."
+            }
+            Self::CreditMemo => {
+                "Credit a customer for a return, a discount or a mistake. It lowers what \
+                 they owe and can pay down their open invoices."
+            }
+            Self::Refund => {
+                "Pay a customer back the credit left on their credit memos."
+            }
         }
     }
 }

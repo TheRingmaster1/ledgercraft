@@ -477,6 +477,18 @@ mod tests {
         assert!(c.reconciliations_for(account("Checking")).is_empty());
         assert!(c.account_balance(account("Checking"), None).is_positive());
 
+        // Sales paid on the spot, credits applied, refunded and still open.
+        assert!(c.transactions.iter().any(|t| matches!(t.body, TxnBody::SalesReceipt(_))));
+        assert!(c
+            .transactions
+            .iter()
+            .any(|t| matches!(&t.body, TxnBody::CreditMemo(m) if !m.applied.is_empty())));
+        assert!(c.transactions.iter().any(|t| matches!(t.body, TxnBody::Refund(_))));
+        assert!(c
+            .customers
+            .iter()
+            .any(|x| !c.open_credits_for(x.id, None).is_empty()));
+
         // Mistakes voided, things retired, rules for the bank download.
         assert!(c
             .transactions
