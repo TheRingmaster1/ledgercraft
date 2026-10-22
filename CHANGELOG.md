@@ -162,8 +162,9 @@ fixes to a release. See docs/releasing.md.
   the work, drawn with arrows (Create Invoices → Receive Payments → Record
   Deposits, with Sales Receipts feeding straight into the deposit; Credit
   Memos → Refunds; Enter Bills → Pay Bills; Import Transactions →
-  Reconcile). Less common steps are smaller boxes; the Customers and
-  Vendors titles open their lists, and Banking links to Transactions. At A
+  Reconcile). Less common steps are smaller boxes; the Customers* and
+  Vendors* titles open their lists (the asterisk points to a note saying so
+  at the bottom of the card), and Banking links to Transactions. At A
   Glance is a card beside them, or below in a narrow window. Create
   Statement… is in the side bar's Create list.
 - Home no longer opens with the workflow squeezed into half the page (its
