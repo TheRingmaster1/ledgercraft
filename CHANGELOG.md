@@ -30,7 +30,19 @@ fixes to a release. See docs/releasing.md.
   it. Importing adds the taxes and a group, or brings existing ones up to
   date (matched by jurisdiction code), and counts as checking the rates.
   `ledgercraft-cli tax-import FILE --rates CSV --boundary CSV --zip ZIP+4`
-  and the `tax.import` command; the import window comes with the screens.
+  and the `tax.import` command.
+- Sales tax, part 2 (the screens): Lists > Sales Tax lists the taxes (with
+  each one's dated rates to change) and the tax groups, and imports rates
+  from state files in a window that reads the large boundary file in the
+  background and, for a bare ZIP, offers each location in it. Customers have
+  a Sales tax column (a group, or Exempt with a certificate number);
+  Products and Services a Taxable column. Invoices choose a tax group
+  (starting with the customer's), mark each line taxed or not, and show the
+  subtotal, each tax and the total; the PDF prints them, and "Sales tax
+  exempt" for exempt customers. When the rates for an edited invoice's date
+  have changed since it was recorded, the form says so. The quarterly
+  reminder pops up when a company is opened: Review Rates, Rates Are Up to
+  Date, or Remind Me Later. A new tutorial lesson, "Charging sales tax".
   Checked against Utah's October 2026 files: for all 350 Utah locations the
   imported rates add up to the combined rate in Utah's published list.
 - PDF invoices. Save as PDF… on the invoice form records the invoice (or the

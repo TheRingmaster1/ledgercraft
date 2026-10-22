@@ -16,6 +16,7 @@ mod pages;
 mod prefs;
 mod recent;
 mod reconcile;
+mod salestax;
 mod security;
 mod start;
 mod theme;
@@ -40,6 +41,7 @@ pub(crate) enum Page {
     Reports,
     Reconcile,
     BankImport,
+    SalesTax,
     Form(FormKind),
 }
 
@@ -78,6 +80,9 @@ pub(crate) enum Reset {
     NewCustomer,
     NewVendor,
     NewItem,
+    NewTax,
+    NewTaxGroup,
+    NewTaxRate,
 }
 
 // `Run` carries a whole `Command` (contacts are large); a handful per frame is fine.

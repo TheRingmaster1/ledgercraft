@@ -294,6 +294,50 @@ const LESSONS: &[Lesson] = &[
         try_it: &[("Create an invoice", form(FormKind::Invoice))],
     },
     Lesson {
+        title: "Charging sales tax",
+        blocks: &[
+            Text(
+                "A sales tax is one agency's rate (state, county, city or district) with the \
+                 date each rate starts. A tax group is the taxes charged together where you \
+                 sell, such as state + county + city. Invoices charge a group; the tax goes \
+                 to Sales Tax Payable, what you owe the state.",
+            ),
+            Heading("Setting it up"),
+            Steps(&[
+                "Open Lists > Sales Tax.",
+                "In most states, click Import Rates from State Files…: download your state's \
+                 rate file and boundary file (Rate and Boundary Files at \
+                 streamlinedsalestax.org), choose them, and type your ZIP+4. LedgerCraft adds \
+                 each tax with its rate history and a group for your location.",
+                "Or add each tax by hand under New sales tax, then put them together under \
+                 New tax group.",
+                "In Products and Services, untick Taxable for anything not taxed (many \
+                 services). In Customers, choose each customer's group, or Exempt with their \
+                 certificate number.",
+            ]),
+            Heading("On an invoice"),
+            Bullets(&[
+                "Sales tax starts with the customer's group (or your only one). Change it, \
+                 or choose No sales tax.",
+                "The Tax box on each line says whether it is taxed. The subtotal, each tax \
+                 and the total show under the lines, and on the PDF.",
+                "The tax uses the rates in force on the invoice's date, and is kept on the \
+                 invoice: changing a rate later never changes an invoice already recorded.",
+            ]),
+            Heading("Keeping rates current"),
+            Text(
+                "States change rates at the start of a quarter and publish them the month \
+                 before. From March, June, September and December 1, LedgerCraft reminds you \
+                 to check: import the new files, or click Rates Are Up to Date.",
+            ),
+            Tip(
+                "Pay what you owe with Write Check: choose the state agency as payee and Sales \
+                 Tax Payable as the account.",
+            ),
+        ],
+        try_it: &[("Open Sales Tax", Target::Page(Page::SalesTax))],
+    },
+    Lesson {
         title: "Receiving payments and deposits",
         blocks: &[
             Text(
@@ -585,7 +629,7 @@ const LESSONS: &[Lesson] = &[
             ),
             Heading("Coming later"),
             Text(
-                "Live bank connections, sales tax, printable invoices and more. See ROADMAP.md in the \
+                "Live bank connections, a sales tax liability report, customer statements and more. See ROADMAP.md in the \
                  project for the plan. Help > Licenses and Help > About explain the open- \
                  source licence (and the licence of Inter, the font LedgerCraft's text is \
                  set in).",

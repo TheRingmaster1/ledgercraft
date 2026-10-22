@@ -9,8 +9,8 @@ use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
     AccountId, AccountLine, AccountType, Applied, Bill, Check, Company, CustomerId, Deposit,
-    Invoice, ItemId, JournalEntry, JournalLine, Party, PayBill, ReceivePayment, SalesLine,
-    Transaction, TxnBody, TxnId, VendorId,
+    Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill, ReceivePayment,
+    SalesLine, TaxGroupId, Transaction, TxnBody, TxnId, VendorId,
 };
 
 use crate::widgets::{self, field, money_label};
@@ -33,6 +33,8 @@ pub(crate) struct SalesLineInput {
     pub qty: String,
     pub rate: String,
     pub account: Option<AccountId>,
+    /// Sales tax is not charged on this line.
+    pub no_tax: bool,
 }
 
 impl SalesLineInput {
@@ -53,6 +55,10 @@ pub(crate) struct InvoiceForm {
     pub number: String,
     pub memo: String,
     pub lines: Vec<SalesLineInput>,
+    /// The tax group charged; `None` for no sales tax.
+    pub tax_group: Option<TaxGroupId>,
+    /// While editing: the tax the invoice charged when recorded.
+    pub recorded_tax: Option<Money>,
 }
 
 impl Default for InvoiceForm {
@@ -65,7 +71,27 @@ impl Default for InvoiceForm {
             number: String::new(),
             memo: String::new(),
             lines: vec![SalesLineInput::default()],
+            tax_group: None,
+            recorded_tax: None,
         }
+    }
+}
+
+/// The tax group a new invoice for `customer` starts with: none for an
+/// exempt customer; otherwise their group, or the company's only one.
+pub(crate) fn default_tax_group(c: &Company, customer: Option<CustomerId>) -> Option<TaxGroupId> {
+    let tax = customer.and_then(|id| c.customer(id)).map(|x| &x.tax);
+    if tax.is_some_and(|t| t.exempt) {
+        return None;
+    }
+    let usable = |g: TaxGroupId| c.tax_group(g).is_some_and(|g| g.active);
+    if let Some(g) = tax.and_then(|t| t.group).filter(|g| usable(*g)) {
+        return Some(g);
+    }
+    let mut active = c.tax_groups.iter().filter(|g| g.active);
+    match (active.next(), active.next()) {
+        (Some(only), None) => Some(only.id),
+        _ => None,
     }
 }
 
@@ -240,8 +266,11 @@ impl Forms {
                             qty: l.qty.to_string(),
                             rate: l.rate.to_plain_string(),
                             account: Some(l.account),
+                            no_tax: !l.taxable,
                         })
                         .collect(),
+                    tax_group: inv.tax.as_ref().map(|t| t.group),
+                    recorded_tax: inv.tax.as_ref().and_then(InvoiceTax::total),
                 };
                 FormKind::Invoice
             }
@@ -477,6 +506,8 @@ fn command_for(editing: Option<TxnId>, built: Result<Command, String>) -> Result
 /// The account box on invoice and journal lines (narrower than elsewhere, so
 /// the lines fit the smallest window).
 const LINE_ACCOUNT_WIDTH: f32 = 170.0;
+/// The Tax checkbox column on invoice lines, with its gap.
+const TAX_BOX_WIDTH: f32 = 24.0 + 8.0;
 /// The x (remove line) button, padding included.
 const REMOVE_WIDTH: f32 = 28.0;
 /// What an invoice line's other columns take: item 130, qty 50, rate 80,
@@ -563,6 +594,7 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
             widgets::hint_label(ui, "Customer");
             if widgets::customer_combo(ui, "inv_customer", c, &mut f.customer) {
                 set_due_from_terms(c, f);
+                f.tax_group = default_tax_group(c, f.customer);
             }
             pairs.end(ui, false);
             widgets::hint_label(ui, "Invoice #");
@@ -584,26 +616,30 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
             ui.label(RichText::new(format!("Bill to: {addr}")).color(theme::MUTED));
         }
     }
+    // Sales tax: once the company has any.
+    let taxes_on = !c.tax_groups.is_empty() || f.tax_group.is_some();
+    if taxes_on {
+        tax_choice(ui, c, f);
+    }
     ui.add_space(8.0);
 
     let mut remove = None;
     let mut total = Money::ZERO;
+    let mut taxable = Money::ZERO;
     // Description takes the room the other columns leave.
-    let description_width = flex_width(ui, INVOICE_FIXED, 80.0, 420.0);
-    egui::Grid::new(("inv_lines", width_step(description_width)))
+    let fixed = INVOICE_FIXED + if taxes_on { TAX_BOX_WIDTH } else { 0.0 };
+    let description_width = flex_width(ui, fixed, 80.0, 420.0);
+    egui::Grid::new(("inv_lines", taxes_on, width_step(description_width)))
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            for h in [
-                "Item",
-                "Description",
-                "Qty",
-                "Rate",
-                "Income account",
-                "Amount",
-                "",
-            ] {
+            for h in ["Item", "Description", "Qty", "Rate", "Income account"] {
                 widgets::column_header(ui, h);
             }
+            if taxes_on {
+                widgets::column_header(ui, "Tax");
+            }
+            widgets::column_header(ui, "Amount");
+            widgets::column_header(ui, "");
             ui.end_row();
             for (i, line) in f.lines.iter_mut().enumerate() {
                 if widgets::item_combo(ui, ("inv_item", i), c, &mut line.item) {
@@ -611,6 +647,7 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
                         line.description = item.spec.description.clone();
                         line.rate = item.spec.rate.to_plain_string();
                         line.account = Some(item.spec.income_account);
+                        line.no_tax = !item.spec.taxable;
                         if line.qty.trim().is_empty() {
                             line.qty = "1".into();
                         }
@@ -627,6 +664,16 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
                     |k| !k.needs_party(),
                     LINE_ACCOUNT_WIDTH,
                 );
+                if taxes_on {
+                    let mut taxed = !line.no_tax;
+                    if ui
+                        .checkbox(&mut taxed, "")
+                        .on_hover_text("Charge sales tax on this line")
+                        .changed()
+                    {
+                        line.no_tax = !taxed;
+                    }
+                }
                 let qty = if line.qty.trim().is_empty() {
                     Ok(Qty::ONE)
                 } else {
@@ -637,6 +684,9 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
                     (Ok(q), Ok(r)) => {
                         let amount = r.times(q).unwrap_or(Money::ZERO);
                         total = total.saturating_add(amount);
+                        if !line.no_tax {
+                            taxable = taxable.saturating_add(amount);
+                        }
                         money_label(ui, amount, false);
                     }
                     _ => {
@@ -664,7 +714,7 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
-    total_row(ui, "Total", total);
+    invoice_totals(ui, c, f, total, taxable);
     let hover = if f.editing.is_some() {
         "Save your changes, then save the invoice as a PDF to email or print"
     } else {
@@ -685,6 +735,82 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
         *f = InvoiceForm::default();
         cleared(out, editing);
     }
+}
+
+/// The invoice's Sales tax choice: a group, or none; with a note for an
+/// exempt customer.
+fn tax_choice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm) {
+    ui.horizontal_wrapped(|ui| {
+        widgets::hint_label(ui, "Sales tax");
+        let shown = f
+            .tax_group
+            .and_then(|g| c.tax_group(g))
+            .map_or_else(|| "No sales tax".to_string(), |g| g.name.clone());
+        egui::ComboBox::from_id_salt("inv_tax")
+            .selected_text(shown)
+            .width(200.0)
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut f.tax_group, None, "No sales tax");
+                for g in c
+                    .tax_groups
+                    .iter()
+                    .filter(|g| g.active || f.tax_group == Some(g.id))
+                {
+                    ui.selectable_value(&mut f.tax_group, Some(g.id), g.name.as_str());
+                }
+            });
+        if let Some(x) = f.customer.and_then(|id| c.customer(id)).filter(|x| x.tax.exempt) {
+            let note = if x.tax.exemption.is_empty() {
+                "This customer is tax-exempt.".to_string()
+            } else {
+                format!("This customer is tax-exempt ({}).", x.tax.exemption)
+            };
+            ui.label(RichText::new(note).color(theme::MUTED));
+        }
+    });
+}
+
+/// Subtotal, each tax and the total, under the lines.
+fn invoice_totals(ui: &mut Ui, c: &Company, f: &InvoiceForm, subtotal: Money, taxable: Money) {
+    let Some(group) = f.tax_group else {
+        total_row(ui, "Total", subtotal);
+        return;
+    };
+    total_row(ui, "Subtotal", subtotal);
+    let mut tax_total = Money::ZERO;
+    match Date::parse(&f.date) {
+        Ok(date) => match c.invoice_tax(group, date, taxable) {
+            Ok(tax) => {
+                for l in &tax.lines {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(RichText::new(format!("{} {}", l.name, l.rate)).color(theme::MUTED));
+                        ui.label(currency::format(l.amount));
+                    });
+                }
+                tax_total = tax.total().unwrap_or(Money::ZERO);
+                // Editing an invoice whose date's rates have changed since.
+                if let Some(recorded) = f.recorded_tax.filter(|r| *r != tax_total) {
+                    ui.label(
+                        RichText::new(format!(
+                            "The tax was {} when this invoice was recorded; with today's rates \
+                             for its date and its lines it is {}. Saving charges {}.",
+                            currency::format(recorded),
+                            currency::format(tax_total),
+                            currency::format(tax_total),
+                        ))
+                        .color(theme::NEGATIVE),
+                    );
+                }
+            }
+            Err(e) => {
+                ui.label(RichText::new(e.to_string()).color(theme::NEGATIVE));
+            }
+        },
+        Err(_) => {
+            ui.label(RichText::new("Enter the date to work out the tax.").color(theme::MUTED));
+        }
+    }
+    total_row(ui, "Total", subtotal.saturating_add(tax_total));
 }
 
 fn set_due_from_terms(c: &Company, f: &mut InvoiceForm) {
@@ -725,10 +851,26 @@ fn build_invoice(c: &Company, f: &InvoiceForm) -> Result<Command, String> {
             description: l.description.clone(),
             qty,
             rate,
-            taxable: true,
+            taxable: !l.no_tax,
             account,
         });
     }
+    // The tax at the rates in force on the invoice's date, stored on it.
+    let tax = match f.tax_group {
+        Some(group) => {
+            let taxable = lines
+                .iter()
+                .filter(|l| l.taxable)
+                .try_fold(Money::ZERO, |acc, l| acc.checked_add(l.amount()?))
+                .ok_or("The taxable total is too large")?;
+            if taxable.is_zero() {
+                None
+            } else {
+                Some(c.invoice_tax(group, date, taxable).map_err(|e| e.to_string())?)
+            }
+        }
+        None => None,
+    };
     let number = if f.number.trim().is_empty() {
         widgets::next_number(c, 1001, |b| matches!(b, TxnBody::Invoice(_)))
     } else {
@@ -742,7 +884,7 @@ fn build_invoice(c: &Company, f: &InvoiceForm) -> Result<Command, String> {
             customer,
             due_date,
             ar_account,
-            tax: None,
+            tax,
             lines,
         }),
     })
