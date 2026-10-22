@@ -595,11 +595,18 @@ impl Company {
         let mut ids = Vec::new();
         for t in taxes {
             let Some(first) = t.rates.first().copied() else {
-                return Err(LedgerError::Required("At least one rate for each sales tax"));
+                return Err(LedgerError::Required(
+                    "At least one rate for each sales tax",
+                ));
             };
             let code = t.code.trim();
             let existing = (!code.is_empty())
-                .then(|| self.tax_components.iter().find(|c| c.code == code).map(|c| c.id))
+                .then(|| {
+                    self.tax_components
+                        .iter()
+                        .find(|c| c.code == code)
+                        .map(|c| c.id)
+                })
                 .flatten();
             let id = match existing {
                 Some(id) => id,
@@ -912,12 +919,20 @@ mod tests {
         // Next quarter's file: Provo's rate changes on October 1.
         let q4 = vec![
             tax("49/45/49", "Utah State", &[("2019-04-01", "4.85")]),
-            tax("49/01/62470", "Provo City", &[("2016-07-01", "0.1"), ("2026-10-01", "0.2")]),
+            tax(
+                "49/01/62470",
+                "Provo City",
+                &[("2016-07-01", "0.1"), ("2026-10-01", "0.2")],
+            ),
         ];
         assert_eq!(c.import_taxes(q4, "provo", d("2026-10-01")).unwrap(), g);
         assert_eq!(c.tax_components.len(), 2);
         assert_eq!(c.tax_groups.len(), 1);
-        let provo = c.tax_components.iter().find(|t| t.code == "49/01/62470").unwrap();
+        let provo = c
+            .tax_components
+            .iter()
+            .find(|t| t.code == "49/01/62470")
+            .unwrap();
         assert_eq!(provo.rate_on(d("2026-09-30")), Some(rate("0.1")));
         assert_eq!(provo.rate_on(d("2026-10-01")), Some(rate("0.2")));
         assert!(c.import_taxes(vec![], "Empty", d("2026-10-01")).is_err());

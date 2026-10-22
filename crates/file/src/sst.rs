@@ -93,11 +93,15 @@ fn file_date(text: &str) -> Result<Option<Date>, String> {
     }
     let month: u32 = t[4..6].parse().map_err(|_| bad())?;
     let day: u32 = t[6..].parse().map_err(|_| bad())?;
-    Date::from_ymd(year, month, day).map(Some).map_err(|e| e.to_string())
+    Date::from_ymd(year, month, day)
+        .map(Some)
+        .map_err(|e| e.to_string())
 }
 
 fn field<'a>(row: &[&'a str], column: usize) -> &'a str {
-    row.get(column.saturating_sub(1)).copied().map_or("", str::trim)
+    row.get(column.saturating_sub(1))
+        .copied()
+        .map_or("", str::trim)
 }
 
 /// Reads a rate file.
@@ -133,11 +137,15 @@ pub fn read_rates(text: &str) -> Result<Rates, String> {
 /// A ZIP as typed: `84601`, `84601-1234` or `846011234`.
 pub fn parse_zip(text: &str) -> Result<(String, Option<String>), String> {
     let digits: String = text.chars().filter(char::is_ascii_digit).collect();
-    let other = text.chars().any(|c| !c.is_ascii_digit() && c != '-' && !c.is_whitespace());
+    let other = text
+        .chars()
+        .any(|c| !c.is_ascii_digit() && c != '-' && !c.is_whitespace());
     match digits.len() {
         5 if !other => Ok((digits, None)),
         9 if !other => Ok((digits[..5].to_string(), Some(digits[5..].to_string()))),
-        _ => Err(format!("{text:?} is not a ZIP or ZIP+4 (84601 or 84601-1234)")),
+        _ => Err(format!(
+            "{text:?} is not a ZIP or ZIP+4 (84601 or 84601-1234)"
+        )),
     }
 }
 
@@ -252,7 +260,11 @@ pub fn locations(boundary: impl BufRead, zip: &str, date: Date) -> Result<Vec<Lo
             rows,
         })
         .collect();
-    out.sort_by(|a, b| b.rows.cmp(&a.rows).then_with(|| a.location_code.cmp(&b.location_code)));
+    out.sort_by(|a, b| {
+        b.rows
+            .cmp(&a.rows)
+            .then_with(|| a.location_code.cmp(&b.location_code))
+    });
     Ok(out)
 }
 
@@ -311,7 +323,10 @@ pub fn plan(rates: &Rates, location: &Location, date: Date) -> Result<Plan, Stri
     let group_name = if location.location_code.is_empty() {
         format!("{state_name} combined")
     } else {
-        format!("{state_name} location {}", pretty_location(&location.location_code))
+        format!(
+            "{state_name} location {}",
+            pretty_location(&location.location_code)
+        )
     };
     Ok(Plan { group_name, taxes })
 }
@@ -328,7 +343,11 @@ fn pretty_location(code: &str) -> String {
 /// The SST member states by FIPS code: abbreviation, name and tax agency.
 fn state_info(fips: &str) -> (&'static str, &'static str, &'static str) {
     match fips.trim_start_matches('0') {
-        "5" => ("AR", "Arkansas", "Arkansas Department of Finance and Administration"),
+        "5" => (
+            "AR",
+            "Arkansas",
+            "Arkansas Department of Finance and Administration",
+        ),
         "13" => ("GA", "Georgia", "Georgia Department of Revenue"),
         "18" => ("IN", "Indiana", "Indiana Department of Revenue"),
         "19" => ("IA", "Iowa", "Iowa Department of Revenue"),
@@ -339,8 +358,16 @@ fn state_info(fips: &str) -> (&'static str, &'static str, &'static str) {
         "31" => ("NE", "Nebraska", "Nebraska Department of Revenue"),
         "32" => ("NV", "Nevada", "Nevada Department of Taxation"),
         "34" => ("NJ", "New Jersey", "New Jersey Division of Taxation"),
-        "37" => ("NC", "North Carolina", "North Carolina Department of Revenue"),
-        "38" => ("ND", "North Dakota", "North Dakota Office of State Tax Commissioner"),
+        "37" => (
+            "NC",
+            "North Carolina",
+            "North Carolina Department of Revenue",
+        ),
+        "38" => (
+            "ND",
+            "North Dakota",
+            "North Dakota Office of State Tax Commissioner",
+        ),
         "39" => ("OH", "Ohio", "Ohio Department of Taxation"),
         "40" => ("OK", "Oklahoma", "Oklahoma Tax Commission"),
         "44" => ("RI", "Rhode Island", "Rhode Island Division of Taxation"),
@@ -374,7 +401,10 @@ mod tests {
     #[test]
     fn zips_are_read_with_or_without_the_plus_four() {
         assert_eq!(parse_zip("84601").unwrap(), ("84601".into(), None));
-        assert_eq!(parse_zip(" 84601-1100 ").unwrap(), ("84601".into(), Some("1100".into())));
+        assert_eq!(
+            parse_zip(" 84601-1100 ").unwrap(),
+            ("84601".into(), Some("1100".into()))
+        );
         assert_eq!(parse_zip("846011100").unwrap().1, Some("1100".into()));
         assert!(parse_zip("8460").is_err());
         assert!(parse_zip("84601-11").is_err());
@@ -394,7 +424,10 @@ mod tests {
         assert_eq!(plan.total_rate(), rate("7.45"));
         let names: Vec<&str> = plan.taxes.iter().map(|t| t.name.as_str()).collect();
         assert_eq!(names, ["Utah State", "UT County 049", "UT City 62470"]);
-        assert!(plan.taxes.iter().all(|t| t.agency == "Utah State Tax Commission"));
+        assert!(plan
+            .taxes
+            .iter()
+            .all(|t| t.agency == "Utah State Tax Commission"));
         assert_eq!(plan.taxes[2].code, "49/01/62470");
     }
 
@@ -402,13 +435,21 @@ mod tests {
     fn a_bare_zip_offers_each_location_in_it() {
         let found = locations(BOUNDARY.as_bytes(), "84601", d("2026-10-01")).unwrap();
         let codes: Vec<&str> = found.iter().map(|l| l.location_code.as_str()).collect();
-        assert!(codes.contains(&"25090") && codes.contains(&"25000"), "{codes:?}");
+        assert!(
+            codes.contains(&"25090") && codes.contains(&"25000"),
+            "{codes:?}"
+        );
         // A ZIP+4 with no ZIP+4 record falls back to the whole-ZIP record:
         // unincorporated Utah County, 7.35%.
         let rates = read_rates(RATES).unwrap();
         let county = locations(BOUNDARY.as_bytes(), "84601-9998", d("2026-10-01")).unwrap();
         assert_eq!(county[0].location_code, "25000");
-        assert_eq!(plan(&rates, &county[0], d("2026-10-01")).unwrap().total_rate(), rate("7.35"));
+        assert_eq!(
+            plan(&rates, &county[0], d("2026-10-01"))
+                .unwrap()
+                .total_rate(),
+            rate("7.35")
+        );
     }
 
     #[test]
@@ -440,6 +481,9 @@ mod tests {
         assert!(locations(BOUNDARY.as_bytes(), "10001", d("2026-10-01")).is_err());
         let rates = read_rates("49,45,49,0.0485,0.0485,0.03,0.03,20190401,99991231\n").unwrap();
         let found = locations(BOUNDARY.as_bytes(), "84601-1100", d("2026-10-01")).unwrap();
-        assert!(plan(&rates, &found[0], d("2026-10-01")).is_err(), "county and city missing");
+        assert!(
+            plan(&rates, &found[0], d("2026-10-01")).is_err(),
+            "county and city missing"
+        );
     }
 }

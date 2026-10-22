@@ -221,11 +221,11 @@ fn run(args: &[String]) -> Result<(), String> {
                 Some(s) => Date::parse(&s).map_err(|e| e.to_string())?,
                 None => Date::today(),
             };
-            let text = std::fs::read_to_string(&rates_path)
-                .map_err(|e| format!("{rates_path}: {e}"))?;
+            let text =
+                std::fs::read_to_string(&rates_path).map_err(|e| format!("{rates_path}: {e}"))?;
             let rates = sst::read_rates(&text)?;
-            let boundary = std::fs::File::open(&boundary_path)
-                .map_err(|e| format!("{boundary_path}: {e}"))?;
+            let boundary =
+                std::fs::File::open(&boundary_path).map_err(|e| format!("{boundary_path}: {e}"))?;
             let found = sst::locations(std::io::BufReader::new(boundary), &zip, date)?;
             let chosen = match flag_value(rest, "--location") {
                 Some(code) => found
@@ -238,7 +238,10 @@ fn run(args: &[String]) -> Result<(), String> {
                     for l in &found {
                         let rate = sst::plan(&rates, l, date)
                             .map_or_else(|e| e, |p| p.total_rate().to_string());
-                        println!("  location {:<8} {rate:>8}   ({} address ranges)", l.location_code, l.rows);
+                        println!(
+                            "  location {:<8} {rate:>8}   ({} address ranges)",
+                            l.location_code, l.rows
+                        );
                     }
                     return Err("tax-import: give a ZIP+4, or --location CODE".into());
                 }
