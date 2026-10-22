@@ -668,7 +668,15 @@ const LESSONS: &[Lesson] = &[
 #[derive(Default)]
 pub(crate) struct Tutorial {
     lesson: usize,
+    /// Whether the window was showing last frame, to notice it opening.
+    showing: bool,
+    /// Frames left in which to bring the window to the front. A new window
+    /// can open behind the app, so it asks for a few frames running.
+    focus_frames: u8,
 }
+
+/// Frames the tutorial asks to come to the front for after it opens.
+const FOCUS_FRAMES: u8 = 3;
 
 /// Share of the app window the tutorial takes, and its size limits in points.
 const WIDTH_SHARE: f32 = 0.70;
@@ -702,7 +710,12 @@ pub(crate) fn window(
     state: &mut Tutorial,
 ) -> Option<Target> {
     if !*open {
+        state.showing = false;
         return None;
+    }
+    if !state.showing {
+        state.showing = true;
+        state.focus_frames = FOCUS_FRAMES;
     }
     let last = LESSONS.len().saturating_sub(1);
     state.lesson = state.lesson.min(last);
@@ -717,6 +730,12 @@ pub(crate) fn window(
     ctx.show_viewport_immediate(id, builder, |ui, _class| {
         if ui.input(|i| i.viewport().close_requested()) {
             *open = false;
+        }
+        // Just opened: come to the front rather than behind the app.
+        if state.focus_frames > 0 {
+            state.focus_frames -= 1;
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Focus);
+            ui.ctx().request_repaint();
         }
         egui::CentralPanel::default()
             .show(ui, |ui| contents(ui, prefs, state))
