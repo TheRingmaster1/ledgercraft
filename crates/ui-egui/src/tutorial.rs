@@ -305,10 +305,12 @@ const LESSONS: &[Lesson] = &[
             Heading("Setting it up"),
             Steps(&[
                 "Open Lists > Sales Tax.",
-                "In most states, click Import Rates from State Files…: download your state's \
-                 rate file and boundary file (Rate and Boundary Files at \
-                 streamlinedsalestax.org), choose them, and type your ZIP+4. LedgerCraft adds \
-                 each tax with its rate history and a group for your location.",
+                "In the 24 Streamlined Sales Tax states (Utah, Washington, Ohio, Georgia, \
+                 Michigan, Minnesota and others), click Import Rates from State Files…: \
+                 download your state's rate file and boundary file (Rate and Boundary Files at \
+                 streamlinedsalestax.org; unzip them if they are .zip), choose them, and type \
+                 your ZIP+4. LedgerCraft adds each tax with its rate history and a group for \
+                 your location. Other states are not covered yet: add their rates by hand.",
                 "Or add each tax by hand under New sales tax, then put them together under \
                  New tax group.",
                 "In Products and Services, untick Taxable for anything not taxed (many \

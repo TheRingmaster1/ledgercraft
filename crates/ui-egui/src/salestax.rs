@@ -870,9 +870,10 @@ pub(crate) fn import_window(
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             ui.label(
-                "States in the Streamlined Sales Tax agreement publish a rate file and a \
-                 boundary file every quarter. Download your state's two files (unzip them if \
-                 they come as .zip), choose them here, and give your business's ZIP+4.",
+                "The 24 states in the Streamlined Sales Tax agreement publish a rate file and \
+                 a boundary file every quarter. Download your state's two files (unzip them if \
+                 they come as .zip), choose them here, and give your business's ZIP+4. Other \
+                 states do not publish such files: enter their rates by hand.",
             );
             ui.hyperlink_to("Rate and Boundary Files at streamlinedsalestax.org", SST_FILES);
             if let Some((_, name)) = &w.customer {
