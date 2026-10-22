@@ -685,7 +685,8 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
                             .on_hover_text("Change their name, address, terms or notes")
                             .clicked()
                         {
-                            s.editing_customer = Some((x.id, ContactInput::from_contact(&x.contact)));
+                            s.editing_customer =
+                                Some((x.id, ContactInput::from_contact(&x.contact)));
                         }
                         if ui.small_button("Invoice").clicked() {
                             out.push(Action::InvoiceFor(x.id));
@@ -887,7 +888,9 @@ fn item_fields(ui: &mut Ui, c: &Company, salt: &str, n: &mut NewItem) {
             let mut taxable = !n.not_taxable;
             if ui
                 .checkbox(&mut taxable, "")
-                .on_hover_text("Charge sales tax on it (most goods are taxed; many services are not)")
+                .on_hover_text(
+                    "Charge sales tax on it (most goods are taxed; many services are not)",
+                )
                 .changed()
             {
                 n.not_taxable = !taxable;
