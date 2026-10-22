@@ -5,7 +5,7 @@ use eframe::egui::{self, Color32, RichText, Ui};
 use ledgercraft_core::{Date, Money};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
-    AccountId, AccountType, Address, Company, Contact, ItemKind, ItemSpec, TxnId,
+    AccountId, AccountType, Address, Company, Contact, ItemKind, ItemSpec, TxnBody, TxnId,
 };
 use ledgercraft_reports::{account_register, ReportKind};
 
@@ -659,6 +659,14 @@ pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
                                     .clicked()
                                 {
                                     out.push(Action::Open(t.id));
+                                }
+                                if matches!(t.body, TxnBody::Invoice(_))
+                                    && ui
+                                        .small_button("PDF")
+                                        .on_hover_text("Save this invoice as a PDF to email or print")
+                                        .clicked()
+                                {
+                                    out.push(Action::InvoicePdf(t.id));
                                 }
                                 if ui
                                     .small_button("Void")

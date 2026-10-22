@@ -1,11 +1,12 @@
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText};
-use ledgercraft_engine::{sample_company, Command, EngineError, Session};
+use ledgercraft_engine::{sample_company, Command, EngineError, Outcome, Session};
 use ledgercraft_file::FileError;
 use ledgercraft_ledger::TxnId;
 
 use crate::bankimport::{self, ImportState};
+use crate::company_info::{self, CompanyInfoForm, CompanyInfoOutcome};
 use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
@@ -39,6 +40,8 @@ pub struct LedgerApp {
     unlock: Option<UnlockForm>,
     /// File > Password…, while open.
     password: Option<PasswordForm>,
+    /// File > Company Information…, while open.
+    company_info: Option<CompanyInfoForm>,
     /// Offer to protect the unprotected file just opened.
     offer_protection: bool,
     /// What the last import brought in, shown until closed.
@@ -156,6 +159,7 @@ impl LedgerApp {
             import_report: None,
             unlock: None,
             password: None,
+            company_info: None,
             offer_protection: false,
             start: StartPage::default(),
             page: Page::Home,
@@ -428,6 +432,7 @@ impl LedgerApp {
         self.lists = ListState::default();
         self.reconcile = ReconcileState::default();
         self.bank_import = ImportState::default();
+        self.company_info = None;
         self.page = Page::Home;
     }
 
@@ -440,6 +445,7 @@ impl LedgerApp {
         self.lists = ListState::default();
         self.reconcile = ReconcileState::default();
         self.bank_import = ImportState::default();
+        self.company_info = None;
         self.page = Page::Home;
     }
 
@@ -547,35 +553,7 @@ impl LedgerApp {
     fn apply(&mut self, action: Action) {
         match action {
             Action::Run { cmd, reset } => {
-                let label = cmd.undo_label();
-                let was_edit = matches!(cmd, Command::TxnUpdate { .. });
-                let Some(session) = self.session.as_mut() else {
-                    self.error("Open or create a company first.");
-                    return;
-                };
-                let result = session.execute(cmd);
-                match result {
-                    Ok(outcome) => {
-                        if let Reset::Form(kind) = reset {
-                            self.forms.reset(kind);
-                        }
-                        self.lists.reset(reset);
-                        if was_edit {
-                            self.info(format!(
-                                "{label}: changes saved. Edit > Undo puts the original back."
-                            ));
-                            if let Some(page) = self.edit_return.take() {
-                                self.page = page;
-                            }
-                        } else {
-                            match outcome.created {
-                                Some(id) => self.info(format!("{label} recorded ({id})")),
-                                None => self.info(format!("{label}: done")),
-                            }
-                        }
-                    }
-                    Err(e) => self.error(e.to_string()),
-                }
+                self.run(cmd, reset);
             }
             Action::Go(page) => self.page = page,
             Action::Reconcile(account) => {
@@ -637,6 +615,115 @@ impl LedgerApp {
                 Ok(bytes) => self.export_xlsx(&name, &bytes),
                 Err(e) => self.error(e),
             },
+            Action::InvoicePdf(id) => self.save_invoice_pdf(id),
+            Action::SaveInvoicePdf(cmd) => {
+                let editing = match &cmd {
+                    Command::TxnUpdate { id, .. } => Some(*id),
+                    _ => None,
+                };
+                let reset = Reset::Form(FormKind::Invoice);
+                let id = match editing {
+                    // Nothing changed: no edit to record (or undo), just the PDF.
+                    Some(id) if self.changes_nothing(&cmd) => {
+                        self.forms.reset(FormKind::Invoice);
+                        if let Some(page) = self.edit_return.take() {
+                            self.page = page;
+                        }
+                        Some(id)
+                    }
+                    _ => self.run(cmd, reset).and_then(|outcome| {
+                        editing.or_else(|| outcome.created.as_deref().and_then(parse_txn_id))
+                    }),
+                };
+                if let Some(id) = id {
+                    self.save_invoice_pdf(id);
+                }
+            }
+        }
+    }
+
+    /// Runs a command, reporting what happened; the outcome when it worked.
+    fn run(&mut self, cmd: Command, reset: Reset) -> Option<Outcome> {
+        let label = cmd.undo_label();
+        let was_edit = matches!(cmd, Command::TxnUpdate { .. });
+        let Some(session) = self.session.as_mut() else {
+            self.error("Open or create a company first.");
+            return None;
+        };
+        match session.execute(cmd) {
+            Ok(outcome) => {
+                if let Reset::Form(kind) = reset {
+                    self.forms.reset(kind);
+                }
+                self.lists.reset(reset);
+                if was_edit {
+                    self.info(format!(
+                        "{label}: changes saved. Edit > Undo puts the original back."
+                    ));
+                    if let Some(page) = self.edit_return.take() {
+                        self.page = page;
+                    }
+                } else {
+                    match &outcome.created {
+                        Some(id) => self.info(format!("{label} recorded ({id})")),
+                        None => self.info(format!("{label}: done")),
+                    }
+                }
+                Some(outcome)
+            }
+            Err(e) => {
+                self.error(e.to_string());
+                None
+            }
+        }
+    }
+
+    /// True when an edit would leave the recorded transaction exactly as it is.
+    fn changes_nothing(&self, cmd: &Command) -> bool {
+        let Command::TxnUpdate {
+            id,
+            date,
+            number,
+            memo,
+            body,
+        } = cmd
+        else {
+            return false;
+        };
+        self.session
+            .as_ref()
+            .and_then(|s| s.company().txn(*id))
+            .is_some_and(|t| {
+                t.date == *date
+                    && t.number == number.trim()
+                    && t.memo.trim() == memo.trim()
+                    && t.body == *body
+            })
+    }
+
+    /// Asks where to save a recorded invoice as a PDF, and writes it.
+    fn save_invoice_pdf(&mut self, id: TxnId) {
+        let Some(company) = self.session.as_ref().map(Session::company) else {
+            return;
+        };
+        let name = ledgercraft_reports::invoice_pdf_name(company, id);
+        let bytes = match ledgercraft_reports::invoice_pdf(company, id, crate::currency::current().symbol()) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                self.error(e);
+                return;
+            }
+        };
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("PDF document", &["pdf"])
+            .set_file_name(name)
+            .save_file()
+        else {
+            return;
+        };
+        match std::fs::write(&path, bytes) {
+            Ok(()) => self.info(format!("Saved {}", file_name(&path))),
+            Err(e) => self.error(format!("Could not write {}: {e}", path.display())),
         }
     }
 
@@ -760,6 +847,18 @@ impl LedgerApp {
                         {
                             ui.close();
                             self.save_as();
+                        }
+                        let info = ui
+                            .add_enabled(has_company, egui::Button::new("Company Information…"))
+                            .on_hover_text(
+                                "The company's name, address, phone and email, as printed on invoices.",
+                            );
+                        if info.clicked() {
+                            ui.close();
+                            self.company_info = self
+                                .session
+                                .as_ref()
+                                .map(|s| CompanyInfoForm::from_company(s.company()));
                         }
                         let password = ui
                             .add_enabled(has_company, egui::Button::new("Password…"))
@@ -1148,6 +1247,20 @@ impl LedgerApp {
             }
         }
 
+        let info = self
+            .company_info
+            .as_mut()
+            .and_then(|form| company_info::window(ctx, form));
+        match info {
+            Some(CompanyInfoOutcome::Save(cmd)) => {
+                if self.run(cmd, Reset::Nothing).is_some() {
+                    self.company_info = None;
+                }
+            }
+            Some(CompanyInfoOutcome::Cancel) => self.company_info = None,
+            None => {}
+        }
+
         let changed = match (self.password.as_mut(), self.session.as_ref()) {
             (Some(form), Some(session)) => security::password_window(ctx, form, session),
             (Some(_), None) => Some(PasswordOutcome::Cancel),
@@ -1436,6 +1549,11 @@ impl eframe::App for LedgerApp {
     }
 }
 
+/// The transaction id in an outcome's `created`, such as `T42`.
+fn parse_txn_id(created: &str) -> Option<TxnId> {
+    created.strip_prefix('T')?.parse().ok().map(TxnId)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1452,6 +1570,52 @@ mod tests {
 
     // Regression: Clear on a form sent ClearStatus, which hit a `panic!` and
     // closed the app.
+    #[test]
+    fn every_sample_invoice_makes_a_pdf() {
+        let c = sample_company().unwrap();
+        let invoices: Vec<_> = c
+            .transactions
+            .iter()
+            .filter(|t| matches!(t.body, ledgercraft_ledger::TxnBody::Invoice(_)))
+            .collect();
+        assert_eq!(invoices.len(), 4);
+        for t in invoices {
+            let pdf = ledgercraft_reports::invoice_pdf(&c, t.id, "$").unwrap();
+            assert!(pdf.starts_with(b"%PDF-1.4"));
+        }
+    }
+
+    #[test]
+    fn a_pdf_of_an_unchanged_invoice_records_no_edit() {
+        let c = sample_company().unwrap();
+        let t = c
+            .transactions
+            .iter()
+            .find(|t| matches!(t.body, ledgercraft_ledger::TxnBody::Invoice(_)))
+            .cloned()
+            .unwrap();
+        let app = LedgerApp::with_session(Session::new(c));
+        let mut cmd = Command::TxnUpdate {
+            id: t.id,
+            date: t.date,
+            number: t.number.clone(),
+            memo: t.memo.clone(),
+            body: t.body.clone(),
+        };
+        assert!(app.changes_nothing(&cmd));
+        if let Command::TxnUpdate { memo, .. } = &mut cmd {
+            *memo = "Changed".into();
+        }
+        assert!(!app.changes_nothing(&cmd));
+    }
+
+    #[test]
+    fn created_transaction_ids_are_read_back() {
+        assert_eq!(parse_txn_id("T42"), Some(TxnId(42)));
+        assert_eq!(parse_txn_id("C4"), None);
+        assert_eq!(parse_txn_id("T"), None);
+    }
+
     #[test]
     fn clear_status_resets_the_status_bar() {
         let mut app = LedgerApp::with_session(Session::new(new_company("Clear Co")));

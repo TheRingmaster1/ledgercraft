@@ -24,6 +24,11 @@ Notes
   long as the licence text travels with it (assets/fonts/OFL.txt, also shown
   in Help > Licenses) and the font is not sold on its own. egui's built-in
   fonts remain as a fallback and for monospace.
+* PDF invoices name the standard Helvetica fonts that PDF readers supply;
+  no font is embedded. The character widths used to lay out the text
+  (`crates/reports/src/pdf.rs`) come from Adobe's Core 14 AFM font metrics,
+  which Adobe allows to be used, copied and distributed for any purpose.
+  The invoice layout is original.
 * UI icons, colours and layouts are defined in code (`crates/ui-egui/src/theme.rs`)
   and are original.
 * The sample company and default chart of accounts are original text written

@@ -7,5 +7,3 @@
 *.lcbooks
 # Update bundles shared through OneDrive; never part of the source.
 *.bundle
-# Update bundles shared through OneDrive; never part of the source.
-*.bundle

@@ -5,11 +5,14 @@
 //! the CLI and CSV export all render the same way.
 
 mod aging;
+mod invoice_pdf;
+mod pdf;
 mod report;
 mod statements;
 mod xlsx;
 
 pub use aging::{ap_aging, ar_aging};
+pub use invoice_pdf::{invoice_pdf, invoice_pdf_name};
 pub use report::{Cell, Report, Row, RowKind};
 pub use statements::{
     account_register, balance_sheet, profit_and_loss, reconciliation_report, transaction_list,

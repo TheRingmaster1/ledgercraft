@@ -7,6 +7,7 @@
 mod app;
 mod assoc;
 mod bankimport;
+mod company_info;
 mod currency;
 mod forms;
 mod hints;
@@ -117,4 +118,9 @@ pub(crate) enum Action {
         name: String,
         data: Result<Vec<u8>, String>,
     },
+    /// Save a recorded invoice as a PDF, asking where.
+    InvoicePdf(TxnId),
+    /// Save the invoice on the form (new, or changes to a recorded one),
+    /// then save it as a PDF.
+    SaveInvoicePdf(Command),
 }

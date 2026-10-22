@@ -1,7 +1,7 @@
 use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
-    AccountId, AccountType, Company, Contact, CustomerId, FeedEntry, ItemSpec, LedgerResult,
-    TxnBody, TxnId, VendorId,
+    AccountId, AccountType, Address, Company, Contact, CustomerId, FeedEntry, ItemSpec,
+    LedgerResult, TxnBody, TxnId, VendorId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +14,19 @@ pub enum Command {
     CompanyRename { name: String },
     #[serde(rename = "company.setFiscalYearStart")]
     CompanySetFiscalYearStart { month: u32 },
+    /// The name and contact details printed on invoices.
+    #[serde(rename = "company.setInfo")]
+    CompanySetInfo {
+        name: String,
+        #[serde(default)]
+        legal_name: String,
+        #[serde(default)]
+        email: String,
+        #[serde(default)]
+        phone: String,
+        #[serde(default)]
+        address: Address,
+    },
     #[serde(rename = "account.create")]
     AccountCreate {
         #[serde(default)]
@@ -92,6 +105,7 @@ pub struct CommandInfo {
 pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "company.rename", summary: "Rename the company. {name}" },
     CommandInfo { id: "company.setFiscalYearStart", summary: "First month of the fiscal year, 1-12. {month}" },
+    CommandInfo { id: "company.setInfo", summary: "Name and contact details printed on invoices. {name, legal_name?, email?, phone?, address?:{line1, line2, city, region, postal_code, country}}" },
     CommandInfo { id: "account.create", summary: "Add an account. {number?, name, kind, description?}" },
     CommandInfo { id: "account.update", summary: "Rename or renumber an account. {id, number?, name, description?}" },
     CommandInfo { id: "account.setActive", summary: "Make an account active or inactive. {id, active}" },
@@ -114,6 +128,7 @@ impl Command {
         match self {
             Self::CompanyRename { .. } => "company.rename",
             Self::CompanySetFiscalYearStart { .. } => "company.setFiscalYearStart",
+            Self::CompanySetInfo { .. } => "company.setInfo",
             Self::AccountCreate { .. } => "account.create",
             Self::AccountUpdate { .. } => "account.update",
             Self::AccountSetActive { .. } => "account.setActive",
@@ -138,6 +153,7 @@ impl Command {
             Self::CompanyRename { .. } | Self::CompanySetFiscalYearStart { .. } => {
                 "Company Settings".into()
             }
+            Self::CompanySetInfo { .. } => "Company Information".into(),
             Self::AccountCreate { name, .. } => format!("New Account {name}"),
             Self::AccountUpdate { name, .. } => format!("Edit Account {name}"),
             Self::AccountSetActive { .. } => "Account Status".into(),
@@ -165,6 +181,32 @@ impl Command {
                     return Err(ledgercraft_ledger::LedgerError::Required("A company name"));
                 }
                 c.info.name = name.to_string();
+                None
+            }
+            Self::CompanySetInfo {
+                name,
+                legal_name,
+                email,
+                phone,
+                address,
+            } => {
+                let name = name.trim();
+                if name.is_empty() {
+                    return Err(ledgercraft_ledger::LedgerError::Required("A company name"));
+                }
+                let tidy = |s: &str| s.trim().to_string();
+                c.info.name = name.to_string();
+                c.info.legal_name = tidy(&legal_name);
+                c.info.email = tidy(&email);
+                c.info.phone = tidy(&phone);
+                c.info.address = Address {
+                    line1: tidy(&address.line1),
+                    line2: tidy(&address.line2),
+                    city: tidy(&address.city),
+                    region: tidy(&address.region),
+                    postal_code: tidy(&address.postal_code),
+                    country: tidy(&address.country),
+                };
                 None
             }
             Self::CompanySetFiscalYearStart { month } => {

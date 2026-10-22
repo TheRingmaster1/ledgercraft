@@ -14,12 +14,14 @@ usage:
   ledgercraft-cli run FILE --cmd JSON [--cmd JSON ...]
   ledgercraft-cli report FILE KIND [--from DATE] [--to DATE] [--csv]
   ledgercraft-cli accounts FILE
+  ledgercraft-cli invoice-pdf FILE NUMBER [--out PDF]
   ledgercraft-cli protect FILE         (password from LEDGERCRAFT_NEW_PASSWORD)
   ledgercraft-cli commands
   ledgercraft-cli --version
 
 report KIND is one of: pl, balance-sheet, trial-balance, ar-aging, ap-aging, transactions
 dates are YYYY-MM-DD; --to is also the \"as of\" date
+invoice-pdf saves invoice NUMBER as a PDF (default: \"Invoice NUMBER.pdf\")
 
 example:
   ledgercraft-cli run books.lcbooks --cmd '{\"command\":\"account.create\",\"number\":\"6700\",\"name\":\"Postage\",\"kind\":\"expense\"}'";
@@ -32,6 +34,19 @@ fn main() -> ExitCode {
             eprintln!("ledgercraft-cli: {e}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// The symbol amounts are printed with, from the company's currency code.
+fn currency_symbol(code: &str) -> &'static str {
+    match code.trim().to_ascii_uppercase().as_str() {
+        "USD" | "CAD" | "AUD" | "NZD" | "MXN" => "$",
+        "EUR" => "€",
+        "GBP" => "£",
+        "CHF" => "CHF ",
+        "ZAR" => "R ",
+        "SEK" => "SEK ",
+        _ => "",
     }
 }
 
@@ -165,6 +180,26 @@ fn run(args: &[String]) -> Result<(), String> {
                     c.account_balance(a.id, None).to_string()
                 );
             }
+            Ok(())
+        }
+        "invoice-pdf" => {
+            let file = rest.first().ok_or("invoice-pdf: which file?")?;
+            let number = rest.get(1).ok_or("invoice-pdf: which invoice number?")?;
+            let session = open(file)?;
+            let c = session.company();
+            let invoice = c
+                .transactions
+                .iter()
+                .find(|t| {
+                    matches!(t.body, ledgercraft_ledger::TxnBody::Invoice(_))
+                        && t.number.trim() == number.trim()
+                })
+                .ok_or_else(|| format!("invoice-pdf: no invoice numbered {number:?}"))?;
+            let bytes = ledgercraft_reports::invoice_pdf(c, invoice.id, currency_symbol(&c.info.currency))?;
+            let out = flag_value(rest, "--out")
+                .map_or_else(|| PathBuf::from(ledgercraft_reports::invoice_pdf_name(c, invoice.id)), PathBuf::from);
+            std::fs::write(&out, bytes).map_err(|e| format!("{}: {e}", out.display()))?;
+            println!("{}", out.display());
             Ok(())
         }
         other => Err(format!("unknown command {other:?}\n\n{USAGE}")),

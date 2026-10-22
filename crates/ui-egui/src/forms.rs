@@ -404,9 +404,21 @@ fn header(ui: &mut Ui, kind: FormKind, editing: Option<TxnId>) {
 /// The Save / Clear buttons, or Save Changes / Cancel while editing.
 /// Returns (save, clear or cancel).
 fn footer(ui: &mut Ui, editing: Option<TxnId>) -> (bool, bool) {
+    let (save, clear, _) = footer_with(ui, editing, None);
+    (save, clear)
+}
+
+/// The footer with one more button, `(label, hover)`, before Clear/Cancel;
+/// the third value says whether it was clicked.
+fn footer_with(
+    ui: &mut Ui,
+    editing: Option<TxnId>,
+    extra: Option<(&str, &str)>,
+) -> (bool, bool, bool) {
     ui.add_space(10.0);
     let mut save = false;
     let mut clear = false;
+    let mut more = false;
     let (save_label, clear_label) = if editing.is_some() {
         ("Save Changes", "Cancel")
     } else {
@@ -414,9 +426,12 @@ fn footer(ui: &mut Ui, editing: Option<TxnId>) -> (bool, bool) {
     };
     ui.horizontal_wrapped(|ui| {
         save = ui.button(RichText::new(save_label).strong()).clicked();
+        if let Some((label, hover)) = extra {
+            more = ui.button(label).on_hover_text(hover).clicked();
+        }
         clear = ui.button(clear_label).clicked();
     });
-    (save, clear)
+    (save, clear, more)
 }
 
 /// Runs what the form built: a new transaction, or, while editing, the
@@ -427,7 +442,19 @@ fn finish(
     editing: Option<TxnId>,
     built: Result<Command, String>,
 ) {
-    let built = built.map(|cmd| match (editing, cmd) {
+    match command_for(editing, built) {
+        Ok(cmd) => out.push(Action::Run {
+            cmd,
+            reset: Reset::Form(kind),
+        }),
+        Err(e) => out.push(Action::Error(e)),
+    }
+}
+
+/// What saving the form runs: posting a new transaction, or, while editing,
+/// updating the recorded one.
+fn command_for(editing: Option<TxnId>, built: Result<Command, String>) -> Result<Command, String> {
+    built.map(|cmd| match (editing, cmd) {
         (
             Some(id),
             Command::TxnPost {
@@ -444,14 +471,7 @@ fn finish(
             body,
         },
         (_, cmd) => cmd,
-    });
-    match built {
-        Ok(cmd) => out.push(Action::Run {
-            cmd,
-            reset: Reset::Form(kind),
-        }),
-        Err(e) => out.push(Action::Error(e)),
-    }
+    })
 }
 
 /// Clear on a new form; Cancel on a form editing a recorded transaction.
@@ -574,9 +594,20 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Total", total);
-    let (save, clear) = footer(ui, f.editing);
+    let hover = if f.editing.is_some() {
+        "Save your changes, then save the invoice as a PDF to email or print"
+    } else {
+        "Record the invoice, then save it as a PDF to email or print"
+    };
+    let (save, clear, pdf) = footer_with(ui, f.editing, Some(("Save as PDF…", hover)));
     if save {
         finish(out, FormKind::Invoice, f.editing, build_invoice(c, f));
+    }
+    if pdf {
+        match command_for(f.editing, build_invoice(c, f)) {
+            Ok(cmd) => out.push(Action::SaveInvoicePdf(cmd)),
+            Err(e) => out.push(Action::Error(e)),
+        }
     }
     if clear {
         let editing = f.editing;

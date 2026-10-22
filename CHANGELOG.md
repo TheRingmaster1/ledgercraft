@@ -8,6 +8,19 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- PDF invoices. Save as PDF… on the invoice form records the invoice (or the
+  changes to it) and saves it as a PDF to email or print; recorded invoices
+  also have a PDF button in Transactions, and `ledgercraft-cli invoice-pdf
+  FILE NUMBER [--out PDF]` does the same from the command line. The page
+  shows the company's name and contact details, Bill To, each line (item
+  name above its description), payments applied and the balance due, the
+  memo as a note, VOID on voided invoices and "Paid in full" on paid ones;
+  long invoices continue onto numbered pages. Written by LedgerCraft's own
+  small PDF writer (no new dependency), using the standard Helvetica fonts
+  every PDF reader has.
+- File > Company Information… changes the company's name, legal name,
+  address, phone and email after the company is created (new engine command
+  `company.setInfo`, undoable like any change).
 - Bank feed import (Banking > Import Bank Transactions). Read a download from
   the bank or card website: OFX (SGML and XML), QFX, QBO or CSV (columns found
   by name: Date, Description/Payee, Amount or Debit/Credit, Check number).

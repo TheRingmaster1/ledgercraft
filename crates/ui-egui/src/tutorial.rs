@@ -273,7 +273,17 @@ const LESSONS: &[Lesson] = &[
                  rate. An empty quantity means 1. The amount and total update as you type.",
                 "Check the income account on each line, then click Save & New.",
             ]),
+            Heading("Sending it as a PDF"),
+            Text(
+                "Click Save as PDF… instead of Save & New to record the invoice and save a \
+                 PDF of it, ready to attach to an email or print. It shows your company's \
+                 name, address, phone and email (change them in File > Company Information…), \
+                 who it is billed to, \
+                 the lines, payments received so far and the balance due.",
+            ),
             Bullets(&[
+                "For an invoice already recorded, click PDF on its row in Transactions, or \
+                 open it and click Save as PDF…; changes you made are saved first.",
                 "A new empty line appears as soon as you type in the last one, so there is \
                  always room for the next; the x button removes a line.",
                 "Dates can be typed as 2026-03-31 or 3/31/2026.",

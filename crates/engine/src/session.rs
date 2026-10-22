@@ -295,6 +295,22 @@ mod tests {
     }
 
     #[test]
+    fn company_information_changes_and_undoes() {
+        let mut s = Session::new(Company::with_default_accounts("Info Co"));
+        let json = r#"{"command":"company.setInfo","name":" Info Co LLC ","phone":"555-0100",
+            "address":{"line1":"1 Main St","city":"Provo","region":"UT"}}"#;
+        s.execute_json(json).unwrap();
+        assert_eq!(s.company().info.name, "Info Co LLC");
+        assert_eq!(s.company().info.phone, "555-0100");
+        assert_eq!(s.company().info.address.city, "Provo");
+        assert_eq!(s.undo().as_deref(), Some("Company Information"));
+        assert_eq!(s.company().info.name, "Info Co");
+        assert!(s.company().info.address.is_empty());
+        let blank = r#"{"command":"company.setInfo","name":"  "}"#;
+        assert!(s.execute_json(blank).is_err());
+    }
+
+    #[test]
     fn every_command_rejects_empty_params_without_panicking() {
         for info in crate::CATALOG {
             let mut s = Session::new(Company::with_default_accounts("Fuzz"));

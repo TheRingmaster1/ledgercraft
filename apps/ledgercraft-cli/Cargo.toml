@@ -12,6 +12,7 @@ repository.workspace = true
 ledgercraft-core.workspace = true
 ledgercraft-engine.workspace = true
 ledgercraft-file.workspace = true
+ledgercraft-ledger.workspace = true
 ledgercraft-reports.workspace = true
 
 [lints]
