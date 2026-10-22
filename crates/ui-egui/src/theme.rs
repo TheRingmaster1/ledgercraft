@@ -457,6 +457,9 @@ pub(crate) fn apply(ctx: &egui::Context) {
     style.visuals = v;
     style.spacing.item_spacing = egui::vec2(8.0, 6.0);
     style.spacing.button_padding = egui::vec2(10.0, 4.0);
+    // Scroll bars get their own space beside the content instead of floating
+    // over it, so they never cover a column or a button.
+    style.spacing.scroll = egui::style::ScrollStyle::solid();
     ctx.set_global_style(style);
     // The default text, and every font's own family, before the first frame.
     set_text(ctx, Font::default(), TextSize::default());
@@ -489,6 +492,13 @@ pub(crate) fn test_frame_sized(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scroll_bars_never_cover_the_content() {
+        let ctx = egui::Context::default();
+        apply(&ctx);
+        assert!(!ctx.global_style().spacing.scroll.floating);
+    }
 
     #[test]
     fn the_inter_fonts_are_truetype_with_their_licence() {
