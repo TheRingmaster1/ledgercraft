@@ -8,6 +8,9 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- The tutorial opens in a window of its own, so it can sit beside the app or
+  on a second screen while the lessons are followed in the sample company.
+  Try it brings the app window to the front.
 - Edit customers, vendors and items: Edit beside each one opens its fields
   (now with address line 2, country and notes) with Save Changes, Cancel and
   Make inactive / Make active. Inactive ones are left off the forms but keep
