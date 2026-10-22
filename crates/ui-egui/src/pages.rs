@@ -223,6 +223,40 @@ fn arrow(ui: &mut Ui) {
         .line_segment([tip, egui::pos2(tip.x - 7.0, y + 6.0)], stroke);
 }
 
+/// Where an arrow would be, left empty, so buttons line up with the
+/// columns of the rows that have arrows.
+fn no_arrow(ui: &mut Ui) {
+    ui.allocate_exact_size(egui::vec2(28.0, 44.0), egui::Sense::hover());
+}
+
+/// A Home workflow section's heading, with room above it.
+fn section(ui: &mut Ui, name: &str) {
+    ui.add_space(10.0);
+    ui.label(RichText::new(name).color(theme::MUTED));
+}
+
+/// A row of small links under a section, for its less common tasks. A link
+/// with no page opens Create Statement.
+fn more_links(ui: &mut Ui, links: &[(&str, Option<Page>)], out: &mut Vec<Action>) {
+    ui.add_space(2.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new("More:").small().color(theme::MUTED));
+        for (i, (label, page)) in links.iter().enumerate() {
+            if i > 0 {
+                ui.label(RichText::new("·").color(theme::MUTED));
+            }
+            let link = egui::Button::new(RichText::new(*label).color(theme::ACCENT)).frame(false);
+            let hint = page.map_or("Save a customer's statement as a PDF", Page::hint);
+            if ui.add(link).on_hover_text(hint).clicked() {
+                out.push(match page {
+                    Some(page) => Action::Go(*page),
+                    None => Action::Statement(None),
+                });
+            }
+        }
+    });
+}
+
 /// Width of the divider between the Home page columns, in ui points.
 const DIVIDER_WIDTH: f32 = 5.0;
 /// Space either side of the Home page divider.
@@ -284,14 +318,15 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
     let mut workflow = |ui: &mut Ui| {
         ui.label(RichText::new("Workflow").strong().underline());
         ui.add_space(4.0);
-        ui.label(RichText::new("Vendors").color(theme::MUTED));
+        // The main steps are big buttons in three lined-up columns, with
+        // arrows where one step leads to the next; the rest are links below.
+        section(ui, "Vendors");
         ui.horizontal_wrapped(|ui| {
             flow_button(ui, "Enter Bills", Page::Form(FormKind::Bill), out);
             arrow(ui);
             flow_button(ui, "Pay Bills", Page::Form(FormKind::PayBills), out);
         });
-        ui.add_space(10.0);
-        ui.label(RichText::new("Customers").color(theme::MUTED));
+        section(ui, "Customers");
         ui.horizontal_wrapped(|ui| {
             flow_button(ui, "Create Invoices", Page::Form(FormKind::Invoice), out);
             arrow(ui);
@@ -304,19 +339,36 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
             arrow(ui);
             flow_button(ui, "Record Deposits", Page::Form(FormKind::Deposit), out);
         });
-        ui.add_space(4.0);
-        ui.horizontal_wrapped(|ui| {
-            flow_button(ui, "Sales Receipts", Page::Form(FormKind::SalesReceipt), out);
-            flow_button(ui, "Credit Memos", Page::Form(FormKind::CreditMemo), out);
-            flow_button(ui, "Refunds", Page::Form(FormKind::Refund), out);
-        });
-        ui.add_space(10.0);
-        ui.label(RichText::new("Banking and company").color(theme::MUTED));
+        more_links(
+            ui,
+            &[
+                ("Sales Receipts", Some(Page::Form(FormKind::SalesReceipt))),
+                ("Credit Memos", Some(Page::Form(FormKind::CreditMemo))),
+                ("Refunds", Some(Page::Form(FormKind::Refund))),
+                ("Statements", None),
+            ],
+            out,
+        );
+        section(ui, "Banking");
         ui.horizontal_wrapped(|ui| {
             flow_button(ui, "Write Checks", Page::Form(FormKind::Check), out);
-            flow_button(ui, "Journal Entry", Page::Form(FormKind::Journal), out);
-            flow_button(ui, "Chart of Accounts", Page::Accounts, out);
+            no_arrow(ui);
+            flow_button(ui, "Import Transactions", Page::BankImport, out);
+            no_arrow(ui);
+            flow_button(ui, "Reconcile", Page::Reconcile, out);
         });
+        section(ui, "Company");
+        more_links(
+            ui,
+            &[
+                ("Chart of Accounts", Some(Page::Accounts)),
+                ("Products & Services", Some(Page::Items)),
+                ("Sales Tax", Some(Page::SalesTax)),
+                ("Journal Entry", Some(Page::Form(FormKind::Journal))),
+                ("Reports", Some(Page::Reports)),
+            ],
+            out,
+        );
     };
     let glance = |ui: &mut Ui| {
         ui.label(RichText::new("At A Glance").strong().underline());

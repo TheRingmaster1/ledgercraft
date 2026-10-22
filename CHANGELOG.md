@@ -147,6 +147,11 @@ fixes to a release. See docs/releasing.md.
   (older files open with none). A new tutorial lesson explains it.
 
 ### Changed
+- Home's workflow is tidier: big buttons only for the everyday steps, lined
+  up in the same three columns in every section (Vendors, Customers,
+  Banking), and the rest as small More: links (Sales Receipts, Credit Memos,
+  Refunds, Statements; Chart of Accounts, Products & Services, Sales Tax,
+  Journal Entry, Reports). Banking gains Import Transactions and Reconcile.
 - Reports (Profit & Loss, Balance Sheet, Trial Balance and the rest, and
   account registers) center their table under the heading, and the scroll
   area fills the page, so the scroll bars run along its edges instead of

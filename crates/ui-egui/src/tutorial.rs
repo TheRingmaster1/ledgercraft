@@ -79,8 +79,9 @@ const LESSONS: &[Lesson] = &[
                 "The side bar on the left: your lists, reports and the everyday forms.",
                 "The menus along the top: File, Edit, View, Lists, Customers, Vendors, \
                  Banking, Reports and Help.",
-                "The Home page: buttons laid out in the order work usually happens, and your \
-                 key balances under At A Glance.",
+                "The Home page: the everyday steps as big buttons, in the order work usually \
+                 happens (arrows show what leads to what), less common tasks as More: links \
+                 under each section, and your key balances under At A Glance.",
             ]),
             Text(
                 "Any window size works. Rows of buttons and fields wrap to fit, side-by-side \
