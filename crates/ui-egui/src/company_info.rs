@@ -25,7 +25,8 @@ pub(crate) struct CompanyInfoForm {
 
 /// What the user chose.
 pub(crate) enum CompanyInfoOutcome {
-    Save(Command),
+    /// Boxed: a command is large, and Cancel carries nothing.
+    Save(Box<Command>),
     Cancel,
 }
 
@@ -128,7 +129,7 @@ pub(crate) fn window(
             ui.horizontal(|ui| {
                 if ui.button(RichText::new("Save").strong()).clicked() {
                     match form.command() {
-                        Ok(cmd) => outcome = Some(CompanyInfoOutcome::Save(cmd)),
+                        Ok(cmd) => outcome = Some(CompanyInfoOutcome::Save(Box::new(cmd))),
                         Err(e) => form.error = Some(e),
                     }
                 }
