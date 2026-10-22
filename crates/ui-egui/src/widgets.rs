@@ -240,70 +240,69 @@ pub(crate) fn report_view(ui: &mut Ui, r: &Report, out: &mut Vec<Action>, fill_p
 
 /// The report's rows; returns the table's width.
 fn report_grid(ui: &mut Ui, r: &Report, out: &mut Vec<Action>) -> f32 {
-            egui::Grid::new("report_grid")
-                .striped(true)
-                .min_col_width(90.0)
-                .spacing([18.0, 4.0])
-                .show(ui, |ui| {
-                    ui.label(RichText::new(r.label_header.as_str()).strong());
-                    for col in &r.columns {
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(RichText::new(col.as_str()).strong());
-                        });
+    egui::Grid::new("report_grid")
+        .striped(true)
+        .min_col_width(90.0)
+        .spacing([18.0, 4.0])
+        .show(ui, |ui| {
+            ui.label(RichText::new(r.label_header.as_str()).strong());
+            for col in &r.columns {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(RichText::new(col.as_str()).strong());
+                });
+            }
+            ui.end_row();
+            for row in &r.rows {
+                let strong = matches!(
+                    row.kind,
+                    RowKind::Section | RowKind::Subtotal | RowKind::Total
+                );
+                let label = format!("{}{}", "    ".repeat(usize::from(row.indent)), row.label);
+                let mut text = RichText::new(label);
+                if strong {
+                    text = text.strong();
+                }
+                match (row.account, row.txn) {
+                    (Some(acct), _) => {
+                        if ui.link(text).clicked() {
+                            out.push(Action::Go(Page::Register(acct)));
+                        }
                     }
-                    ui.end_row();
-                    for row in &r.rows {
-                        let strong = matches!(
-                            row.kind,
-                            RowKind::Section | RowKind::Subtotal | RowKind::Total
-                        );
-                        let label =
-                            format!("{}{}", "    ".repeat(usize::from(row.indent)), row.label);
-                        let mut text = RichText::new(label);
-                        if strong {
-                            text = text.strong();
+                    (None, Some(txn)) => {
+                        if ui
+                            .link(text)
+                            .on_hover_text("Open this transaction to see or change it")
+                            .clicked()
+                        {
+                            out.push(Action::Open(txn));
                         }
-                        match (row.account, row.txn) {
-                            (Some(acct), _) => {
-                                if ui.link(text).clicked() {
-                                    out.push(Action::Go(Page::Register(acct)));
-                                }
-                            }
-                            (None, Some(txn)) => {
-                                if ui
-                                    .link(text)
-                                    .on_hover_text("Open this transaction to see or change it")
-                                    .clicked()
-                                {
-                                    out.push(Action::Open(txn));
-                                }
-                            }
-                            (None, None) => {
-                                ui.label(text);
-                            }
-                        }
-                        for i in 0..r.columns.len() {
-                            match row.cells.get(i) {
-                                Some(Cell::Money(m)) => money_label(ui, *m, strong),
-                                Some(Cell::Text(t)) => match row.txn {
-                                    Some(txn) => {
-                                        txn_cell(ui, RichText::new(t.as_str()), txn, out);
-                                    }
-                                    None => {
-                                        ui.label(t.as_str());
-                                    }
-                                },
-                                _ => {
-                                    ui.label("");
-                                }
-                            }
-                        }
-                        ui.end_row();
                     }
-                })
-                .response
-                .rect
-                .width()
+                    (None, None) => {
+                        ui.label(text);
+                    }
+                }
+                for i in 0..r.columns.len() {
+                    match row.cells.get(i) {
+                        Some(Cell::Money(m)) => money_label(ui, *m, strong),
+                        Some(Cell::Text(t)) => match row.txn {
+                            Some(txn) => {
+                                txn_cell(ui, RichText::new(t.as_str()), txn, out);
+                            }
+                            None => {
+                                ui.label(t.as_str());
+                            }
+                        },
+                        _ => {
+                            ui.label("");
+                        }
+                    }
+                }
+                ui.end_row();
+            }
+        })
+        .response
+        .rect
+        .width()
 }
 
 /// A cell in a row that stands for one transaction: double-click opens it.
