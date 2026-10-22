@@ -14,7 +14,7 @@ mod statements;
 mod xlsx;
 
 pub use aging::{ap_aging, ar_aging};
-pub use invoice_pdf::{invoice_pdf, invoice_pdf_name};
+pub use invoice_pdf::{has_pdf, invoice_pdf, invoice_pdf_name};
 pub use report::{Cell, Report, Row, RowKind};
 pub use salestax::sales_tax_liability;
 pub use statement_pdf::{statement_pdf, statement_pdf_name};

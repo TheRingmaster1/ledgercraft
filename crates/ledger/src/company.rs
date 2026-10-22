@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     default_chart_of_accounts, Account, AccountId, AccountLine, AccountType, Address, Applied,
     BankRule, Contact, Customer, CustomerId, CustomerTax, FeedLink, Item, ItemId, ItemSpec,
-    LedgerError, LedgerResult, Party, Posting, Reconciliation, TaxComponent, TaxGroup, Transaction,
-    TxnBody, TxnId, Vendor, VendorId,
+    LedgerError, LedgerResult, Party, Posting, Reconciliation, Sale, TaxComponent, TaxGroup,
+    Transaction, TxnBody, TxnId, Vendor, VendorId,
 };
 
 /// Company-wide settings.
@@ -594,6 +594,31 @@ impl Company {
         Ok(())
     }
 
+    /// Checks the lines and tax of an invoice, sales receipt or credit memo;
+    /// returns its total. `what` names the total in the error.
+    fn check_sale(&self, sale: &Sale<'_>, what: &'static str) -> LedgerResult<Money> {
+        if sale.lines.is_empty() {
+            return Err(LedgerError::Required("At least one line"));
+        }
+        for l in sale.lines {
+            self.require_kind(
+                l.account,
+                |k| !k.needs_party(),
+                "an account other than AR or AP",
+            )?;
+            if let Some(item) = l.item {
+                self.item(item)
+                    .ok_or_else(|| LedgerError::NotFound(format!("Item {item}")))?;
+            }
+        }
+        let total = sale.total().ok_or(LedgerError::Overflow)?;
+        if !total.is_positive() {
+            return Err(LedgerError::NotPositive(what));
+        }
+        self.validate_sale_tax(sale)?;
+        Ok(total)
+    }
+
     /// Validates a transaction against the books without changing anything.
     pub fn validate(&self, body: &TxnBody) -> LedgerResult<()> {
         self.validate_for(body, None)
@@ -650,25 +675,82 @@ impl Company {
                     |k| k == AccountType::AccountsReceivable,
                     "an Accounts Receivable account",
                 )?;
-                if inv.lines.is_empty() {
-                    return Err(LedgerError::Required("At least one line"));
+                if let Some(sale) = body.sale() {
+                    self.check_sale(&sale, "The invoice total")?;
                 }
-                for l in &inv.lines {
-                    self.require_kind(
-                        l.account,
-                        |k| !k.needs_party(),
-                        "an account other than AR or AP",
-                    )?;
-                    if let Some(item) = l.item {
-                        self.item(item)
-                            .ok_or_else(|| LedgerError::NotFound(format!("Item {item}")))?;
-                    }
+            }
+            TxnBody::SalesReceipt(r) => {
+                if let Some(customer) = r.customer {
+                    self.require_customer(customer)?;
                 }
-                let total = inv.total().ok_or(LedgerError::Overflow)?;
-                if !total.is_positive() {
-                    return Err(LedgerError::NotPositive("The invoice total"));
+                self.require_kind(
+                    r.deposit_to,
+                    |k| matches!(k, AccountType::Bank | AccountType::OtherCurrentAsset),
+                    "a bank or Undeposited Funds account",
+                )?;
+                if let Some(sale) = body.sale() {
+                    self.check_sale(&sale, "The sales receipt total")?;
                 }
-                self.validate_invoice_tax(inv)?;
+            }
+            TxnBody::CreditMemo(m) => {
+                self.require_customer(m.customer)?;
+                self.require_kind(
+                    m.ar_account,
+                    |k| k == AccountType::AccountsReceivable,
+                    "an Accounts Receivable account",
+                )?;
+                let total = match body.sale() {
+                    Some(sale) => self.check_sale(&sale, "The credit memo total")?,
+                    None => Money::ZERO,
+                };
+                let customer = m.customer;
+                self.check_applications(
+                    &m.applied,
+                    total,
+                    |b| matches!(b, TxnBody::Invoice(i) if i.customer == customer),
+                    editing,
+                )?;
+                // An edited credit cannot shrink below what it has paid out.
+                let refunded = editing.map_or(Money::ZERO, |id| self.paid_against(id));
+                let used = Money::checked_sum(m.applied.iter().map(|a| a.amount))
+                    .and_then(|s| s.checked_add(refunded))
+                    .ok_or(LedgerError::Overflow)?;
+                if used > total {
+                    return Err(LedgerError::Invalid(format!(
+                        "the credit of {total} is less than the {used} it applies and refunds"
+                    )));
+                }
+            }
+            TxnBody::Refund(r) => {
+                self.require_customer(r.customer)?;
+                self.require_kind(
+                    r.pay_from,
+                    |k| matches!(k, AccountType::Bank | AccountType::CreditCard),
+                    "a bank or credit card account",
+                )?;
+                self.require_kind(
+                    r.ar_account,
+                    |k| k == AccountType::AccountsReceivable,
+                    "an Accounts Receivable account",
+                )?;
+                if !r.amount.is_positive() {
+                    return Err(LedgerError::NotPositive("The refund amount"));
+                }
+                let customer = r.customer;
+                self.check_applications(
+                    &r.applied,
+                    r.amount,
+                    |b| matches!(b, TxnBody::CreditMemo(m) if m.customer == customer),
+                    editing,
+                )?;
+                let applied = Money::checked_sum(r.applied.iter().map(|a| a.amount))
+                    .ok_or(LedgerError::Overflow)?;
+                if applied != r.amount {
+                    return Err(LedgerError::Invalid(format!(
+                        "a refund pays back credit memos: {applied} of the {} is applied to them",
+                        r.amount
+                    )));
+                }
             }
             TxnBody::ReceivePayment(p) => {
                 self.require_customer(p.customer)?;
@@ -816,6 +898,7 @@ impl Company {
             let total = match &body {
                 TxnBody::Invoice(i) => i.total(),
                 TxnBody::Bill(b) => b.total(),
+                TxnBody::CreditMemo(m) => m.total(),
                 _ => None,
             }
             .unwrap_or(Money::ZERO);
@@ -930,9 +1013,18 @@ impl Company {
         let total = match &t.body {
             TxnBody::Invoice(i) => i.total(),
             TxnBody::Bill(b) => b.total(),
+            TxnBody::CreditMemo(m) => m.total(),
             _ => None,
         }
         .unwrap_or(Money::ZERO);
+        // A credit memo's own credit is also used up by the invoices it pays.
+        let used_here = match &t.body {
+            TxnBody::CreditMemo(m) if ignore != Some(doc) => m
+                .applied
+                .iter()
+                .fold(Money::ZERO, |acc, a| acc.saturating_add(a.amount)),
+            _ => Money::ZERO,
+        };
         let paid = self
             .transactions
             .iter()
@@ -940,7 +1032,7 @@ impl Company {
             .flat_map(|p| p.body.applications().iter())
             .filter(|a| a.txn == doc)
             .fold(Money::ZERO, |acc, a| acc.saturating_add(a.amount));
-        total.saturating_sub(paid)
+        total.saturating_sub(paid).saturating_sub(used_here)
     }
 
     /// Open invoices for a customer, oldest first: (invoice, open amount).
@@ -962,6 +1054,19 @@ impl Company {
     ) -> Vec<(&Transaction, Money)> {
         self.open_docs(
             |b| matches!(b, TxnBody::Invoice(i) if i.customer == customer),
+            editing,
+        )
+    }
+
+    /// A customer's credit memos with credit left, as the refund being edited
+    /// (`editing`) sees them: (credit memo, credit left).
+    pub fn open_credits_for(
+        &self,
+        customer: CustomerId,
+        editing: Option<TxnId>,
+    ) -> Vec<(&Transaction, Money)> {
+        self.open_docs(
+            |b| matches!(b, TxnBody::CreditMemo(m) if m.customer == customer),
             editing,
         )
     }
@@ -1417,6 +1522,145 @@ mod tests {
             .set_account_active(acct(&c, "Service Income"), false)
             .is_err());
         assert!(c.set_account_active(acct(&c, "Rent"), false).is_ok());
+    }
+
+    fn lines(c: &Company, cents: i64) -> Vec<SalesLine> {
+        vec![SalesLine {
+            item: None,
+            description: "Returned work".into(),
+            qty: Qty::ONE,
+            rate: Money::from_cents(cents),
+            taxable: true,
+            account: acct(c, "Service Income"),
+        }]
+    }
+
+    fn credit(c: &Company, cust: CustomerId, cents: i64, applied: Vec<Applied>) -> TxnBody {
+        TxnBody::CreditMemo(crate::CreditMemo {
+            customer: cust,
+            ar_account: acct(c, "Accounts Receivable"),
+            lines: lines(c, cents),
+            tax: None,
+            applied,
+        })
+    }
+
+    fn refund(c: &Company, cust: CustomerId, memo: TxnId, cents: i64) -> TxnBody {
+        TxnBody::Refund(crate::Refund {
+            customer: cust,
+            pay_from: acct(c, "Checking"),
+            ar_account: acct(c, "Accounts Receivable"),
+            amount: Money::from_cents(cents),
+            method: "Check 1050".into(),
+            applied: vec![Applied {
+                txn: memo,
+                amount: Money::from_cents(cents),
+            }],
+        })
+    }
+
+    #[test]
+    fn a_sales_receipt_is_paid_on_the_spot() {
+        let (mut c, cust, _) = setup();
+        let receipt = TxnBody::SalesReceipt(crate::SalesReceipt {
+            customer: Some(cust),
+            deposit_to: acct(&c, "Undeposited Funds"),
+            method: "Cash".into(),
+            lines: lines(&c, 12_500),
+            tax: None,
+        });
+        c.post(d("2026-01-05"), "1", "", receipt).unwrap();
+        assert_eq!(
+            c.account_balance(acct(&c, "Undeposited Funds"), None),
+            Money::from_cents(12_500)
+        );
+        assert_eq!(
+            c.account_balance(acct(&c, "Service Income"), None),
+            Money::from_cents(12_500)
+        );
+        // Nothing is owed.
+        assert_eq!(c.customer_balance(cust), Money::ZERO);
+        // A walk-in sale needs no customer, but must go to a bank or
+        // Undeposited Funds.
+        let walk_in = TxnBody::SalesReceipt(crate::SalesReceipt {
+            customer: None,
+            deposit_to: acct(&c, "Rent"),
+            method: String::new(),
+            lines: lines(&c, 500),
+            tax: None,
+        });
+        assert!(c.validate(&walk_in).is_err());
+    }
+
+    #[test]
+    fn credit_memos_pay_invoices_and_the_rest_is_refunded() {
+        let (mut c, cust, _) = setup();
+        // $1,000 invoiced, $300 credited: $200 against the invoice, $100 left.
+        let inv = c
+            .post(d("2026-01-02"), "1001", "", invoice(&c, cust, 50_000))
+            .unwrap();
+        let applied = vec![Applied {
+            txn: inv,
+            amount: Money::from_cents(20_000),
+        }];
+        let memo = c
+            .post(d("2026-01-10"), "CM-1", "", credit(&c, cust, 30_000, applied))
+            .unwrap();
+        assert_eq!(c.customer_balance(cust), Money::from_cents(70_000));
+        assert_eq!(c.open_balance(inv, None), Money::from_cents(80_000));
+        assert_eq!(c.open_balance(memo, None), Money::from_cents(10_000));
+        assert_eq!(
+            c.account_balance(acct(&c, "Service Income"), None),
+            Money::from_cents(70_000)
+        );
+        assert_eq!(c.open_credits_for(cust, None).len(), 1);
+
+        // More than is left cannot be refunded, or applied.
+        assert!(c.validate(&refund(&c, cust, memo, 10_001)).is_err());
+        let too_much = vec![Applied {
+            txn: inv,
+            amount: Money::from_cents(40_000),
+        }];
+        assert!(c.validate(&credit(&c, cust, 30_000, too_much)).is_err());
+
+        let r = c
+            .post(d("2026-01-12"), "1050", "", refund(&c, cust, memo, 10_000))
+            .unwrap();
+        assert_eq!(c.open_balance(memo, None), Money::ZERO);
+        assert!(c.open_credits_for(cust, None).is_empty());
+        // The refund took the credit off their account: they owe the invoice.
+        assert_eq!(c.customer_balance(cust), Money::from_cents(80_000));
+        assert_eq!(
+            c.account_balance(acct(&c, "Checking"), None),
+            Money::from_cents(-10_000)
+        );
+
+        // A refunded credit cannot be voided, or shrink below its refund.
+        assert!(c.void(memo).is_err());
+        let smaller = credit(&c, cust, 25_000, vec![Applied {
+            txn: inv,
+            amount: Money::from_cents(20_000),
+        }]);
+        assert!(c.update(memo, d("2026-01-10"), "CM-1", "", smaller).is_err());
+        // Undo the refund, then voiding the credit reopens the invoice in full.
+        c.void(r).unwrap();
+        c.void(memo).unwrap();
+        assert_eq!(c.open_balance(inv, None), Money::from_cents(100_000));
+        assert_eq!(c.customer_balance(cust), Money::from_cents(100_000));
+    }
+
+    #[test]
+    fn a_refund_must_pay_back_credit_memos() {
+        let (mut c, cust, _) = setup();
+        let memo = c
+            .post(d("2026-01-10"), "CM-1", "", credit(&c, cust, 30_000, Vec::new()))
+            .unwrap();
+        let mut unapplied = refund(&c, cust, memo, 5_000);
+        if let TxnBody::Refund(r) = &mut unapplied {
+            r.applied.clear();
+        }
+        assert!(c.validate(&unapplied).is_err());
+        assert!(c.validate(&refund(&c, cust, memo, 5_000)).is_ok());
     }
 
     #[test]

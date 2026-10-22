@@ -194,7 +194,7 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "item.create", summary: "Add a product or service. {spec:{name, rate, income_account, kind?, taxable?}}" },
     CommandInfo { id: "item.update", summary: "Change a product or service; recorded invoices keep their lines. {id, spec}" },
     CommandInfo { id: "item.setActive", summary: "Make an item active or inactive (inactive ones are left off forms). {id, active}" },
-    CommandInfo { id: "txn.post", summary: "Record a transaction. {date, number?, memo?, body:{type: invoice|receive_payment|bill|pay_bill|check|deposit|journal, …}}" },
+    CommandInfo { id: "txn.post", summary: "Record a transaction. {date, number?, memo?, body:{type: invoice|sales_receipt|credit_memo|refund|receive_payment|bill|pay_bill|check|deposit|journal, …}}" },
     CommandInfo { id: "txn.update", summary: "Edit a recorded transaction; it keeps its id and type. {id, date, number?, memo?, body}" },
     CommandInfo { id: "txn.void", summary: "Void a transaction (it stays on file). {id}" },
     CommandInfo { id: "account.reconcile", summary: "Reconcile a bank or credit card account against a statement; the cleared items must match the ending balance exactly. {account, statement_date, ending_balance, cleared:[txn ids]}" },

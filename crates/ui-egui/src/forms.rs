@@ -8,9 +8,10 @@ use eframe::egui::{self, RichText, Ui};
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
-    AccountId, AccountLine, AccountType, Applied, Bill, Check, Company, CustomerId, Deposit,
-    Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill, ReceivePayment,
-    SalesLine, TaxGroupId, Transaction, TxnBody, TxnId, VendorId,
+    AccountId, AccountLine, AccountType, Applied, Bill, Check, Company, CreditMemo, CustomerId,
+    Deposit, Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill,
+    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, Transaction, TxnBody, TxnId,
+    VendorId,
 };
 
 use crate::widgets::{self, field, money_label};
@@ -46,6 +47,8 @@ impl SalesLineInput {
     }
 }
 
+/// An invoice, sales receipt or credit memo: lines, sales tax and a
+/// customer, with the few fields that differ between them.
 pub(crate) struct InvoiceForm {
     /// The invoice being edited, if this is not a new one.
     pub editing: Option<TxnId>,
@@ -59,6 +62,12 @@ pub(crate) struct InvoiceForm {
     pub tax_group: Option<TaxGroupId>,
     /// While editing: the tax the invoice charged when recorded.
     pub recorded_tax: Option<Money>,
+    /// Sales receipt: where the money goes.
+    pub deposit_to: Option<AccountId>,
+    /// Sales receipt: how they paid.
+    pub method: String,
+    /// Credit memo: what it pays on each open invoice.
+    pub amounts: BTreeMap<TxnId, String>,
 }
 
 impl Default for InvoiceForm {
@@ -73,6 +82,9 @@ impl Default for InvoiceForm {
             lines: vec![SalesLineInput::default()],
             tax_group: None,
             recorded_tax: None,
+            deposit_to: None,
+            method: String::new(),
+            amounts: BTreeMap::new(),
         }
     }
 }
@@ -213,6 +225,9 @@ impl Default for JournalForm {
 #[derive(Default)]
 pub(crate) struct Forms {
     pub invoice: InvoiceForm,
+    pub sales_receipt: InvoiceForm,
+    pub credit_memo: InvoiceForm,
+    pub refund: PaymentForm,
     pub receive: PaymentForm,
     pub bill: LinesForm,
     pub pay_bills: PaymentForm,
@@ -231,6 +246,9 @@ impl Forms {
             FormKind::Check => self.check = LinesForm::default(),
             FormKind::Deposit => self.deposit = LinesForm::default(),
             FormKind::Journal => self.journal = JournalForm::default(),
+            FormKind::SalesReceipt => self.sales_receipt = InvoiceForm::default(),
+            FormKind::CreditMemo => self.credit_memo = InvoiceForm::default(),
+            FormKind::Refund => self.refund = PaymentForm::default(),
         }
     }
 
@@ -248,31 +266,64 @@ impl Forms {
         let date = t.date.to_string();
         let number = t.number.clone();
         let memo = t.memo.clone();
+        // Invoices, sales receipts and credit memos share their lines and tax.
+        let sale_form = |customer, lines: &[SalesLine], tax: &Option<InvoiceTax>| InvoiceForm {
+            editing,
+            customer,
+            date: date.clone(),
+            number: number.clone(),
+            memo: memo.clone(),
+            lines: lines
+                .iter()
+                .map(|l| SalesLineInput {
+                    item: l.item,
+                    description: l.description.clone(),
+                    qty: l.qty.to_string(),
+                    rate: l.rate.to_plain_string(),
+                    account: Some(l.account),
+                    no_tax: !l.taxable,
+                })
+                .collect(),
+            tax_group: tax.as_ref().map(|t| t.group),
+            recorded_tax: tax.as_ref().and_then(InvoiceTax::total),
+            ..InvoiceForm::default()
+        };
         Ok(match &t.body {
             TxnBody::Invoice(inv) => {
                 self.invoice = InvoiceForm {
-                    editing,
-                    customer: Some(inv.customer),
-                    date,
                     due: inv.due_date.to_string(),
-                    number,
-                    memo,
-                    lines: inv
-                        .lines
-                        .iter()
-                        .map(|l| SalesLineInput {
-                            item: l.item,
-                            description: l.description.clone(),
-                            qty: l.qty.to_string(),
-                            rate: l.rate.to_plain_string(),
-                            account: Some(l.account),
-                            no_tax: !l.taxable,
-                        })
-                        .collect(),
-                    tax_group: inv.tax.as_ref().map(|t| t.group),
-                    recorded_tax: inv.tax.as_ref().and_then(InvoiceTax::total),
+                    ..sale_form(Some(inv.customer), &inv.lines, &inv.tax)
                 };
                 FormKind::Invoice
+            }
+            TxnBody::SalesReceipt(r) => {
+                self.sales_receipt = InvoiceForm {
+                    deposit_to: Some(r.deposit_to),
+                    method: r.method.clone(),
+                    ..sale_form(r.customer, &r.lines, &r.tax)
+                };
+                FormKind::SalesReceipt
+            }
+            TxnBody::CreditMemo(m) => {
+                self.credit_memo = InvoiceForm {
+                    amounts: applied_amounts(&m.applied),
+                    ..sale_form(Some(m.customer), &m.lines, &m.tax)
+                };
+                FormKind::CreditMemo
+            }
+            TxnBody::Refund(r) => {
+                self.refund = PaymentForm {
+                    editing,
+                    customer: Some(r.customer),
+                    vendor: None,
+                    date,
+                    number,
+                    memo,
+                    method: r.method.clone(),
+                    account: Some(r.pay_from),
+                    amounts: applied_amounts(&r.applied),
+                };
+                FormKind::Refund
             }
             TxnBody::ReceivePayment(p) => {
                 self.receive = PaymentForm {
@@ -589,16 +640,61 @@ fn total_row(ui: &mut Ui, label: &str, total: Money) {
 // ----- invoice ------------------------------------------------------------------
 
 pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut Vec<Action>) {
-    header(ui, FormKind::Invoice, f.editing);
+    sales_form(ui, c, f, FormKind::Invoice, out);
+}
+
+/// A sale paid on the spot.
+pub(crate) fn sales_receipt(
+    ui: &mut Ui,
+    c: &Company,
+    f: &mut InvoiceForm,
+    out: &mut Vec<Action>,
+) {
+    sales_form(ui, c, f, FormKind::SalesReceipt, out);
+}
+
+/// A credit to a customer, which can pay down their open invoices.
+pub(crate) fn credit_memo(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut Vec<Action>) {
+    sales_form(ui, c, f, FormKind::CreditMemo, out);
+}
+
+/// Whether a recorded transaction is the kind a sales form makes, for
+/// numbering each kind in its own run.
+fn same_sale_kind(kind: FormKind) -> impl Fn(&TxnBody) -> bool {
+    move |b| match kind {
+        FormKind::SalesReceipt => matches!(b, TxnBody::SalesReceipt(_)),
+        FormKind::CreditMemo => matches!(b, TxnBody::CreditMemo(_)),
+        _ => matches!(b, TxnBody::Invoice(_)),
+    }
+}
+
+/// The invoice, sales receipt or credit memo form.
+fn sales_form(
+    ui: &mut Ui,
+    c: &Company,
+    f: &mut InvoiceForm,
+    kind: FormKind,
+    out: &mut Vec<Action>,
+) {
+    header(ui, kind, f.editing);
+    if kind == FormKind::SalesReceipt && f.deposit_to.is_none() {
+        f.deposit_to = undeposited_or_bank(c);
+    }
+    let number_label = match kind {
+        FormKind::SalesReceipt => "Receipt #",
+        FormKind::CreditMemo => "Credit #",
+        _ => "Invoice #",
+    };
     head_grid(ui, "inv_head", |ui, pairs| {
         widgets::hint_label(ui, "Customer");
         if widgets::customer_combo(ui, "inv_customer", c, &mut f.customer) {
             set_due_from_terms(c, f);
             f.tax_group = default_tax_group(c, f.customer);
+            f.amounts.clear();
         }
         pairs.end(ui, false);
-        widgets::hint_label(ui, "Invoice #");
-        let hint = widgets::next_number(c, 1001, |b| matches!(b, TxnBody::Invoice(_)));
+        widgets::hint_label(ui, number_label);
+        let hint = widgets::next_number(c, 1001, same_sale_kind(kind));
         field(ui, &mut f.number, 100.0, &hint);
         pairs.end(ui, true);
         widgets::hint_label(ui, "Date");
@@ -606,10 +702,30 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
             set_due_from_terms(c, f);
         }
         pairs.end(ui, false);
-        widgets::hint_label(ui, "Due date");
-        field(ui, &mut f.due, 110.0, "from terms");
-        pairs.end(ui, true);
+        match kind {
+            FormKind::Invoice => {
+                widgets::hint_label(ui, "Due date");
+                field(ui, &mut f.due, 110.0, "from terms");
+                pairs.end(ui, true);
+            }
+            FormKind::SalesReceipt => {
+                widgets::hint_label(ui, "Paid by");
+                field(ui, &mut f.method, 140.0, "Cash, check #, card…");
+                pairs.end(ui, true);
+                widgets::hint_label(ui, "Deposit to");
+                widgets::account_combo(ui, "sr_deposit", c, &mut f.deposit_to, |k| {
+                    matches!(k, AccountType::Bank | AccountType::OtherCurrentAsset)
+                });
+                pairs.end(ui, false);
+            }
+            _ => {}
+        }
     });
+    if kind == FormKind::SalesReceipt && f.customer.is_none() {
+        ui.label(
+            RichText::new("A walk-in sale needs no customer.").color(theme::MUTED),
+        );
+    }
     if let Some(cust) = f.customer.and_then(|id| c.customer(id)) {
         let addr = cust.contact.address.lines().join(", ");
         if !addr.is_empty() {
@@ -719,19 +835,22 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
     });
-    invoice_totals(ui, c, f, total, taxable);
+    let grand_total = invoice_totals(ui, c, f, total, taxable);
+    if kind == FormKind::CreditMemo {
+        credit_applications(ui, c, f, grand_total);
+    }
     let hover = if f.editing.is_some() {
-        "Save your changes, then save the invoice as a PDF to email or print"
+        "Save your changes, then save it as a PDF to email or print"
     } else {
-        "Record the invoice, then save it as a PDF to email or print"
+        "Record it, then save it as a PDF to email or print"
     };
     let (save, clear, pdf) = footer_with(ui, f.editing, Some(("Save as PDF…", hover)));
     if save {
-        finish(out, FormKind::Invoice, f.editing, build_invoice(c, f));
+        finish(out, kind, f.editing, build_sale(c, f, kind));
     }
     if pdf {
-        match command_for(f.editing, build_invoice(c, f)) {
-            Ok(cmd) => out.push(Action::SaveInvoicePdf(cmd)),
+        match command_for(f.editing, build_sale(c, f, kind)) {
+            Ok(cmd) => out.push(Action::SaveInvoicePdf(kind, cmd)),
             Err(e) => out.push(Action::Error(e)),
         }
     }
@@ -782,10 +901,17 @@ fn tax_choice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm) {
 }
 
 /// Subtotal, each tax and the total, under the lines.
-fn invoice_totals(ui: &mut Ui, c: &Company, f: &InvoiceForm, subtotal: Money, taxable: Money) {
+/// Shows the totals; returns the total, tax included.
+fn invoice_totals(
+    ui: &mut Ui,
+    c: &Company,
+    f: &InvoiceForm,
+    subtotal: Money,
+    taxable: Money,
+) -> Money {
     let Some(group) = f.tax_group else {
         total_row(ui, "Total", subtotal);
-        return;
+        return subtotal;
     };
     total_row(ui, "Subtotal", subtotal);
     let mut tax_total = Money::ZERO;
@@ -823,7 +949,72 @@ fn invoice_totals(ui: &mut Ui, c: &Company, f: &InvoiceForm, subtotal: Money, ta
             ui.label(RichText::new("Enter the date to work out the tax.").color(theme::MUTED));
         }
     }
-    total_row(ui, "Total", subtotal.saturating_add(tax_total));
+    let total = subtotal.saturating_add(tax_total);
+    total_row(ui, "Total", total);
+    total
+}
+
+/// The account money received on the spot goes to by default: Undeposited
+/// Funds, or the first bank account.
+fn undeposited_or_bank(c: &Company) -> Option<AccountId> {
+    c.account_by_name("Undeposited Funds")
+        .filter(|a| a.active && a.kind == AccountType::OtherCurrentAsset)
+        .map(|a| a.id)
+        .or_else(|| c.first_account_of(AccountType::Bank))
+}
+
+/// A credit memo's customer's open invoices, with what the credit pays on
+/// each, and the credit left over.
+fn credit_applications(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, credit: Money) {
+    let Some(customer) = f.customer else {
+        return;
+    };
+    ui.add_space(6.0);
+    ui.label(RichText::new("Apply the credit to open invoices").strong());
+    let docs = open_invoice_docs(c, customer, f.editing);
+    let applied = open_docs_grid(
+        ui,
+        "cm_docs",
+        &docs,
+        &mut f.amounts,
+        ("Apply to all open", "Fill in each open amount, oldest first."),
+    );
+    let left = credit.saturating_sub(applied);
+    let text = if left.is_negative() {
+        RichText::new(format!(
+            "That applies {} more than the credit.",
+            currency::format(left.saturating_neg())
+        ))
+        .color(theme::NEGATIVE)
+    } else {
+        RichText::new(format!(
+            "Credit left for later invoices or a refund: {}",
+            currency::format(left)
+        ))
+        .color(theme::MUTED)
+    };
+    ui.label(text);
+}
+
+/// A customer's open invoices for a payment or credit grid.
+fn open_invoice_docs(c: &Company, customer: CustomerId, editing: Option<TxnId>) -> Vec<OpenDoc> {
+    c.open_invoices_for(customer, editing)
+        .into_iter()
+        .map(|(t, open)| {
+            let (due, total) = match &t.body {
+                TxnBody::Invoice(i) => (i.due_date, i.total().unwrap_or(Money::ZERO)),
+                _ => (t.date, Money::ZERO),
+            };
+            OpenDoc {
+                id: t.id,
+                number: t.number.clone(),
+                date: t.date,
+                due,
+                total,
+                open,
+            }
+        })
+        .collect()
 }
 
 fn set_due_from_terms(c: &Company, f: &mut InvoiceForm) {
@@ -836,8 +1027,13 @@ fn set_due_from_terms(c: &Company, f: &mut InvoiceForm) {
     }
 }
 
-fn build_invoice(c: &Company, f: &InvoiceForm) -> Result<Command, String> {
-    let customer = f.customer.ok_or("Choose a customer")?;
+/// What an invoice, sales receipt or credit memo form records.
+fn build_sale(c: &Company, f: &InvoiceForm, kind: FormKind) -> Result<Command, String> {
+    let customer = match (kind, f.customer) {
+        (FormKind::SalesReceipt, customer) => customer,
+        (_, Some(customer)) => Some(customer),
+        (_, None) => return Err("Choose a customer".into()),
+    };
     let date = parse_date("Date", &f.date)?;
     let due_date = if f.due.trim().is_empty() {
         date
@@ -888,21 +1084,41 @@ fn build_invoice(c: &Company, f: &InvoiceForm) -> Result<Command, String> {
         None => None,
     };
     let number = if f.number.trim().is_empty() {
-        widgets::next_number(c, 1001, |b| matches!(b, TxnBody::Invoice(_)))
+        widgets::next_number(c, 1001, same_sale_kind(kind))
     } else {
         f.number.clone()
     };
-    Ok(Command::TxnPost {
-        date,
-        number,
-        memo: f.memo.clone(),
-        body: TxnBody::Invoice(Invoice {
+    let body = match (kind, customer) {
+        (FormKind::SalesReceipt, customer) => TxnBody::SalesReceipt(SalesReceipt {
+            customer,
+            deposit_to: f
+                .deposit_to
+                .ok_or("Choose where the money goes (Deposit to)")?,
+            method: f.method.clone(),
+            lines,
+            tax,
+        }),
+        (FormKind::CreditMemo, Some(customer)) => TxnBody::CreditMemo(CreditMemo {
+            customer,
+            ar_account,
+            lines,
+            tax,
+            applied: applications(&f.amounts)?,
+        }),
+        (_, Some(customer)) => TxnBody::Invoice(Invoice {
             customer,
             due_date,
             ar_account,
             tax,
             lines,
         }),
+        (_, None) => return Err("Choose a customer".into()),
+    };
+    Ok(Command::TxnPost {
+        date,
+        number,
+        memo: f.memo.clone(),
+        body,
     })
 }
 
@@ -961,7 +1177,7 @@ pub(crate) fn receive_payment(
             .collect(),
         None => Vec::new(),
     };
-    let total = open_docs_grid(ui, "rp_docs", &docs, &mut f.amounts);
+    let total = open_docs_grid(ui, "rp_docs", &docs, &mut f.amounts, PAY_ALL);
     ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
@@ -1030,7 +1246,7 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
             .collect(),
         None => Vec::new(),
     };
-    let total = open_docs_grid(ui, "pb_docs", &docs, &mut f.amounts);
+    let total = open_docs_grid(ui, "pb_docs", &docs, &mut f.amounts, PAY_ALL);
     ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Memo");
         field(ui, &mut f.memo, 360.0, "");
@@ -1052,6 +1268,113 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
     }
 }
 
+/// Refund a Credit: pay a customer back what is left on their credit memos.
+pub(crate) fn refund(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut Vec<Action>) {
+    header(ui, FormKind::Refund, f.editing);
+    ui.label(
+        RichText::new(
+            "Pays a customer back from their credit memos' credit, by check, card or \
+             transfer. To give credit instead, apply the credit memo to an invoice.",
+        )
+        .color(theme::MUTED),
+    );
+    if f.account.is_none() {
+        f.account = c.first_account_of(AccountType::Bank);
+    }
+    head_grid(ui, "rf_head", |ui, pairs| {
+        widgets::hint_label(ui, "Refund to");
+        if widgets::customer_combo(ui, "rf_customer", c, &mut f.customer) {
+            f.amounts.clear();
+        }
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Date");
+        field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
+        pairs.end(ui, true);
+        widgets::hint_label(ui, "Pay from");
+        widgets::account_combo(ui, "rf_from", c, &mut f.account, |k| {
+            matches!(k, AccountType::Bank | AccountType::CreditCard)
+        });
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Check #");
+        field(ui, &mut f.number, 100.0, "");
+        pairs.end(ui, true);
+        widgets::hint_label(ui, "Method / ref");
+        field(ui, &mut f.method, 140.0, "Check, card refund…");
+        pairs.end(ui, false);
+    });
+    let docs: Vec<OpenDoc> = match f.customer {
+        Some(id) => c
+            .open_credits_for(id, f.editing)
+            .into_iter()
+            .map(|(t, open)| OpenDoc {
+                id: t.id,
+                number: t.number.clone(),
+                date: t.date,
+                due: t.date,
+                total: t.body.total().unwrap_or(Money::ZERO),
+                open,
+            })
+            .collect(),
+        None => Vec::new(),
+    };
+    if f.customer.is_some() && docs.is_empty() {
+        ui.label(
+            RichText::new("This customer has no credit left to refund.").color(theme::MUTED),
+        );
+    }
+    let total = open_docs_grid(
+        ui,
+        "rf_docs",
+        &docs,
+        &mut f.amounts,
+        ("Refund all credit", "Fill in the credit left on each credit memo."),
+    );
+    ui.horizontal_wrapped(|ui| {
+        widgets::hint_label(ui, "Memo");
+        field(ui, &mut f.memo, 360.0, "");
+    });
+    total_row(ui, "Refund amount", total);
+    let (save, clear) = footer(ui, f.editing);
+    if save {
+        finish(out, FormKind::Refund, f.editing, build_refund(c, f, total));
+    }
+    if clear {
+        let editing = f.editing;
+        *f = PaymentForm::default();
+        cleared(out, editing);
+    }
+}
+
+fn build_refund(c: &Company, f: &PaymentForm, amount: Money) -> Result<Command, String> {
+    let customer = f.customer.ok_or("Choose a customer")?;
+    let pay_from = f.account.ok_or("Choose the account to pay from")?;
+    let ar_account = c
+        .first_account_of(AccountType::AccountsReceivable)
+        .ok_or("Add an Accounts Receivable account first")?;
+    if !amount.is_positive() {
+        return Err("Enter what to refund from each credit memo".into());
+    }
+    Ok(Command::TxnPost {
+        date: parse_date("Date", &f.date)?,
+        number: f.number.clone(),
+        memo: f.memo.clone(),
+        body: TxnBody::Refund(Refund {
+            customer,
+            pay_from,
+            ar_account,
+            amount,
+            method: f.method.clone(),
+            applied: applications(&f.amounts)?,
+        }),
+    })
+}
+
+/// The fill-in button on payment forms.
+const PAY_ALL: (&str, &str) = (
+    "Pay all open",
+    "Fill in the full open amount of every item listed.",
+);
+
 /// An open invoice or bill shown on a payment form.
 struct OpenDoc {
     id: TxnId,
@@ -1068,6 +1391,7 @@ fn open_docs_grid(
     salt: &str,
     docs: &[OpenDoc],
     amounts: &mut BTreeMap<TxnId, String>,
+    (fill, fill_hover): (&str, &str),
 ) -> Money {
     ui.add_space(8.0);
     if docs.is_empty() {
@@ -1075,10 +1399,7 @@ fn open_docs_grid(
         ui.add_space(8.0);
         return Money::ZERO;
     }
-    if ui
-        .button("Pay all open")
-        .on_hover_text("Fill in the full open amount of every item listed.")
-        .clicked()
+    if ui.button(fill).on_hover_text(fill_hover).clicked()
     {
         for doc in docs {
             amounts.insert(doc.id, doc.open.to_plain_string());
@@ -1558,6 +1879,9 @@ mod tests {
             check(ui, c, &mut f.check, &mut out);
             deposit(ui, c, &mut f.deposit, &mut out);
             journal(ui, c, &mut f.journal, &mut out);
+            sales_receipt(ui, c, &mut f.sales_receipt, &mut out);
+            credit_memo(ui, c, &mut f.credit_memo, &mut out);
+            refund(ui, c, &mut f.refund, &mut out);
         });
         out
     }
@@ -1607,7 +1931,22 @@ mod tests {
                 .fold(Money::ZERO, Money::saturating_add)
         };
         let (editing, built) = match kind {
-            FormKind::Invoice => (f.invoice.editing, build_invoice(c, &f.invoice)),
+            FormKind::Invoice => (
+                f.invoice.editing,
+                build_sale(c, &f.invoice, FormKind::Invoice),
+            ),
+            FormKind::SalesReceipt => (
+                f.sales_receipt.editing,
+                build_sale(c, &f.sales_receipt, FormKind::SalesReceipt),
+            ),
+            FormKind::CreditMemo => (
+                f.credit_memo.editing,
+                build_sale(c, &f.credit_memo, FormKind::CreditMemo),
+            ),
+            FormKind::Refund => (
+                f.refund.editing,
+                build_refund(c, &f.refund, paid(&f.refund.amounts)),
+            ),
             FormKind::ReceivePayment => (
                 f.receive.editing,
                 build_receive(c, &f.receive, paid(&f.receive.amounts)),

@@ -31,8 +31,8 @@ pub use salestax::{
 };
 pub use template::{default_chart_of_accounts, AccountTemplate};
 pub use txn::{
-    AccountLine, Applied, Bill, Check, Deposit, Invoice, JournalEntry, JournalLine, PayBill,
-    Posting, ReceivePayment, SalesLine, Transaction, TxnBody,
+    AccountLine, Applied, Bill, Check, CreditMemo, Deposit, Invoice, JournalEntry, JournalLine,
+    PayBill, Posting, ReceivePayment, Refund, Sale, SalesLine, SalesReceipt, Transaction, TxnBody,
 };
 
 pub use ledgercraft_core::{Date, Money, Qty};

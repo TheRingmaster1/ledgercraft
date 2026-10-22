@@ -36,15 +36,18 @@ fn aging(company: &Company, as_of: Date, receivable: bool) -> Report {
         .iter()
         .filter(|t| !t.voided && t.date <= as_of)
     {
-        let (party, due) = match (&t.body, receivable) {
-            (TxnBody::Invoice(i), true) => (Party::Customer(i.customer), i.due_date),
-            (TxnBody::Bill(b), false) => (Party::Vendor(b.vendor), b.due_date),
+        // Credit left on a credit memo counts against what is owed, as current.
+        let (party, due, credit) = match (&t.body, receivable) {
+            (TxnBody::Invoice(i), true) => (Party::Customer(i.customer), i.due_date, false),
+            (TxnBody::CreditMemo(m), true) => (Party::Customer(m.customer), as_of, true),
+            (TxnBody::Bill(b), false) => (Party::Vendor(b.vendor), b.due_date, false),
             _ => continue,
         };
-        let open = company.open_balance(t.id, Some(as_of));
-        if !open.is_positive() {
+        let left = company.open_balance(t.id, Some(as_of));
+        if !left.is_positive() {
             continue;
         }
+        let open = if credit { left.saturating_neg() } else { left };
         let idx = bucket(due.days_until(as_of));
         let pos = match rows.iter().position(|(p, _)| *p == party) {
             Some(pos) => pos,

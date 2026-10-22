@@ -40,6 +40,9 @@ pub enum TxnBody {
     PayBill(PayBill),
     Check(Check),
     Deposit(Deposit),
+    SalesReceipt(SalesReceipt),
+    CreditMemo(CreditMemo),
+    Refund(Refund),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -99,6 +102,120 @@ pub struct Invoice {
 }
 
 impl Invoice {
+    fn sale(&self) -> Sale<'_> {
+        Sale {
+            customer: Some(self.customer),
+            lines: &self.lines,
+            tax: self.tax.as_ref(),
+        }
+    }
+
+    /// The lines added up, before tax.
+    pub fn subtotal(&self) -> Option<Money> {
+        self.sale().subtotal()
+    }
+
+    /// The lines sales tax is charged on, added up.
+    pub fn taxable_amount(&self) -> Option<Money> {
+        self.sale().taxable_amount()
+    }
+
+    /// The sales tax charged; zero without tax.
+    pub fn tax_total(&self) -> Option<Money> {
+        self.sale().tax_total()
+    }
+
+    /// What the customer owes: the lines plus tax.
+    pub fn total(&self) -> Option<Money> {
+        self.sale().total()
+    }
+}
+
+/// A sale paid for on the spot (cash, card, check): nothing is owed, and
+/// the money goes straight to a bank account or Undeposited Funds.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SalesReceipt {
+    /// Who bought; walk-in sales need not say.
+    #[serde(default)]
+    pub customer: Option<CustomerId>,
+    /// A bank account, or Undeposited Funds to group with other takings.
+    pub deposit_to: AccountId,
+    /// How they paid: cash, a check number, a card.
+    #[serde(default)]
+    pub method: String,
+    pub lines: Vec<SalesLine>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tax: Option<InvoiceTax>,
+}
+
+impl SalesReceipt {
+    fn sale(&self) -> Sale<'_> {
+        Sale {
+            customer: self.customer,
+            lines: &self.lines,
+            tax: self.tax.as_ref(),
+        }
+    }
+
+    pub fn total(&self) -> Option<Money> {
+        self.sale().total()
+    }
+}
+
+/// Money a customer is credited (a return, an allowance, a mistake): it
+/// lowers what they owe, can pay down their open invoices, and what is left
+/// can be refunded. Sales tax charged on the credited lines is given back.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CreditMemo {
+    pub customer: CustomerId,
+    pub ar_account: AccountId,
+    pub lines: Vec<SalesLine>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tax: Option<InvoiceTax>,
+    /// Open invoices the credit pays down.
+    #[serde(default)]
+    pub applied: Vec<Applied>,
+}
+
+impl CreditMemo {
+    fn sale(&self) -> Sale<'_> {
+        Sale {
+            customer: Some(self.customer),
+            lines: &self.lines,
+            tax: self.tax.as_ref(),
+        }
+    }
+
+    pub fn total(&self) -> Option<Money> {
+        self.sale().total()
+    }
+}
+
+/// Money paid back to a customer out of their credit memos.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Refund {
+    pub customer: CustomerId,
+    /// The bank or credit card account the money goes out of.
+    pub pay_from: AccountId,
+    pub ar_account: AccountId,
+    pub amount: Money,
+    #[serde(default)]
+    pub method: String,
+    /// The credit memos refunded.
+    #[serde(default)]
+    pub applied: Vec<Applied>,
+}
+
+/// The lines and tax of an invoice, sales receipt or credit memo, which are
+/// added up and taxed the same way.
+#[derive(Clone, Copy, Debug)]
+pub struct Sale<'a> {
+    pub customer: Option<CustomerId>,
+    pub lines: &'a [SalesLine],
+    pub tax: Option<&'a InvoiceTax>,
+}
+
+impl Sale<'_> {
     /// The lines added up, before tax.
     pub fn subtotal(&self) -> Option<Money> {
         self.lines
@@ -114,14 +231,12 @@ impl Invoice {
             .try_fold(Money::ZERO, |acc, l| acc.checked_add(l.amount()?))
     }
 
-    /// The sales tax charged; zero without tax.
+    /// The sales tax; zero without tax.
     pub fn tax_total(&self) -> Option<Money> {
-        self.tax
-            .as_ref()
-            .map_or(Some(Money::ZERO), InvoiceTax::total)
+        self.tax.map_or(Some(Money::ZERO), InvoiceTax::total)
     }
 
-    /// What the customer owes: the lines plus tax.
+    /// The lines plus tax.
     pub fn total(&self) -> Option<Money> {
         self.subtotal()?.checked_add(self.tax_total()?)
     }
@@ -215,6 +330,28 @@ fn neg(m: Money) -> LedgerResult<Money> {
     m.checked_neg().ok_or(LedgerError::Overflow)
 }
 
+/// The income and tax side of a sale: credits to income and sales tax, or,
+/// for a credit memo (`reverse`), debits taking them back.
+fn sale_postings(
+    out: &mut Vec<Posting>,
+    lines: &[SalesLine],
+    tax: Option<&InvoiceTax>,
+    party: Option<Party>,
+    reverse: bool,
+) -> LedgerResult<()> {
+    let signed = |m: Money| if reverse { Ok(m) } else { neg(m) };
+    for l in lines {
+        let amount = l.amount().ok_or(LedgerError::Overflow)?;
+        out.push(post(l.account, signed(amount)?, party, &l.description));
+    }
+    if let Some(tax) = tax {
+        for l in &tax.lines {
+            out.push(post(tax.account, signed(l.amount)?, party, &l.name));
+        }
+    }
+    Ok(())
+}
+
 fn post(account: AccountId, amount: Money, party: Option<Party>, memo: &str) -> Posting {
     Posting {
         account,
@@ -234,6 +371,29 @@ impl TxnBody {
             Self::PayBill(_) => "Bill Payment",
             Self::Check(_) => "Check",
             Self::Deposit(_) => "Deposit",
+            Self::SalesReceipt(_) => "Sales Receipt",
+            Self::CreditMemo(_) => "Credit Memo",
+            Self::Refund(_) => "Refund",
+        }
+    }
+
+    /// The lines and tax of an invoice, sales receipt or credit memo.
+    pub fn sale(&self) -> Option<Sale<'_>> {
+        match self {
+            Self::Invoice(i) => Some(i.sale()),
+            Self::SalesReceipt(r) => Some(r.sale()),
+            Self::CreditMemo(m) => Some(m.sale()),
+            _ => None,
+        }
+    }
+
+    /// Whether the transaction's sales count against sales (a credit memo
+    /// gives sales, and their tax, back): 1, -1, or 0 for no sales.
+    pub fn sales_sign(&self) -> i64 {
+        match self {
+            Self::Invoice(_) | Self::SalesReceipt(_) => 1,
+            Self::CreditMemo(_) => -1,
+            _ => 0,
         }
     }
 
@@ -247,6 +407,9 @@ impl TxnBody {
             Self::PayBill(p) => Some(Party::Vendor(p.vendor)),
             Self::Check(c) => c.payee,
             Self::Deposit(_) => None,
+            Self::SalesReceipt(r) => r.customer.map(Party::Customer),
+            Self::CreditMemo(m) => Some(Party::Customer(m.customer)),
+            Self::Refund(r) => Some(Party::Customer(r.customer)),
         }
     }
 
@@ -260,6 +423,9 @@ impl TxnBody {
             Self::PayBill(p) => Some(p.amount),
             Self::Check(c) => c.total(),
             Self::Deposit(d) => d.total(),
+            Self::SalesReceipt(r) => r.total(),
+            Self::CreditMemo(m) => m.total(),
+            Self::Refund(r) => Some(r.amount),
         }
     }
 
@@ -277,15 +443,7 @@ impl TxnBody {
                 let party = Some(Party::Customer(inv.customer));
                 let total = inv.total().ok_or(LedgerError::Overflow)?;
                 out.push(post(inv.ar_account, total, party, ""));
-                for l in &inv.lines {
-                    let amount = l.amount().ok_or(LedgerError::Overflow)?;
-                    out.push(post(l.account, neg(amount)?, party, &l.description));
-                }
-                if let Some(tax) = &inv.tax {
-                    for l in &tax.lines {
-                        out.push(post(tax.account, neg(l.amount)?, party, &l.name));
-                    }
-                }
+                sale_postings(&mut out, &inv.lines, inv.tax.as_ref(), party, false)?;
             }
             Self::ReceivePayment(p) => {
                 let party = Some(Party::Customer(p.customer));
@@ -319,6 +477,23 @@ impl TxnBody {
                     out.push(post(l.account, neg(l.amount)?, None, &l.description));
                 }
             }
+            Self::SalesReceipt(r) => {
+                let party = r.customer.map(Party::Customer);
+                let total = r.total().ok_or(LedgerError::Overflow)?;
+                out.push(post(r.deposit_to, total, party, &r.method));
+                sale_postings(&mut out, &r.lines, r.tax.as_ref(), party, false)?;
+            }
+            Self::CreditMemo(m) => {
+                let party = Some(Party::Customer(m.customer));
+                let total = m.total().ok_or(LedgerError::Overflow)?;
+                out.push(post(m.ar_account, neg(total)?, party, ""));
+                sale_postings(&mut out, &m.lines, m.tax.as_ref(), party, true)?;
+            }
+            Self::Refund(r) => {
+                let party = Some(Party::Customer(r.customer));
+                out.push(post(r.ar_account, r.amount, party, &r.method));
+                out.push(post(r.pay_from, neg(r.amount)?, party, &r.method));
+            }
         }
         Ok(out)
     }
@@ -328,6 +503,8 @@ impl TxnBody {
         match self {
             Self::ReceivePayment(p) => &p.applied,
             Self::PayBill(p) => &p.applied,
+            Self::CreditMemo(m) => &m.applied,
+            Self::Refund(r) => &r.applied,
             _ => &[],
         }
     }

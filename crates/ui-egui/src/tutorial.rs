@@ -421,6 +421,56 @@ const LESSONS: &[Lesson] = &[
         ],
     },
     Lesson {
+        title: "Sales receipts, credits and refunds",
+        blocks: &[
+            Heading("Sales receipts"),
+            Text(
+                "When a customer pays as they buy (at a craft fair, over the counter), \
+                 skip the invoice: Customers > Enter Sales Receipt records the sale and the \
+                 money together. Nothing is owed.",
+            ),
+            Bullets(&[
+                "The customer is optional: leave it empty for a walk-in sale.",
+                "Paid by says how (cash, a check number, a card). Deposit to is usually \
+                 Undeposited Funds, so the day's takings go to the bank together with Make \
+                 Deposit.",
+                "Lines, items and sales tax work as on an invoice, and Save as PDF… gives \
+                 the customer a receipt.",
+            ]),
+            Heading("Credit memos"),
+            Text(
+                "A credit memo gives a customer credit: for a return, a discount after the \
+                 fact, or a mistake on an invoice already sent. It takes the sale (and its \
+                 sales tax) back and lowers what they owe.",
+            ),
+            Steps(&[
+                "Open Customers > Create Credit Memo and choose the customer.",
+                "Enter what is credited, as invoice lines: the item, quantity and price.",
+                "Under Apply the credit to open invoices, type what it pays on each, or \
+                 click Apply to all open. Leave credit unapplied to use it later.",
+                "Save. An invoice the credit pays down shows it among what was applied; \
+                 credit left shows on their statement and the A/R Aging report.",
+            ]),
+            Heading("Refunds"),
+            Text(
+                "To pay credit back instead, open Customers > Refund a Credit, choose the \
+                 customer, and type what to refund from each credit memo (Refund all \
+                 credit fills it in). Choose the account it is paid from, and the check \
+                 number if you write one.",
+            ),
+            Tip(
+                "In the sample company, Alpine Lodge Rentals has a credit for a scratched \
+                 chair applied to an invoice, Dana Lin returned a chair and was refunded, \
+                 and Harbor Design Studio still has credit to use.",
+            ),
+        ],
+        try_it: &[
+            ("Enter a sales receipt", form(FormKind::SalesReceipt)),
+            ("Create a credit memo", form(FormKind::CreditMemo)),
+            ("Refund a credit", form(FormKind::Refund)),
+        ],
+    },
+    Lesson {
         title: "Bills and paying vendors",
         blocks: &[
             Text(
@@ -947,6 +997,9 @@ mod tests {
             FormKind::Check,
             FormKind::Deposit,
             FormKind::Journal,
+            FormKind::SalesReceipt,
+            FormKind::CreditMemo,
+            FormKind::Refund,
         ];
         for kind in all {
             let taught = LESSONS

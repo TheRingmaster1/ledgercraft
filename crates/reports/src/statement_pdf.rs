@@ -103,6 +103,7 @@ fn describe(c: &Company, id: TxnId) -> (String, String) {
     let mut detail = match &t.body {
         TxnBody::Invoice(i) => format!("Due {}", i.due_date),
         TxnBody::ReceivePayment(p) => p.method.trim().to_string(),
+        TxnBody::Refund(r) => r.method.trim().to_string(),
         _ => String::new(),
     };
     let memo = t.memo.trim();

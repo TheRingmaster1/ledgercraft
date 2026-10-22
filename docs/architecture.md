@@ -32,9 +32,11 @@ crates/ui-egui            │                 L4  desktop UI (swappable)
 
 * `Money` — `i64` cents with checked/saturating arithmetic and a parser for
   `$1,234.50`, `(12.00)` etc.
-* `TxnBody` — the forms: `Journal`, `Invoice`, `ReceivePayment`, `Bill`,
-  `PayBill`, `Check`, `Deposit`. `TxnBody::postings()` is the single source
-  of truth for what each form does to the books.
+* `TxnBody` — the forms: `Journal`, `Invoice`, `SalesReceipt`,
+  `ReceivePayment`, `CreditMemo`, `Refund`, `Bill`, `PayBill`, `Check`,
+  `Deposit`. `TxnBody::postings()` is the single source of truth for what
+  each form does to the books; `TxnBody::sale()` gives the lines and tax that
+  invoices, sales receipts and credit memos share.
 * `Report` — a toolkit-free table (label column + typed cells) rendered by the
   UI, the CLI text printer and CSV export alike.
 

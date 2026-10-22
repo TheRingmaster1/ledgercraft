@@ -23,7 +23,8 @@ usage:
 
 report KIND is one of: pl, balance-sheet, trial-balance, ar-aging, ap-aging, transactions, sales-tax
 dates are YYYY-MM-DD; --to is also the \"as of\" date
-invoice-pdf saves invoice NUMBER as a PDF (default: \"Invoice NUMBER.pdf\")
+invoice-pdf saves invoice NUMBER as a PDF (default: \"Invoice NUMBER.pdf\"); a sales
+  receipt or credit memo with that number prints when no invoice has it
 statement-pdf saves CUSTOMER's (by name) statement as a PDF; the period defaults to
   this month so far
 tax-import reads a Streamlined Sales Tax rate and boundary file (streamlinedsalestax.org)
@@ -193,13 +194,14 @@ fn run(args: &[String]) -> Result<(), String> {
             let number = rest.get(1).ok_or("invoice-pdf: which invoice number?")?;
             let session = open(file)?;
             let c = session.company();
+            // An invoice first, then a sales receipt or credit memo.
             let invoice = c
                 .transactions
                 .iter()
-                .find(|t| {
-                    matches!(t.body, ledgercraft_ledger::TxnBody::Invoice(_))
-                        && t.number.trim() == number.trim()
+                .filter(|t| {
+                    ledgercraft_reports::has_pdf(&t.body) && t.number.trim() == number.trim()
                 })
+                .min_by_key(|t| !matches!(t.body, ledgercraft_ledger::TxnBody::Invoice(_)))
                 .ok_or_else(|| format!("invoice-pdf: no invoice numbered {number:?}"))?;
             let bytes =
                 ledgercraft_reports::invoice_pdf(c, invoice.id, currency_symbol(&c.info.currency))?;

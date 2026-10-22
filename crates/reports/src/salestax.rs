@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use ledgercraft_core::{Date, Money};
-use ledgercraft_ledger::{Company, TaxComponentId, TaxGroupId, TaxRate, TxnBody};
+use ledgercraft_ledger::{Company, TaxComponentId, TaxGroupId, TaxRate};
 
 use crate::report::{Cell, Report, RowKind};
 
@@ -38,7 +38,8 @@ impl Tally {
     }
 }
 
-/// Sales tax charged on invoices dated `from` to `to` (voided ones left out),
+/// Sales tax charged on invoices and sales receipts dated `from` to `to`, less
+/// tax credited back on credit memos (voided ones left out),
 /// and the Sales Tax Payable account over the period.
 pub fn sales_tax_liability(company: &Company, from: Date, to: Date) -> Report {
     let mut r = Report::new(
@@ -56,16 +57,19 @@ pub fn sales_tax_liability(company: &Company, from: Date, to: Date) -> Report {
         .iter()
         .filter(|t| !t.voided && t.date >= from && t.date <= to);
     for t in invoices {
-        let TxnBody::Invoice(inv) = &t.body else {
+        // Invoices and sales receipts are sales; credit memos take them back.
+        let Some(sale) = t.body.sale() else {
             continue;
         };
-        sales = sales.saturating_add(inv.subtotal().unwrap_or(Money::ZERO));
-        let Some(tax) = &inv.tax else {
+        let credit = t.body.sales_sign() < 0;
+        let signed = |m: Money| if credit { m.saturating_neg() } else { m };
+        sales = sales.saturating_add(signed(sale.subtotal().unwrap_or(Money::ZERO)));
+        let Some(tax) = sale.tax else {
             continue;
         };
-        let charged = inv.taxable_amount().unwrap_or(Money::ZERO);
+        let charged = signed(sale.taxable_amount().unwrap_or(Money::ZERO));
         taxable = taxable.saturating_add(charged);
-        let total = tax.total().unwrap_or(Money::ZERO);
+        let total = signed(tax.total().unwrap_or(Money::ZERO));
         let combined =
             TaxRate::from_millionths(tax.lines.iter().map(|l| l.rate.millionths()).sum());
         by_group
@@ -76,7 +80,7 @@ pub fn sales_tax_liability(company: &Company, from: Date, to: Date) -> Report {
             let (_, tally) = by_tax
                 .entry(l.component)
                 .or_insert_with(|| (company.tax_agency(l), Tally::default()));
-            tally.add(l.taxable, l.rate, l.amount);
+            tally.add(signed(l.taxable), l.rate, signed(l.amount));
         }
     }
 
@@ -143,10 +147,8 @@ pub fn sales_tax_liability(company: &Company, from: Date, to: Date) -> Report {
             if e.posting.account != account || e.date < from || e.date > to {
                 continue;
             }
-            let from_invoice = company
-                .txn(e.txn)
-                .is_some_and(|t| matches!(t.body, TxnBody::Invoice(_)));
-            if !from_invoice {
+            let from_sale = company.txn(e.txn).is_some_and(|t| t.body.sale().is_some());
+            if !from_sale {
                 paid = paid.saturating_add(e.posting.amount);
             }
         }
@@ -183,7 +185,7 @@ mod tests {
     use super::*;
     use ledgercraft_core::Qty;
     use ledgercraft_ledger::{
-        tax_payment_memo, AccountLine, AccountType, Check, Contact, Invoice, SalesLine,
+        tax_payment_memo, AccountLine, AccountType, Check, Contact, Invoice, SalesLine, TxnBody,
     };
 
     fn d(s: &str) -> Date {
@@ -288,5 +290,65 @@ mod tests {
         // Before the invoices: nothing charged, nothing owed.
         let empty = sales_tax_liability(&c, d("2026-09-01"), d("2026-09-30"));
         assert_eq!(money_in(&empty, "Tax charged", 2), Money::ZERO);
+    }
+
+    #[test]
+    fn sales_receipts_add_and_credit_memos_take_back() {
+        let mut c = Company::with_default_accounts("Tax Co");
+        let state = c
+            .add_tax_component(
+                "Utah State",
+                "",
+                "",
+                d("2020-01-01"),
+                TaxRate::parse("5").unwrap(),
+            )
+            .unwrap();
+        let group = c.add_tax_group("Utah", vec![state]).unwrap();
+        let customer = c
+            .add_customer(Contact {
+                name: "Cafe".into(),
+                ..Contact::default()
+            })
+            .unwrap();
+        let sales = c.account_by_name("Sales").unwrap().id;
+        let lines = |dollars: i64| {
+            vec![SalesLine {
+                item: None,
+                description: String::new(),
+                qty: Qty::ONE,
+                rate: Money::from_dollars(dollars),
+                account: sales,
+                taxable: true,
+            }]
+        };
+        let date = d("2026-10-05");
+        // $400 sold over the counter, $100 of it returned.
+        let receipt = ledgercraft_ledger::SalesReceipt {
+            customer: None,
+            deposit_to: c.account_by_name("Undeposited Funds").unwrap().id,
+            method: "Cash".into(),
+            lines: lines(400),
+            tax: Some(c.invoice_tax(group, date, Money::from_dollars(400)).unwrap()),
+        };
+        c.post(date, "1", "", TxnBody::SalesReceipt(receipt))
+            .unwrap();
+        let memo = ledgercraft_ledger::CreditMemo {
+            customer,
+            ar_account: c.first_account_of(AccountType::AccountsReceivable).unwrap(),
+            lines: lines(100),
+            tax: Some(c.invoice_tax(group, date, Money::from_dollars(100)).unwrap()),
+            applied: Vec::new(),
+        };
+        c.post(date, "CM-1", "", TxnBody::CreditMemo(memo))
+            .unwrap();
+
+        let r = sales_tax_liability(&c, d("2026-10-01"), d("2026-10-31"));
+        assert_eq!(money_in(&r, "Total sales", 0), Money::from_dollars(300));
+        assert_eq!(money_in(&r, "Taxable sales", 0), Money::from_dollars(300));
+        assert_eq!(money_in(&r, "Utah", 2), Money::from_dollars(15));
+        assert_eq!(money_in(&r, "Owed at 2026-10-31", 2), Money::from_dollars(15));
+        let owed = c.sales_tax_owed(d("2026-10-31"));
+        assert_eq!(owed.first().map(|o| o.owed), Some(Money::from_dollars(15)));
     }
 }
