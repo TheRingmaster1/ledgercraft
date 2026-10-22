@@ -20,7 +20,7 @@ usage:
   ledgercraft-cli commands
   ledgercraft-cli --version
 
-report KIND is one of: pl, balance-sheet, trial-balance, ar-aging, ap-aging, transactions
+report KIND is one of: pl, balance-sheet, trial-balance, ar-aging, ap-aging, transactions, sales-tax
 dates are YYYY-MM-DD; --to is also the \"as of\" date
 invoice-pdf saves invoice NUMBER as a PDF (default: \"Invoice NUMBER.pdf\")
 tax-import reads a Streamlined Sales Tax rate and boundary file (streamlinedsalestax.org)

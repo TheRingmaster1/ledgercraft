@@ -330,9 +330,17 @@ const LESSONS: &[Lesson] = &[
                  before. From March, June, September and December 1, LedgerCraft reminds you \
                  to check: import the new files, or click Rates Are Up to Date.",
             ),
+            Heading("Filing and paying"),
+            Bullets(&[
+                "Reports > Sales Tax Liability, for your filing period, shows your sales, \
+                 the taxable part, the tax charged by location (tax group) and by agency, \
+                 and what is owed.",
+                "Pay sales tax, at the bottom of Lists > Sales Tax, shows what each agency is \
+                 owed and records your payment (Amount owed fills it in).",
+            ]),
             Tip(
-                "Pay what you owe with Write Check: choose the state agency as payee and Sales \
-                 Tax Payable as the account.",
+                "Rate files name taxes by code (UT City 58730). Click Edit beside a tax to give \
+                 it a real name, such as Payson City.",
             ),
         ],
         try_it: &[("Open Sales Tax", Target::Page(Page::SalesTax))],

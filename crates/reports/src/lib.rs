@@ -8,12 +8,14 @@ mod aging;
 mod invoice_pdf;
 mod pdf;
 mod report;
+mod salestax;
 mod statements;
 mod xlsx;
 
 pub use aging::{ap_aging, ar_aging};
 pub use invoice_pdf::{invoice_pdf, invoice_pdf_name};
 pub use report::{Cell, Report, Row, RowKind};
+pub use salestax::sales_tax_liability;
 pub use statements::{
     account_register, balance_sheet, profit_and_loss, reconciliation_report, transaction_list,
     trial_balance,
@@ -28,16 +30,18 @@ pub enum ReportKind {
     ArAging,
     ApAging,
     TransactionList,
+    SalesTaxLiability,
 }
 
 impl ReportKind {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::ProfitAndLoss,
         Self::BalanceSheet,
         Self::TrialBalance,
         Self::ArAging,
         Self::ApAging,
         Self::TransactionList,
+        Self::SalesTaxLiability,
     ];
 
     pub fn label(self) -> &'static str {
@@ -48,6 +52,7 @@ impl ReportKind {
             Self::ArAging => "A/R Aging Summary",
             Self::ApAging => "A/P Aging Summary",
             Self::TransactionList => "Transaction List",
+            Self::SalesTaxLiability => "Sales Tax Liability",
         }
     }
 
@@ -60,6 +65,7 @@ impl ReportKind {
             Self::ArAging => "ar-aging",
             Self::ApAging => "ap-aging",
             Self::TransactionList => "transactions",
+            Self::SalesTaxLiability => "sales-tax",
         }
     }
 
@@ -69,7 +75,10 @@ impl ReportKind {
 
     /// Period reports use a from/to range; the rest are "as of" one date.
     pub fn uses_period(self) -> bool {
-        matches!(self, Self::ProfitAndLoss | Self::TransactionList)
+        matches!(
+            self,
+            Self::ProfitAndLoss | Self::TransactionList | Self::SalesTaxLiability
+        )
     }
 
     pub fn build(
@@ -85,6 +94,7 @@ impl ReportKind {
             Self::ArAging => ar_aging(company, to),
             Self::ApAging => ap_aging(company, to),
             Self::TransactionList => transaction_list(company, from, to),
+            Self::SalesTaxLiability => sales_tax_liability(company, from, to),
         }
     }
 }

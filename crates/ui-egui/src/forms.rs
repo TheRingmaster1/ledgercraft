@@ -665,13 +665,18 @@ pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut V
                     LINE_ACCOUNT_WIDTH,
                 );
                 if taxes_on {
-                    let mut taxed = !line.no_tax;
-                    if ui
-                        .checkbox(&mut taxed, "")
-                        .on_hover_text("Charge sales tax on this line")
-                        .changed()
-                    {
-                        line.no_tax = !taxed;
+                    // The empty line waiting for the next item has no box.
+                    if line.is_blank() {
+                        ui.label("");
+                    } else {
+                        let mut taxed = !line.no_tax;
+                        if ui
+                            .checkbox(&mut taxed, "")
+                            .on_hover_text("Charge sales tax on this line")
+                            .changed()
+                        {
+                            line.no_tax = !taxed;
+                        }
                     }
                 }
                 let qty = if line.qty.trim().is_empty() {

@@ -10,7 +10,10 @@ use eframe::egui::{self, RichText, Ui};
 use ledgercraft_core::Date;
 use ledgercraft_engine::Command;
 use ledgercraft_file::sst;
-use ledgercraft_ledger::{Company, ImportedTax, TaxComponentId, TaxGroupId, TaxRate, TaxReview};
+use ledgercraft_ledger::{
+    tax_payment_memo, AccountId, AccountLine, AccountType, Check, Company, ImportedTax, Money,
+    Party, TaxComponentId, TaxGroupId, TaxRate, TaxReview, TxnBody, VendorId,
+};
 
 use crate::widgets::{self, field};
 use crate::{theme, Action, Reset};
@@ -26,6 +29,17 @@ struct NewTax {
     from: String,
 }
 
+/// Pay sales tax: a check to the agency, posted to Sales Tax Payable.
+#[derive(Default)]
+struct PayTax {
+    agency: String,
+    payee: Option<VendorId>,
+    from: Option<AccountId>,
+    date: String,
+    number: String,
+    amount: String,
+}
+
 #[derive(Clone, Default)]
 struct GroupInput {
     name: String,
@@ -38,6 +52,9 @@ pub(crate) struct SalesTaxState {
     new_group: GroupInput,
     editing_group: Option<(TaxGroupId, GroupInput)>,
     rates_for: Option<TaxComponentId>,
+    /// A tax being renamed: (id, name, agency).
+    editing_tax: Option<(TaxComponentId, String, String)>,
+    pay: PayTax,
     new_rate_from: String,
     new_rate: String,
     show_inactive: bool,
@@ -53,6 +70,10 @@ impl SalesTaxState {
             Reset::NewTaxRate => {
                 self.new_rate.clear();
                 self.new_rate_from.clear();
+            }
+            Reset::PayTax => {
+                self.pay.amount.clear();
+                self.pay.number.clear();
             }
             _ => {}
         }
@@ -119,9 +140,154 @@ pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Ve
     new_tax(ui, s, out);
     ui.add_space(6.0);
     taxes(ui, c, s, out, today);
+    tax_editor(ui, c, s, out);
     rates_editor(ui, c, s, out);
     ui.add_space(12.0);
     groups(ui, c, s, out, today);
+    ui.add_space(12.0);
+    pay_tax(ui, c, &mut s.pay, out, today);
+}
+
+/// Renaming a tax, or changing its agency.
+fn tax_editor(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<Action>) {
+    let mut close = false;
+    if let Some((id, name, agency)) = s.editing_tax.as_mut() {
+        let code = c.tax_component(*id).map(|t| t.code.clone()).unwrap_or_default();
+        ui.add_space(8.0);
+        egui::Frame::group(ui.style()).show(ui, |ui| {
+            egui::Grid::new("edit_tax").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
+                widgets::hint_label(ui, "Name");
+                field(ui, name, 220.0, "");
+                ui.end_row();
+                widgets::hint_label(ui, "Agency");
+                field(ui, agency, 220.0, "");
+                ui.end_row();
+            });
+            ui.horizontal_wrapped(|ui| {
+                if ui.button(RichText::new("Save").strong()).clicked() {
+                    out.push(run(
+                        Command::TaxUpdate {
+                            id: *id,
+                            name: name.clone(),
+                            agency: agency.clone(),
+                            code: code.clone(),
+                        },
+                        Reset::Nothing,
+                    ));
+                    close = true;
+                }
+                if ui.button("Cancel").clicked() {
+                    close = true;
+                }
+            });
+        });
+    }
+    if close {
+        s.editing_tax = None;
+    }
+}
+
+/// What is owed each agency, and recording a payment to one.
+fn pay_tax(ui: &mut Ui, c: &Company, p: &mut PayTax, out: &mut Vec<Action>, today: Date) {
+    let owed = c.sales_tax_owed(today);
+    if owed.is_empty() {
+        return;
+    }
+    egui::CollapsingHeader::new("Pay sales tax").show(ui, |ui| {
+        ui.label(muted(
+            "What each agency is owed today: tax charged on invoices, less payments recorded \
+             here. For a filing period, see Reports > Sales Tax Liability.",
+        ));
+        egui::Grid::new("tax_owed").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
+            for h in ["Agency", "Charged", "Paid", "Owed"] {
+                widgets::column_header(ui, h);
+            }
+            ui.end_row();
+            for o in &owed {
+                ui.label(o.agency.as_str());
+                widgets::money_label(ui, o.collected, false);
+                widgets::money_label(ui, o.paid, false);
+                widgets::money_label(ui, o.owed, true);
+                ui.end_row();
+            }
+        });
+        ui.add_space(6.0);
+        if p.agency.is_empty() || !owed.iter().any(|o| o.agency == p.agency) {
+            p.agency = owed.first().map(|o| o.agency.clone()).unwrap_or_default();
+        }
+        if p.date.is_empty() {
+            p.date = today.to_string();
+        }
+        egui::Grid::new("pay_tax").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
+            widgets::hint_label(ui, "Agency");
+            egui::ComboBox::from_id_salt("pay_tax_agency")
+                .selected_text(p.agency.as_str())
+                .width(260.0)
+                .show_ui(ui, |ui| {
+                    for o in &owed {
+                        ui.selectable_value(&mut p.agency, o.agency.clone(), o.agency.as_str());
+                    }
+                });
+            ui.end_row();
+            widgets::hint_label(ui, "Pay to");
+            widgets::vendor_combo(ui, "pay_tax_vendor", c, &mut p.payee);
+            ui.end_row();
+            widgets::hint_label(ui, "Pay from");
+            widgets::account_combo(ui, "pay_tax_from", c, &mut p.from, |k| {
+                matches!(k, AccountType::Bank | AccountType::CreditCard)
+            });
+            ui.end_row();
+            widgets::hint_label(ui, "Date");
+            field(ui, &mut p.date, 110.0, "YYYY-MM-DD");
+            ui.end_row();
+            widgets::hint_label(ui, "Check #");
+            field(ui, &mut p.number, 100.0, "");
+            ui.end_row();
+            widgets::hint_label(ui, "Amount");
+            ui.horizontal(|ui| {
+                field(ui, &mut p.amount, 100.0, "0.00");
+                let due = owed.iter().find(|o| o.agency == p.agency).map(|o| o.owed);
+                if let Some(due) = due.filter(|d| d.is_positive()) {
+                    if ui.small_button("Amount owed").clicked() {
+                        p.amount = due.to_plain_string();
+                    }
+                }
+            });
+            ui.end_row();
+        });
+        if ui.button(RichText::new("Record Payment").strong()).clicked() {
+            match build_payment(c, p) {
+                Ok(cmd) => out.push(run(cmd, Reset::PayTax)),
+                Err(e) => out.push(Action::Error(e)),
+            }
+        }
+    });
+}
+
+fn build_payment(c: &Company, p: &PayTax) -> Result<Command, String> {
+    let pay_from = p.from.ok_or("Choose the account to pay from")?;
+    let date = Date::parse(&p.date).map_err(|e| e.to_string())?;
+    let amount = Money::parse(&p.amount).map_err(|e| e.to_string())?;
+    if !amount.is_positive() {
+        return Err("Enter the amount paid".into());
+    }
+    let account = c
+        .sales_tax_account()
+        .ok_or("There is no Sales Tax Payable account")?;
+    Ok(Command::TxnPost {
+        date,
+        number: p.number.trim().to_string(),
+        memo: "Sales tax payment".into(),
+        body: TxnBody::Check(Check {
+            payee: p.payee.map(Party::Vendor),
+            pay_from,
+            lines: vec![AccountLine {
+                account,
+                description: tax_payment_memo(&p.agency),
+                amount,
+            }],
+        }),
+    })
 }
 
 fn new_tax(ui: &mut Ui, s: &mut SalesTaxState, out: &mut Vec<Action>) {
@@ -177,7 +343,7 @@ fn taxes(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<Action>,
         .striped(true)
         .spacing([18.0, 4.0])
         .show(ui, |ui| {
-            for h in ["Name", "Agency", "Rate today", "Since", "", ""] {
+            for h in ["Name", "Agency", "Rate today", "Since", "", "", ""] {
                 widgets::column_header(ui, h);
             }
             ui.end_row();
@@ -197,6 +363,13 @@ fn taxes(ui: &mut Ui, c: &Company, s: &mut SalesTaxState, out: &mut Vec<Action>,
                     .max_by_key(|r| r.from)
                     .map_or_else(String::new, |r| r.from.to_string());
                 ui.label(muted(since));
+                if ui
+                    .small_button("Edit")
+                    .on_hover_text("Rename it, or change its agency")
+                    .clicked()
+                {
+                    s.editing_tax = Some((t.id, t.name.clone(), t.agency.clone()));
+                }
                 let open = s.rates_for == Some(t.id);
                 if ui
                     .small_button(if open { "Hide rates" } else { "Rates…" })
