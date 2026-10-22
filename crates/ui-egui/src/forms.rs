@@ -751,10 +751,12 @@ fn tax_choice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm) {
             .width(200.0)
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut f.tax_group, None, "No sales tax");
+                // The chosen group stays listed even if made inactive since.
+                let chosen = f.tax_group;
                 for g in c
                     .tax_groups
                     .iter()
-                    .filter(|g| g.active || f.tax_group == Some(g.id))
+                    .filter(|g| g.active || chosen == Some(g.id))
                 {
                     ui.selectable_value(&mut f.tax_group, Some(g.id), g.name.as_str());
                 }
