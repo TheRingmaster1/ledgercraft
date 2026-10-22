@@ -477,19 +477,25 @@ fn command_for(editing: Option<TxnId>, built: Result<Command, String>) -> Result
 /// The account box on invoice and journal lines (narrower than elsewhere, so
 /// the lines fit the smallest window).
 const LINE_ACCOUNT_WIDTH: f32 = 170.0;
+/// The x (remove line) button, padding included.
+const REMOVE_WIDTH: f32 = 28.0;
 /// What an invoice line's other columns take: item 130, qty 50, rate 80,
-/// account, amount about 85, the remove button about 22, and the gaps.
-const INVOICE_FIXED: f32 = 130.0 + 50.0 + 80.0 + LINE_ACCOUNT_WIDTH + 85.0 + 22.0 + 6.0 * 8.0;
+/// account, amount about 85, the remove button, and the gaps.
+const INVOICE_FIXED: f32 =
+    130.0 + 50.0 + 80.0 + LINE_ACCOUNT_WIDTH + 85.0 + REMOVE_WIDTH + 6.0 * 8.0;
 /// Bill, check and deposit lines: account 230, amount 90, remove, gaps.
-const ACCOUNT_LINES_FIXED: f32 = 230.0 + 90.0 + 22.0 + 3.0 * 8.0;
+const ACCOUNT_LINES_FIXED: f32 = 230.0 + 90.0 + REMOVE_WIDTH + 3.0 * 8.0;
 /// Journal lines: account, debit, credit, name about 170, remove, gaps.
-const JOURNAL_FIXED: f32 = LINE_ACCOUNT_WIDTH + 90.0 + 90.0 + 170.0 + 22.0 + 5.0 * 8.0;
+const JOURNAL_FIXED: f32 = LINE_ACCOUNT_WIDTH + 90.0 + 90.0 + 170.0 + REMOVE_WIDTH + 5.0 * 8.0;
+/// Room kept spare at the right, for combo box arrows and rounding, so a
+/// line never ends a few points past the edge.
+const LINE_SLACK: f32 = 16.0;
 
 /// The width left for a line's stretchy text box once the fixed columns are
 /// placed, kept between `min` and `max`: the lines fill a wide window and
 /// still fit a small one.
 fn flex_width(ui: &Ui, fixed: f32, min: f32, max: f32) -> f32 {
-    (ui.available_width() - fixed).clamp(min, max)
+    (ui.available_width() - fixed - LINE_SLACK).clamp(min, max)
 }
 
 /// Part of a line grid's id: a grid remembers its column widths, so when the
