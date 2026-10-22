@@ -1,7 +1,9 @@
 use ledgercraft_core::{Date, Money, Qty};
 use serde::{Deserialize, Serialize};
 
-use crate::{AccountId, CustomerId, ItemId, LedgerError, LedgerResult, Party, TxnId, VendorId};
+use crate::{
+    AccountId, CustomerId, InvoiceTax, ItemId, LedgerError, LedgerResult, Party, TxnId, VendorId,
+};
 
 /// One side of a double-entry: a positive amount is a debit, a negative one a credit.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -69,6 +71,14 @@ pub struct SalesLine {
     pub rate: Money,
     /// The income account this line credits.
     pub account: AccountId,
+    /// Whether sales tax is charged on the line.
+    #[serde(default = "taxable_by_default")]
+    pub taxable: bool,
+}
+
+/// Lines and items are taxable unless marked otherwise.
+pub(crate) const fn taxable_by_default() -> bool {
+    true
 }
 
 impl SalesLine {
@@ -83,13 +93,35 @@ pub struct Invoice {
     pub due_date: Date,
     pub ar_account: AccountId,
     pub lines: Vec<SalesLine>,
+    /// The sales tax charged, as worked out when the invoice was recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tax: Option<InvoiceTax>,
 }
 
 impl Invoice {
-    pub fn total(&self) -> Option<Money> {
+    /// The lines added up, before tax.
+    pub fn subtotal(&self) -> Option<Money> {
         self.lines
             .iter()
             .try_fold(Money::ZERO, |acc, l| acc.checked_add(l.amount()?))
+    }
+
+    /// The lines sales tax is charged on, added up.
+    pub fn taxable_amount(&self) -> Option<Money> {
+        self.lines
+            .iter()
+            .filter(|l| l.taxable)
+            .try_fold(Money::ZERO, |acc, l| acc.checked_add(l.amount()?))
+    }
+
+    /// The sales tax charged; zero without tax.
+    pub fn tax_total(&self) -> Option<Money> {
+        self.tax.as_ref().map_or(Some(Money::ZERO), InvoiceTax::total)
+    }
+
+    /// What the customer owes: the lines plus tax.
+    pub fn total(&self) -> Option<Money> {
+        self.subtotal()?.checked_add(self.tax_total()?)
     }
 }
 
@@ -246,6 +278,11 @@ impl TxnBody {
                 for l in &inv.lines {
                     let amount = l.amount().ok_or(LedgerError::Overflow)?;
                     out.push(post(l.account, neg(amount)?, party, &l.description));
+                }
+                if let Some(tax) = &inv.tax {
+                    for l in &tax.lines {
+                        out.push(post(tax.account, neg(l.amount)?, party, &l.name));
+                    }
                 }
             }
             Self::ReceivePayment(p) => {

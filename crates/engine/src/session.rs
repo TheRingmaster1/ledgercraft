@@ -295,6 +295,34 @@ mod tests {
     }
 
     #[test]
+    fn sales_tax_is_set_up_charged_and_undone_through_commands() {
+        let mut s = Session::new(Company::with_default_accounts("Tax Co"));
+        let state = s
+            .execute_json(r#"{"command":"tax.create","name":"Utah State","agency":"Utah State Tax Commission","from":"2020-01-01","rate":"4.85"}"#)
+            .unwrap()
+            .created
+            .unwrap();
+        let id: u64 = state.trim_start_matches('X').parse().unwrap();
+        s.execute_json(&format!(r#"{{"command":"tax.setRate","id":{id},"from":"2026-10-01","rate":5}}"#))
+            .unwrap();
+        let group = s
+            .execute_json(&format!(r#"{{"command":"taxGroup.create","name":"Statewide","components":[{id}]}}"#))
+            .unwrap()
+            .created
+            .unwrap();
+        assert!(group.starts_with('G'));
+        let c = s.company();
+        let t = &c.tax_components[0];
+        assert_eq!(t.rates.len(), 2);
+        assert!(c.sales_tax_account().is_some());
+        assert_eq!(s.undo().as_deref(), Some("New Tax Group Statewide"));
+        assert!(s.company().tax_groups.is_empty());
+        // A rate that is not a percentage is refused.
+        let bad = format!(r#"{{"command":"tax.setRate","id":{id},"from":"2026-01-01","rate":"lots"}}"#);
+        assert!(s.execute_json(&bad).is_err());
+    }
+
+    #[test]
     fn company_information_changes_and_undoes() {
         let mut s = Session::new(Company::with_default_accounts("Info Co"));
         let json = r#"{"command":"company.setInfo","name":" Info Co LLC ","phone":"555-0100",

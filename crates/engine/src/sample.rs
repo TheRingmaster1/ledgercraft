@@ -92,6 +92,7 @@ pub fn sample_company() -> LedgerResult<Company> {
         kind: ItemKind::NonInventory,
         rate: dollars(2400),
         income_account: sales,
+        taxable: true,
     })?;
     let chair = c.add_item(ItemSpec {
         name: "Chair".into(),
@@ -99,6 +100,7 @@ pub fn sample_company() -> LedgerResult<Company> {
         kind: ItemKind::NonInventory,
         rate: dollars(325),
         income_account: sales,
+        taxable: true,
     })?;
     let design = c.add_item(ItemSpec {
         name: "Design Hours".into(),
@@ -106,6 +108,8 @@ pub fn sample_company() -> LedgerResult<Company> {
         kind: ItemKind::Service,
         rate: dollars(85),
         income_account: service,
+        // Design work is a service: not taxed.
+        taxable: false,
     })?;
 
     let line = |item, desc: &str, qty: i64, rate: Money, account| SalesLine {
@@ -113,6 +117,7 @@ pub fn sample_company() -> LedgerResult<Company> {
         description: desc.into(),
         qty: Qty::from_whole(qty),
         rate,
+        taxable: true,
         account,
     };
     let exp = |account, description: &str, amount: Money| AccountLine {
@@ -184,6 +189,7 @@ pub fn sample_company() -> LedgerResult<Company> {
             customer: maple,
             due_date: d(2026, 2, 11)?,
             ar_account: ar,
+            tax: None,
             lines: vec![
                 line(table, "Communal table, 10 ft", 2, dollars(2_400), sales),
                 line(chair, "Bench-height chairs", 12, dollars(325), sales),
@@ -199,6 +205,7 @@ pub fn sample_company() -> LedgerResult<Company> {
             customer: harbor,
             due_date: d(2026, 2, 4)?,
             ar_account: ar,
+            tax: None,
             lines: vec![line(
                 design,
                 "Showroom fixture design",
@@ -330,6 +337,7 @@ pub fn sample_company() -> LedgerResult<Company> {
             customer: lin,
             due_date: d(2026, 2, 20)?,
             ar_account: ar,
+            tax: None,
             lines: vec![
                 line(table, "Round kitchen table", 1, dollars(2_150), sales),
                 line(design, "Design consult", 3, dollars(85), service),
@@ -367,6 +375,7 @@ pub fn sample_company() -> LedgerResult<Company> {
             customer: harbor,
             due_date: d(2026, 3, 24)?,
             ar_account: ar,
+            tax: None,
             lines: vec![
                 line(design, "Reception desk design", 10, dollars(85), service),
                 line(chair, "Lounge chairs", 4, dollars(325), sales),

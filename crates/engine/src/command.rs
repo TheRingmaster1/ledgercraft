@@ -1,7 +1,7 @@
 use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
-    AccountId, AccountType, Address, Company, Contact, CustomerId, FeedEntry, ItemSpec,
-    LedgerResult, TxnBody, TxnId, VendorId,
+    AccountId, AccountType, Address, Company, Contact, CustomerId, CustomerTax, FeedEntry, ItemId,
+    ItemSpec, LedgerResult, TaxComponentId, TaxGroupId, TaxRate, TxnBody, TxnId, VendorId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -94,6 +94,59 @@ pub enum Command {
     },
     #[serde(rename = "bank.removeRule")]
     BankRemoveRule { index: usize },
+    /// A sales tax component with its first rate.
+    #[serde(rename = "tax.create")]
+    TaxCreate {
+        name: String,
+        #[serde(default)]
+        agency: String,
+        #[serde(default)]
+        code: String,
+        from: Date,
+        rate: TaxRate,
+    },
+    #[serde(rename = "tax.update")]
+    TaxUpdate {
+        id: TaxComponentId,
+        name: String,
+        #[serde(default)]
+        agency: String,
+        #[serde(default)]
+        code: String,
+    },
+    /// Sets the rate that starts on `from` (replacing one starting that day).
+    #[serde(rename = "tax.setRate")]
+    TaxSetRate {
+        id: TaxComponentId,
+        from: Date,
+        rate: TaxRate,
+    },
+    #[serde(rename = "tax.removeRate")]
+    TaxRemoveRate { id: TaxComponentId, from: Date },
+    #[serde(rename = "tax.setActive")]
+    TaxSetActive { id: TaxComponentId, active: bool },
+    #[serde(rename = "taxGroup.create")]
+    TaxGroupCreate {
+        name: String,
+        components: Vec<TaxComponentId>,
+    },
+    #[serde(rename = "taxGroup.update")]
+    TaxGroupUpdate {
+        id: TaxGroupId,
+        name: String,
+        components: Vec<TaxComponentId>,
+    },
+    #[serde(rename = "taxGroup.setActive")]
+    TaxGroupSetActive { id: TaxGroupId, active: bool },
+    /// A customer's tax group and exemption.
+    #[serde(rename = "customer.setTax")]
+    CustomerSetTax {
+        id: CustomerId,
+        #[serde(default)]
+        tax: CustomerTax,
+    },
+    #[serde(rename = "item.setTaxable")]
+    ItemSetTaxable { id: ItemId, taxable: bool },
 }
 
 /// One row of the command catalog shown by `ledgercraft-cli commands`.
@@ -121,6 +174,16 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "account.undoReconciliation", summary: "Undo an account's last reconciliation. {account}" },
     CommandInfo { id: "bank.import", summary: "Bring downloaded bank lines into an account: match, add in a category, or skip each; lines imported before are passed over. {account, entries:[{line:{date, amount, payee?, memo?, number?, fit_id?}, action:{action: match|add|skip, txn? | category?, remember?}}]}" },
     CommandInfo { id: "bank.removeRule", summary: "Delete a bank feed rule by its position, from 0. {index}" },
+    CommandInfo { id: "tax.create", summary: "Add a sales tax (one agency's rate) with its first rate, in percent. {name, agency?, code?, from, rate}" },
+    CommandInfo { id: "tax.update", summary: "Rename a sales tax or change its agency or code. {id, name, agency?, code?}" },
+    CommandInfo { id: "tax.setRate", summary: "Set the rate starting on a date; recorded invoices keep their rate. {id, from, rate}" },
+    CommandInfo { id: "tax.removeRate", summary: "Remove the rate starting on a date (one must remain). {id, from}" },
+    CommandInfo { id: "tax.setActive", summary: "Make a sales tax active or inactive. {id, active}" },
+    CommandInfo { id: "taxGroup.create", summary: "Add a tax group: the sales taxes charged together at a location. {name, components:[ids]}" },
+    CommandInfo { id: "taxGroup.update", summary: "Rename a tax group or change its sales taxes. {id, name, components:[ids]}" },
+    CommandInfo { id: "taxGroup.setActive", summary: "Make a tax group active or inactive. {id, active}" },
+    CommandInfo { id: "customer.setTax", summary: "A customer's tax group and exemption. {id, tax:{group?, exempt?, exemption?}}" },
+    CommandInfo { id: "item.setTaxable", summary: "Mark an item taxable or not. {id, taxable}" },
 ];
 
 impl Command {
@@ -144,6 +207,16 @@ impl Command {
             Self::AccountUndoReconciliation { .. } => "account.undoReconciliation",
             Self::BankImport { .. } => "bank.import",
             Self::BankRemoveRule { .. } => "bank.removeRule",
+            Self::TaxCreate { .. } => "tax.create",
+            Self::TaxUpdate { .. } => "tax.update",
+            Self::TaxSetRate { .. } => "tax.setRate",
+            Self::TaxRemoveRate { .. } => "tax.removeRate",
+            Self::TaxSetActive { .. } => "tax.setActive",
+            Self::TaxGroupCreate { .. } => "taxGroup.create",
+            Self::TaxGroupUpdate { .. } => "taxGroup.update",
+            Self::TaxGroupSetActive { .. } => "taxGroup.setActive",
+            Self::CustomerSetTax { .. } => "customer.setTax",
+            Self::ItemSetTaxable { .. } => "item.setTaxable",
         }
     }
 
@@ -169,6 +242,15 @@ impl Command {
             Self::AccountUndoReconciliation { .. } => "Undo Reconciliation".into(),
             Self::BankImport { .. } => "Import Bank Transactions".into(),
             Self::BankRemoveRule { .. } => "Delete Bank Rule".into(),
+            Self::TaxCreate { name, .. } => format!("New Sales Tax {name}"),
+            Self::TaxUpdate { name, .. } => format!("Edit Sales Tax {name}"),
+            Self::TaxSetRate { .. } | Self::TaxRemoveRate { .. } => "Sales Tax Rate".into(),
+            Self::TaxSetActive { .. } => "Sales Tax Status".into(),
+            Self::TaxGroupCreate { name, .. } => format!("New Tax Group {name}"),
+            Self::TaxGroupUpdate { name, .. } => format!("Edit Tax Group {name}"),
+            Self::TaxGroupSetActive { .. } => "Tax Group Status".into(),
+            Self::CustomerSetTax { .. } => "Customer Sales Tax".into(),
+            Self::ItemSetTaxable { .. } => "Item Taxable".into(),
         }
     }
 
@@ -290,6 +372,57 @@ impl Command {
             }
             Self::BankRemoveRule { index } => {
                 c.remove_bank_rule(index)?;
+                None
+            }
+            Self::TaxCreate {
+                name,
+                agency,
+                code,
+                from,
+                rate,
+            } => Some(c.add_tax_component(&name, &agency, &code, from, rate)?.to_string()),
+            Self::TaxUpdate {
+                id,
+                name,
+                agency,
+                code,
+            } => {
+                c.update_tax_component(id, &name, &agency, &code)?;
+                None
+            }
+            Self::TaxSetRate { id, from, rate } => {
+                c.set_tax_rate(id, from, rate)?;
+                None
+            }
+            Self::TaxRemoveRate { id, from } => {
+                c.remove_tax_rate(id, from)?;
+                None
+            }
+            Self::TaxSetActive { id, active } => {
+                c.set_tax_component_active(id, active)?;
+                None
+            }
+            Self::TaxGroupCreate { name, components } => {
+                Some(c.add_tax_group(&name, components)?.to_string())
+            }
+            Self::TaxGroupUpdate {
+                id,
+                name,
+                components,
+            } => {
+                c.update_tax_group(id, &name, components)?;
+                None
+            }
+            Self::TaxGroupSetActive { id, active } => {
+                c.set_tax_group_active(id, active)?;
+                None
+            }
+            Self::CustomerSetTax { id, tax } => {
+                c.set_customer_tax(id, tax)?;
+                None
+            }
+            Self::ItemSetTaxable { id, taxable } => {
+                c.set_item_taxable(id, taxable)?;
                 None
             }
         })

@@ -35,6 +35,10 @@ pub struct ItemSpec {
     #[serde(default)]
     pub rate: Money,
     pub income_account: AccountId,
+    /// Whether sales tax is charged on it. Items in files made before sales
+    /// tax count as taxable.
+    #[serde(default = "crate::txn::taxable_by_default")]
+    pub taxable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

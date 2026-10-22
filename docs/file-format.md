@@ -34,6 +34,16 @@ A company file is UTF-8 JSON:
 * Quantities (`qty`) are integers in **thousandths** (`1000` = 1).
 * Dates are `YYYY-MM-DD`.
 * Ids are unique across the whole file.
+* `tax_components` are the sales taxes: id, `name`, `agency`, `code` (a
+  state rate file's jurisdiction code, when imported), `rates` (each
+  `{from, rate}`, oldest first; a rate is a percentage string such as
+  `"7.125"`) and `active`. `tax_groups` are the taxes charged together at a
+  location: id, `name`, `components` (ids) and `active`. A customer's `tax`
+  holds their `group`, `exempt` and `exemption` note; an item spec's
+  `taxable` and an invoice line's `taxable` default to true. An invoice's
+  `tax`, when it charges tax, stores what was charged: `group`, the
+  liability `account`, and `lines` of `{component, name, rate, taxable,
+  amount}`. All are absent in older files.
 * `feed_links` records downloaded bank lines already imported (account, the
   bank's id, and the transaction it became or matched); `bank_rules` holds the
   import rules (payee text and category). Both are absent in older files.

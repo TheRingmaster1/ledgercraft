@@ -37,3 +37,13 @@ define_id!(
     /// Identifies a transaction.
     TxnId, "T"
 );
+define_id!(
+    /// Identifies one sales tax component: a rate charged for one agency,
+    /// such as a state, county, city or transit district.
+    TaxComponentId, "X"
+);
+define_id!(
+    /// Identifies a sales tax group: the components charged together at a
+    /// location (state + county + city ...), chosen on invoices.
+    TaxGroupId, "G"
+);
