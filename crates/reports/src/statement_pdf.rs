@@ -270,7 +270,14 @@ fn layout(s: &Sheet) -> Vec<Page> {
             row_y += LINE_HEIGHT;
         }
         p.text(AMOUNT_RIGHT, baseline, &row.amount, body, INK, Align::Right);
-        p.text(BALANCE_RIGHT, baseline, &row.balance, body, INK, Align::Right);
+        p.text(
+            BALANCE_RIGHT,
+            baseline,
+            &row.balance,
+            body,
+            INK,
+            Align::Right,
+        );
         y += height;
         p.rule(LEFT, RIGHT, y, RULE, 0.6);
     }
@@ -285,8 +292,22 @@ fn layout(s: &Sheet) -> Vec<Page> {
     let mut y = y + 26.0;
     p.rule(AMOUNT_RIGHT - 120.0, RIGHT, y - 13.0, INK, 0.8);
     let strong = Font::bold(11.5);
-    p.text(AMOUNT_RIGHT, y + 2.0, "Amount due", strong, INK, Align::Right);
-    p.text(BALANCE_RIGHT, y + 2.0, &s.closing, strong, INK, Align::Right);
+    p.text(
+        AMOUNT_RIGHT,
+        y + 2.0,
+        "Amount due",
+        strong,
+        INK,
+        Align::Right,
+    );
+    p.text(
+        BALANCE_RIGHT,
+        y + 2.0,
+        &s.closing,
+        strong,
+        INK,
+        Align::Right,
+    );
     y += 26.0;
     aging_table(p, s, y);
     if let Some(note) = &s.credit_note {
@@ -404,7 +425,14 @@ fn column_headings(p: &mut Page, y: f32) -> f32 {
     p.text(DATE_X, baseline, "Date", font, WHITE, Align::Left);
     p.text(TXN_X, baseline, "Transaction", font, WHITE, Align::Left);
     p.text(AMOUNT_RIGHT, baseline, "Amount", font, WHITE, Align::Right);
-    p.text(BALANCE_RIGHT, baseline, "Balance", font, WHITE, Align::Right);
+    p.text(
+        BALANCE_RIGHT,
+        baseline,
+        "Balance",
+        font,
+        WHITE,
+        Align::Right,
+    );
     y + 20.0
 }
 
@@ -523,7 +551,15 @@ mod tests {
         // 1002 ($1,000) was due 2026-03-14: 17 days late.
         assert_eq!(
             s.aging,
-            ["$0.00", "$1,000.00", "$300.00", "$0.00", "$0.00", "$1,300.00"].map(String::from)
+            [
+                "$0.00",
+                "$1,000.00",
+                "$300.00",
+                "$0.00",
+                "$0.00",
+                "$1,300.00"
+            ]
+            .map(String::from)
         );
         assert!(s.credit_note.is_none());
     }
@@ -550,7 +586,8 @@ mod tests {
                     .unwrap();
             }
         }
-        let text = text_of(&statement_pdf(&c, cafe, d("2026-04-01"), d("2026-04-30"), "€").unwrap());
+        let text =
+            text_of(&statement_pdf(&c, cafe, d("2026-04-01"), d("2026-04-30"), "€").unwrap());
         assert!(text.contains("(Page 2 of "));
         assert!(text.contains("(Statement for Maple Street Cafe \\(continued\\)) Tj"));
     }
@@ -558,7 +595,14 @@ mod tests {
     #[test]
     fn bad_requests_are_refused() {
         let (c, cafe) = books();
-        assert!(statement_pdf(&c, CustomerId(999_999), d("2026-01-01"), d("2026-01-31"), "$").is_err());
+        assert!(statement_pdf(
+            &c,
+            CustomerId(999_999),
+            d("2026-01-01"),
+            d("2026-01-31"),
+            "$"
+        )
+        .is_err());
         assert!(statement_pdf(&c, cafe, d("2026-02-01"), d("2026-01-01"), "$").is_err());
         assert_eq!(
             statement_pdf_name(&c, cafe, d("2026-03-31")),

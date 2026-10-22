@@ -237,13 +237,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 currency_symbol(&c.info.currency),
             )?;
             let out = flag_value(rest, "--out").map_or_else(
-                || {
-                    PathBuf::from(ledgercraft_reports::statement_pdf_name(
-                        c,
-                        customer.id,
-                        to,
-                    ))
-                },
+                || PathBuf::from(ledgercraft_reports::statement_pdf_name(c, customer.id, to)),
                 PathBuf::from,
             );
             std::fs::write(&out, bytes).map_err(|e| format!("{}: {e}", out.display()))?;
