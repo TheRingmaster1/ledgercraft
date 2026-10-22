@@ -15,6 +15,7 @@ usage:
   ledgercraft-cli report FILE KIND [--from DATE] [--to DATE] [--csv]
   ledgercraft-cli accounts FILE
   ledgercraft-cli invoice-pdf FILE NUMBER [--out PDF]
+  ledgercraft-cli tax-import FILE --rates CSV --boundary CSV --zip ZIP[-PLUS4] [--location CODE] [--date DATE]
   ledgercraft-cli protect FILE         (password from LEDGERCRAFT_NEW_PASSWORD)
   ledgercraft-cli commands
   ledgercraft-cli --version
@@ -22,6 +23,8 @@ usage:
 report KIND is one of: pl, balance-sheet, trial-balance, ar-aging, ap-aging, transactions
 dates are YYYY-MM-DD; --to is also the \"as of\" date
 invoice-pdf saves invoice NUMBER as a PDF (default: \"Invoice NUMBER.pdf\")
+tax-import reads a Streamlined Sales Tax rate and boundary file (streamlinedsalestax.org)
+  and adds or updates the sales taxes for a ZIP+4, grouped; a bare ZIP lists its locations
 
 example:
   ledgercraft-cli run books.lcbooks --cmd '{\"command\":\"account.create\",\"number\":\"6700\",\"name\":\"Postage\",\"kind\":\"expense\"}'";
@@ -201,6 +204,66 @@ fn run(args: &[String]) -> Result<(), String> {
             std::fs::write(&out, bytes).map_err(|e| format!("{}: {e}", out.display()))?;
             println!("{}", out.display());
             Ok(())
+        }
+        "tax-import" => {
+            use ledgercraft_file::sst;
+            let file = rest.first().ok_or("tax-import: which company file?")?;
+            let need = |flag: &str| {
+                flag_value(rest, flag).ok_or_else(|| format!("tax-import: give {flag}"))
+            };
+            let rates_path = need("--rates")?;
+            let boundary_path = need("--boundary")?;
+            let zip = need("--zip")?;
+            let date = match flag_value(rest, "--date") {
+                Some(s) => Date::parse(&s).map_err(|e| e.to_string())?,
+                None => Date::today(),
+            };
+            let text = std::fs::read_to_string(&rates_path)
+                .map_err(|e| format!("{rates_path}: {e}"))?;
+            let rates = sst::read_rates(&text)?;
+            let boundary = std::fs::File::open(&boundary_path)
+                .map_err(|e| format!("{boundary_path}: {e}"))?;
+            let found = sst::locations(std::io::BufReader::new(boundary), &zip, date)?;
+            let chosen = match flag_value(rest, "--location") {
+                Some(code) => found
+                    .iter()
+                    .find(|l| l.location_code == code.replace('-', ""))
+                    .ok_or_else(|| format!("tax-import: {zip} has no location {code}"))?,
+                None if found.len() == 1 => &found[0],
+                None => {
+                    println!("{zip} has more than one tax location on {date}:");
+                    for l in &found {
+                        let rate = sst::plan(&rates, l, date)
+                            .map_or_else(|e| e, |p| p.total_rate().to_string());
+                        println!("  location {:<8} {rate:>8}   ({} address ranges)", l.location_code, l.rows);
+                    }
+                    return Err("tax-import: give a ZIP+4, or --location CODE".into());
+                }
+            };
+            let plan = sst::plan(&rates, chosen, date)?;
+            println!("{}: {} on {date}", plan.group_name, plan.total_rate());
+            for t in &plan.taxes {
+                println!("  {:<24} {:>8}   {}", t.name, t.rate.to_string(), t.code);
+            }
+            let taxes = plan
+                .taxes
+                .iter()
+                .map(|t| ledgercraft_ledger::ImportedTax {
+                    code: t.code.clone(),
+                    name: t.name.clone(),
+                    agency: t.agency.clone(),
+                    rates: t.rates.clone(),
+                })
+                .collect();
+            let mut session = open(file)?;
+            session
+                .execute(ledgercraft_engine::Command::TaxImport {
+                    taxes,
+                    group: plan.group_name.clone(),
+                    on: Date::today(),
+                })
+                .map_err(|e| e.to_string())?;
+            session.save().map_err(|e| e.to_string())
         }
         other => Err(format!("unknown command {other:?}\n\n{USAGE}")),
     }

@@ -9,6 +9,7 @@
 pub mod bankfeed;
 pub mod crypto;
 pub mod import;
+pub mod sst;
 
 pub use crypto::{check_new_password, Protection, MIN_PASSWORD_CHARS};
 
