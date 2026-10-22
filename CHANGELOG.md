@@ -52,6 +52,10 @@ fixes to a release. See docs/releasing.md.
   (older files open with none). A new tutorial lesson explains it.
 
 ### Changed
+- Form headings (customer or vendor, date, number, due date, accounts) put
+  their label-and-field pairs one to a row in a narrow window instead of
+  running off the side, labels still lined up; two to a row as before when
+  there is room.
 - Scroll bars sit beside what they scroll instead of floating over it, so
   they no longer cover the right-hand column (such as Make inactive in the
   Chart of Accounts). The Chart of Accounts, Customers, Vendors and

@@ -474,6 +474,38 @@ fn command_for(editing: Option<TxnId>, built: Result<Command, String>) -> Result
     })
 }
 
+/// Narrower than this, a form's heading fields go one to a row.
+const HEAD_TWO_PAIRS_WIDTH: f32 = 640.0;
+
+/// Where a heading row ends: after every second label-and-field pair while
+/// two fit side by side, after every pair in a narrow window.
+#[derive(Clone, Copy)]
+struct HeadPairs {
+    two_per_row: bool,
+}
+
+impl HeadPairs {
+    /// Call after each pair's field; `second` says it is the right-hand pair.
+    fn end(self, ui: &mut Ui, second: bool) {
+        if second || !self.two_per_row {
+            ui.end_row();
+        }
+    }
+}
+
+/// A form's heading fields as label-and-field pairs, labels lined up, two
+/// pairs to a row or one in a narrow window.
+fn head_grid(ui: &mut Ui, salt: &str, add: impl FnOnce(&mut Ui, HeadPairs)) {
+    let two_per_row = ui.available_width() >= HEAD_TWO_PAIRS_WIDTH;
+    let columns = if two_per_row { 4 } else { 2 };
+    // Each layout keeps its own grid, so remembered column widths from one
+    // never squeeze the other.
+    egui::Grid::new((salt, two_per_row))
+        .num_columns(columns)
+        .spacing([12.0, 6.0])
+        .show(ui, |ui| add(ui, HeadPairs { two_per_row }));
+}
+
 /// Clear on a new form; Cancel on a form editing a recorded transaction.
 fn cleared(out: &mut Vec<Action>, editing: Option<TxnId>) {
     out.push(if editing.is_some() {
@@ -494,25 +526,24 @@ fn total_row(ui: &mut Ui, label: &str, total: Money) {
 
 pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut Vec<Action>) {
     header(ui, FormKind::Invoice, f.editing);
-    egui::Grid::new("inv_head")
-        .num_columns(4)
-        .spacing([12.0, 6.0])
-        .show(ui, |ui| {
+    head_grid(ui, "inv_head", |ui, pairs| {
             widgets::hint_label(ui, "Customer");
             if widgets::customer_combo(ui, "inv_customer", c, &mut f.customer) {
                 set_due_from_terms(c, f);
             }
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Invoice #");
             let hint = widgets::next_number(c, 1001, |b| matches!(b, TxnBody::Invoice(_)));
             field(ui, &mut f.number, 100.0, &hint);
-            ui.end_row();
+            pairs.end(ui, true);
             widgets::hint_label(ui, "Date");
             if field(ui, &mut f.date, 110.0, "YYYY-MM-DD").changed() {
                 set_due_from_terms(c, f);
             }
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Due date");
             field(ui, &mut f.due, 110.0, "from terms");
-            ui.end_row();
+            pairs.end(ui, true);
         });
     if let Some(cust) = f.customer.and_then(|id| c.customer(id)) {
         let addr = cust.contact.address.lines().join(", ");
@@ -691,24 +722,23 @@ pub(crate) fn receive_payment(
             .map(|a| a.id)
             .or_else(|| c.first_account_of(AccountType::Bank));
     }
-    egui::Grid::new("rp_head")
-        .num_columns(4)
-        .spacing([12.0, 6.0])
-        .show(ui, |ui| {
+    head_grid(ui, "rp_head", |ui, pairs| {
             widgets::hint_label(ui, "Received from");
             if widgets::customer_combo(ui, "rp_customer", c, &mut f.customer) {
                 f.amounts.clear();
             }
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Date");
             field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
-            ui.end_row();
+            pairs.end(ui, true);
             widgets::hint_label(ui, "Deposit to");
             widgets::account_combo(ui, "rp_deposit", c, &mut f.account, |k| {
                 matches!(k, AccountType::Bank | AccountType::OtherCurrentAsset)
             });
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Method / ref");
             field(ui, &mut f.method, 140.0, "Check #, ACH, card…");
-            ui.end_row();
+            pairs.end(ui, true);
         });
     let docs: Vec<OpenDoc> = match f.customer {
         Some(id) => c
@@ -758,27 +788,26 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
     if f.account.is_none() {
         f.account = c.first_account_of(AccountType::Bank);
     }
-    egui::Grid::new("pb_head")
-        .num_columns(4)
-        .spacing([12.0, 6.0])
-        .show(ui, |ui| {
+    head_grid(ui, "pb_head", |ui, pairs| {
             widgets::hint_label(ui, "Pay to");
             if widgets::vendor_combo(ui, "pb_vendor", c, &mut f.vendor) {
                 f.amounts.clear();
             }
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Date");
             field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
-            ui.end_row();
+            pairs.end(ui, true);
             widgets::hint_label(ui, "Pay from");
             widgets::account_combo(ui, "pb_from", c, &mut f.account, |k| {
                 matches!(k, AccountType::Bank | AccountType::CreditCard)
             });
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Check #");
             let hint = widgets::next_number(c, 1001, |b| {
                 matches!(b, TxnBody::Check(_) | TxnBody::PayBill(_))
             });
             field(ui, &mut f.number, 100.0, &hint);
-            ui.end_row();
+            pairs.end(ui, true);
         });
     let docs: Vec<OpenDoc> = match f.vendor {
         Some(id) => c
@@ -1000,20 +1029,19 @@ fn build_lines(lines: &[AccountLineInput]) -> Result<Vec<AccountLine>, String> {
 
 pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Action>) {
     header(ui, FormKind::Bill, f.editing);
-    egui::Grid::new("bill_head")
-        .num_columns(4)
-        .spacing([12.0, 6.0])
-        .show(ui, |ui| {
+    head_grid(ui, "bill_head", |ui, pairs| {
             widgets::hint_label(ui, "Vendor");
             let changed = widgets::vendor_combo(ui, "bill_vendor", c, &mut f.vendor);
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Ref no.");
             field(ui, &mut f.number, 120.0, "vendor's invoice #");
-            ui.end_row();
+            pairs.end(ui, true);
             widgets::hint_label(ui, "Date");
             let date_changed = field(ui, &mut f.date, 110.0, "YYYY-MM-DD").changed();
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Due date");
             field(ui, &mut f.due, 110.0, "from terms");
-            ui.end_row();
+            pairs.end(ui, true);
             if changed || date_changed {
                 let terms = f
                     .vendor
@@ -1071,25 +1099,24 @@ pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<A
     if f.account.is_none() {
         f.account = c.first_account_of(AccountType::Bank);
     }
-    egui::Grid::new("chk_head")
-        .num_columns(4)
-        .spacing([12.0, 6.0])
-        .show(ui, |ui| {
+    head_grid(ui, "chk_head", |ui, pairs| {
             widgets::hint_label(ui, "Pay from");
             widgets::account_combo(ui, "chk_from", c, &mut f.account, |k| {
                 matches!(k, AccountType::Bank | AccountType::CreditCard)
             });
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Check #");
             let hint = widgets::next_number(c, 1001, |b| {
                 matches!(b, TxnBody::Check(_) | TxnBody::PayBill(_))
             });
             field(ui, &mut f.number, 100.0, &hint);
-            ui.end_row();
+            pairs.end(ui, true);
             widgets::hint_label(ui, "Payee");
             widgets::party_combo(ui, "chk_payee", c, &mut f.payee);
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Date");
             field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
-            ui.end_row();
+            pairs.end(ui, true);
         });
     ui.add_space(8.0);
     let total = account_lines(ui, "chk_lines", c, &mut f.lines);
@@ -1138,15 +1165,13 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
     if f.account.is_none() {
         f.account = c.first_account_of(AccountType::Bank);
     }
-    egui::Grid::new("dep_head")
-        .num_columns(4)
-        .spacing([12.0, 6.0])
-        .show(ui, |ui| {
+    head_grid(ui, "dep_head", |ui, pairs| {
             widgets::hint_label(ui, "Deposit to");
             widgets::account_combo(ui, "dep_to", c, &mut f.account, |k| k == AccountType::Bank);
+            pairs.end(ui, false);
             widgets::hint_label(ui, "Date");
             field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
-            ui.end_row();
+            pairs.end(ui, true);
         });
     // Offer payments waiting in Undeposited Funds.
     if let Some(uf) = c.account_by_name("Undeposited Funds") {
@@ -1306,6 +1331,44 @@ fn build_journal(f: &JournalForm) -> Result<Command, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Draws every form at `width`; returns what they asked for.
+    fn draw_all(c: &Company, width: f32) -> Vec<Action> {
+        let ctx = egui::Context::default();
+        crate::theme::apply(&ctx);
+        let mut f = Forms::default();
+        let mut out = Vec::new();
+        crate::theme::test_frame_sized(&ctx, egui::vec2(width, 900.0), |ui| {
+            invoice(ui, c, &mut f.invoice, &mut out);
+            receive_payment(ui, c, &mut f.receive, &mut out);
+            bill(ui, c, &mut f.bill, &mut out);
+            pay_bills(ui, c, &mut f.pay_bills, &mut out);
+            check(ui, c, &mut f.check, &mut out);
+            deposit(ui, c, &mut f.deposit, &mut out);
+            journal(ui, c, &mut f.journal, &mut out);
+        });
+        out
+    }
+
+    #[test]
+    fn every_form_draws_in_a_narrow_and_a_wide_window() {
+        let c = ledgercraft_engine::sample_company().unwrap();
+        assert!(draw_all(&c, 420.0).is_empty());
+        assert!(draw_all(&c, 1400.0).is_empty());
+    }
+
+    #[test]
+    fn heading_pairs_go_one_to_a_row_when_narrow() {
+        let ctx = egui::Context::default();
+        crate::theme::apply(&ctx);
+        for (width, two) in [(420.0, false), (1400.0, true)] {
+            let mut seen = None;
+            crate::theme::test_frame_sized(&ctx, egui::vec2(width, 600.0), |ui| {
+                head_grid(ui, "test_head", |_, pairs| seen = Some(pairs.two_per_row));
+            });
+            assert_eq!(seen, Some(two), "at {width}");
+        }
+    }
 
     /// What Save Changes builds from the form `kind` as it stands.
     fn rebuild(c: &Company, f: &Forms, kind: FormKind) -> Result<Command, String> {
