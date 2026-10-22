@@ -218,7 +218,7 @@ pub(crate) fn report_view(ui: &mut Ui, r: &Report, out: &mut Vec<Action>, fill_p
     // The table sits centered under the heading, and the scroll area fills
     // the page so its bars run along the page's edges. The table's width is
     // measured each frame and used to center it on the next.
-    let width_id = ui.id().with(("report_width", r.title.as_str()));
+    let width_id = ui.scope_id().with(("report_width", r.title.as_str()));
     let last_width = ui.data(|d| d.get_temp::<f32>(width_id)).unwrap_or(0.0);
     egui::ScrollArea::both()
         .id_salt("report_scroll")
