@@ -158,6 +158,9 @@ fixes to a release. See docs/releasing.md.
   Create list of the everyday forms. Home shows the workflow, with Journal
   Entry as a link under Banking; its Company links, which repeated the side
   bar, are gone. Home's big buttons are all one width, so the columns line up.
+- Home no longer opens with the workflow squeezed into half the page (its
+  buttons wrapping until the window was resized): the workflow column is
+  sized for its widest row from the first frame.
 - Reports (Profit & Loss, Balance Sheet, Trial Balance and the rest, and
   account registers) center their table under the heading, and the scroll
   area fills the page, so the scroll bars run along its edges instead of
