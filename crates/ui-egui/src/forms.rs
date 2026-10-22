@@ -527,24 +527,24 @@ fn total_row(ui: &mut Ui, label: &str, total: Money) {
 pub(crate) fn invoice(ui: &mut Ui, c: &Company, f: &mut InvoiceForm, out: &mut Vec<Action>) {
     header(ui, FormKind::Invoice, f.editing);
     head_grid(ui, "inv_head", |ui, pairs| {
-            widgets::hint_label(ui, "Customer");
-            if widgets::customer_combo(ui, "inv_customer", c, &mut f.customer) {
-                set_due_from_terms(c, f);
-            }
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Invoice #");
-            let hint = widgets::next_number(c, 1001, |b| matches!(b, TxnBody::Invoice(_)));
-            field(ui, &mut f.number, 100.0, &hint);
-            pairs.end(ui, true);
-            widgets::hint_label(ui, "Date");
-            if field(ui, &mut f.date, 110.0, "YYYY-MM-DD").changed() {
-                set_due_from_terms(c, f);
-            }
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Due date");
-            field(ui, &mut f.due, 110.0, "from terms");
-            pairs.end(ui, true);
-        });
+        widgets::hint_label(ui, "Customer");
+        if widgets::customer_combo(ui, "inv_customer", c, &mut f.customer) {
+            set_due_from_terms(c, f);
+        }
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Invoice #");
+        let hint = widgets::next_number(c, 1001, |b| matches!(b, TxnBody::Invoice(_)));
+        field(ui, &mut f.number, 100.0, &hint);
+        pairs.end(ui, true);
+        widgets::hint_label(ui, "Date");
+        if field(ui, &mut f.date, 110.0, "YYYY-MM-DD").changed() {
+            set_due_from_terms(c, f);
+        }
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Due date");
+        field(ui, &mut f.due, 110.0, "from terms");
+        pairs.end(ui, true);
+    });
     if let Some(cust) = f.customer.and_then(|id| c.customer(id)) {
         let addr = cust.contact.address.lines().join(", ");
         if !addr.is_empty() {
@@ -723,23 +723,23 @@ pub(crate) fn receive_payment(
             .or_else(|| c.first_account_of(AccountType::Bank));
     }
     head_grid(ui, "rp_head", |ui, pairs| {
-            widgets::hint_label(ui, "Received from");
-            if widgets::customer_combo(ui, "rp_customer", c, &mut f.customer) {
-                f.amounts.clear();
-            }
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Date");
-            field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
-            pairs.end(ui, true);
-            widgets::hint_label(ui, "Deposit to");
-            widgets::account_combo(ui, "rp_deposit", c, &mut f.account, |k| {
-                matches!(k, AccountType::Bank | AccountType::OtherCurrentAsset)
-            });
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Method / ref");
-            field(ui, &mut f.method, 140.0, "Check #, ACH, card…");
-            pairs.end(ui, true);
+        widgets::hint_label(ui, "Received from");
+        if widgets::customer_combo(ui, "rp_customer", c, &mut f.customer) {
+            f.amounts.clear();
+        }
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Date");
+        field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
+        pairs.end(ui, true);
+        widgets::hint_label(ui, "Deposit to");
+        widgets::account_combo(ui, "rp_deposit", c, &mut f.account, |k| {
+            matches!(k, AccountType::Bank | AccountType::OtherCurrentAsset)
         });
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Method / ref");
+        field(ui, &mut f.method, 140.0, "Check #, ACH, card…");
+        pairs.end(ui, true);
+    });
     let docs: Vec<OpenDoc> = match f.customer {
         Some(id) => c
             .open_invoices_for(id, f.editing)
@@ -789,26 +789,26 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
         f.account = c.first_account_of(AccountType::Bank);
     }
     head_grid(ui, "pb_head", |ui, pairs| {
-            widgets::hint_label(ui, "Pay to");
-            if widgets::vendor_combo(ui, "pb_vendor", c, &mut f.vendor) {
-                f.amounts.clear();
-            }
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Date");
-            field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
-            pairs.end(ui, true);
-            widgets::hint_label(ui, "Pay from");
-            widgets::account_combo(ui, "pb_from", c, &mut f.account, |k| {
-                matches!(k, AccountType::Bank | AccountType::CreditCard)
-            });
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Check #");
-            let hint = widgets::next_number(c, 1001, |b| {
-                matches!(b, TxnBody::Check(_) | TxnBody::PayBill(_))
-            });
-            field(ui, &mut f.number, 100.0, &hint);
-            pairs.end(ui, true);
+        widgets::hint_label(ui, "Pay to");
+        if widgets::vendor_combo(ui, "pb_vendor", c, &mut f.vendor) {
+            f.amounts.clear();
+        }
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Date");
+        field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
+        pairs.end(ui, true);
+        widgets::hint_label(ui, "Pay from");
+        widgets::account_combo(ui, "pb_from", c, &mut f.account, |k| {
+            matches!(k, AccountType::Bank | AccountType::CreditCard)
         });
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Check #");
+        let hint = widgets::next_number(c, 1001, |b| {
+            matches!(b, TxnBody::Check(_) | TxnBody::PayBill(_))
+        });
+        field(ui, &mut f.number, 100.0, &hint);
+        pairs.end(ui, true);
+    });
     let docs: Vec<OpenDoc> = match f.vendor {
         Some(id) => c
             .open_bills_for(id, f.editing)
@@ -1030,28 +1030,28 @@ fn build_lines(lines: &[AccountLineInput]) -> Result<Vec<AccountLine>, String> {
 pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Action>) {
     header(ui, FormKind::Bill, f.editing);
     head_grid(ui, "bill_head", |ui, pairs| {
-            widgets::hint_label(ui, "Vendor");
-            let changed = widgets::vendor_combo(ui, "bill_vendor", c, &mut f.vendor);
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Ref no.");
-            field(ui, &mut f.number, 120.0, "vendor's invoice #");
-            pairs.end(ui, true);
-            widgets::hint_label(ui, "Date");
-            let date_changed = field(ui, &mut f.date, 110.0, "YYYY-MM-DD").changed();
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Due date");
-            field(ui, &mut f.due, 110.0, "from terms");
-            pairs.end(ui, true);
-            if changed || date_changed {
-                let terms = f
-                    .vendor
-                    .and_then(|id| c.vendor(id))
-                    .map(|v| v.contact.terms_days);
-                if let (Some(t), Ok(d)) = (terms, Date::parse(&f.date)) {
-                    f.due = d.add_days(i64::from(t)).to_string();
-                }
+        widgets::hint_label(ui, "Vendor");
+        let changed = widgets::vendor_combo(ui, "bill_vendor", c, &mut f.vendor);
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Ref no.");
+        field(ui, &mut f.number, 120.0, "vendor's invoice #");
+        pairs.end(ui, true);
+        widgets::hint_label(ui, "Date");
+        let date_changed = field(ui, &mut f.date, 110.0, "YYYY-MM-DD").changed();
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Due date");
+        field(ui, &mut f.due, 110.0, "from terms");
+        pairs.end(ui, true);
+        if changed || date_changed {
+            let terms = f
+                .vendor
+                .and_then(|id| c.vendor(id))
+                .map(|v| v.contact.terms_days);
+            if let (Some(t), Ok(d)) = (terms, Date::parse(&f.date)) {
+                f.due = d.add_days(i64::from(t)).to_string();
             }
-        });
+        }
+    });
     ui.add_space(8.0);
     let total = account_lines(ui, "bill_lines", c, &mut f.lines);
     ui.horizontal_wrapped(|ui| {
@@ -1100,24 +1100,24 @@ pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<A
         f.account = c.first_account_of(AccountType::Bank);
     }
     head_grid(ui, "chk_head", |ui, pairs| {
-            widgets::hint_label(ui, "Pay from");
-            widgets::account_combo(ui, "chk_from", c, &mut f.account, |k| {
-                matches!(k, AccountType::Bank | AccountType::CreditCard)
-            });
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Check #");
-            let hint = widgets::next_number(c, 1001, |b| {
-                matches!(b, TxnBody::Check(_) | TxnBody::PayBill(_))
-            });
-            field(ui, &mut f.number, 100.0, &hint);
-            pairs.end(ui, true);
-            widgets::hint_label(ui, "Payee");
-            widgets::party_combo(ui, "chk_payee", c, &mut f.payee);
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Date");
-            field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
-            pairs.end(ui, true);
+        widgets::hint_label(ui, "Pay from");
+        widgets::account_combo(ui, "chk_from", c, &mut f.account, |k| {
+            matches!(k, AccountType::Bank | AccountType::CreditCard)
         });
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Check #");
+        let hint = widgets::next_number(c, 1001, |b| {
+            matches!(b, TxnBody::Check(_) | TxnBody::PayBill(_))
+        });
+        field(ui, &mut f.number, 100.0, &hint);
+        pairs.end(ui, true);
+        widgets::hint_label(ui, "Payee");
+        widgets::party_combo(ui, "chk_payee", c, &mut f.payee);
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Date");
+        field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
+        pairs.end(ui, true);
+    });
     ui.add_space(8.0);
     let total = account_lines(ui, "chk_lines", c, &mut f.lines);
     ui.horizontal_wrapped(|ui| {
@@ -1166,13 +1166,13 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
         f.account = c.first_account_of(AccountType::Bank);
     }
     head_grid(ui, "dep_head", |ui, pairs| {
-            widgets::hint_label(ui, "Deposit to");
-            widgets::account_combo(ui, "dep_to", c, &mut f.account, |k| k == AccountType::Bank);
-            pairs.end(ui, false);
-            widgets::hint_label(ui, "Date");
-            field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
-            pairs.end(ui, true);
-        });
+        widgets::hint_label(ui, "Deposit to");
+        widgets::account_combo(ui, "dep_to", c, &mut f.account, |k| k == AccountType::Bank);
+        pairs.end(ui, false);
+        widgets::hint_label(ui, "Date");
+        field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
+        pairs.end(ui, true);
+    });
     // Offer payments waiting in Undeposited Funds.
     if let Some(uf) = c.account_by_name("Undeposited Funds") {
         let waiting = c.account_balance(uf.id, None);
