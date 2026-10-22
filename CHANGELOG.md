@@ -147,6 +147,10 @@ fixes to a release. See docs/releasing.md.
   (older files open with none). A new tutorial lesson explains it.
 
 ### Changed
+- The side bar's hide and show buttons are a drawn icon (a little window
+  with its side bar filled in, and a chevron pointing the way it will go)
+  instead of plain < and > characters: larger in the side bar, smaller at
+  the left end of the menu bar. Drawn, so it stays sharp at any scale.
 - Home's workflow is tidier: big buttons only for the everyday steps, lined
   up in the same three columns in every section (Vendors, Customers,
   Banking), and the rest as small More: links (Sales Receipts, Credit Memos,

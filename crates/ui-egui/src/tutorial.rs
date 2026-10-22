@@ -112,8 +112,9 @@ const LESSONS: &[Lesson] = &[
                 "Ctrl+N new company, Ctrl+O open, Ctrl+S save",
                 "Ctrl+Z undo, Ctrl+Y redo",
                 "Ctrl+I create an invoice, Ctrl+W write a check",
-                "Ctrl+B hide or show the side bar (also View > Side Bar, or the < and > \
-                 buttons)",
+                "Ctrl+B hide or show the side bar (also View > Side Bar, or the side bar \
+                 button: top right of the side bar to hide it, left end of the menu bar to \
+                 show it again)",
             ]),
         ],
         try_it: &[("Go to Home", Target::Page(Page::Home))],

@@ -330,3 +330,51 @@ pub(crate) fn column_header(ui: &mut Ui, text: &str) -> egui::Response {
         None => response,
     }
 }
+
+/// The show/hide side bar button: a little window with its side bar filled
+/// in, and a chevron pointing the way the side bar will go (left to hide,
+/// right to show). Drawn rather than an image, so it is sharp at any display
+/// scale and takes the colour it is given.
+pub(crate) fn sidebar_toggle(
+    ui: &mut Ui,
+    size: egui::Vec2,
+    color: egui::Color32,
+    hide: bool,
+) -> egui::Response {
+    let pad = egui::vec2(6.0, 4.0);
+    let (rect, response) = ui.allocate_exact_size(size + 2.0 * pad, egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let painter = ui.painter();
+        if response.hovered() {
+            painter.rect_filled(rect, 4.0, ui.visuals().widgets.hovered.weak_bg_fill);
+        }
+        let icon = egui::Rect::from_center_size(rect.center(), size);
+        let stroke = egui::Stroke::new(1.5, color);
+        // The side bar: the left third, filled, square on its right edge.
+        let pane_right = icon.left() + icon.width() * 0.36;
+        let pane = egui::Rect::from_min_max(icon.min, egui::pos2(pane_right, icon.bottom()));
+        painter.rect_filled(pane, 2.5, color);
+        let square = egui::Rect::from_min_max(
+            egui::pos2(pane_right - 3.0, icon.top()),
+            egui::pos2(pane_right, icon.bottom()),
+        );
+        painter.rect_filled(square, 0.0, color);
+        painter.rect_stroke(icon, 2.5, stroke, egui::StrokeKind::Inside);
+        // The chevron, in the middle of the rest.
+        let centre = egui::pos2((pane_right + icon.right()) / 2.0, icon.center().y);
+        let half_height = icon.height() * 0.22;
+        let half_width = half_height * 0.4;
+        let (tip, back) = if hide {
+            (centre.x - half_width, centre.x + half_width)
+        } else {
+            (centre.x + half_width, centre.x - half_width)
+        };
+        let points = vec![
+            egui::pos2(back, centre.y - half_height),
+            egui::pos2(tip, centre.y),
+            egui::pos2(back, centre.y + half_height),
+        ];
+        painter.add(egui::Shape::line(points, stroke));
+    }
+    response
+}

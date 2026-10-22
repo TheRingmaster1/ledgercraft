@@ -10,6 +10,7 @@ use crate::company_info::{self, CompanyInfoForm, CompanyInfoOutcome};
 use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
+use crate::widgets;
 use crate::prefs::{self, Prefs};
 use crate::recent::{AppState, WindowState};
 use crate::reconcile::{self, ReconcileState};
@@ -897,14 +898,14 @@ impl LedgerApp {
             egui::MenuBar::new().ui(ui, |ui| {
                 let mut tops = Vec::new();
                 let has_company = self.session.is_some();
-                if has_company
-                    && !self.show_nav
-                    && ui
-                        .button(">")
+                if has_company && !self.show_nav {
+                    let color = ui.visuals().text_color();
+                    if widgets::sidebar_toggle(ui, egui::vec2(16.0, 13.0), color, false)
                         .on_hover_text("Show side bar (Ctrl+B)")
                         .clicked()
-                {
-                    self.show_nav = true;
+                    {
+                        self.show_nav = true;
+                    }
                 }
                 tops.push(
                     ui.menu_button("File", |ui| {
@@ -1187,11 +1188,8 @@ impl LedgerApp {
                             .color(theme::NAV_TEXT),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let hide_button =
-                            egui::Button::new(RichText::new("<").color(theme::NAV_TEXT))
-                                .frame(false);
-                        if ui
-                            .add(hide_button)
+                        let size = egui::vec2(22.0, 17.0);
+                        if widgets::sidebar_toggle(ui, size, theme::NAV_TEXT, true)
                             .on_hover_text("Hide side bar (Ctrl+B)")
                             .clicked()
                         {
