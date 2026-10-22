@@ -52,6 +52,10 @@ fixes to a release. See docs/releasing.md.
   (older files open with none). A new tutorial lesson explains it.
 
 ### Changed
+- Form lines fit the window: the Description box (Memo on journal entries)
+  takes the room the other columns leave, so at the smallest window size
+  the whole line, Amount included, is on screen, and in a large window the
+  box is wider. The Item and line account boxes are a little narrower.
 - Form headings (customer or vendor, date, number, due date, accounts) put
   their label-and-field pairs one to a row in a narrow window instead of
   running off the side, labels still lined up; two to a row as before when
