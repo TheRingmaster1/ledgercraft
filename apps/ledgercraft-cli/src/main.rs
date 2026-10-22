@@ -15,6 +15,7 @@ usage:
   ledgercraft-cli report FILE KIND [--from DATE] [--to DATE] [--csv]
   ledgercraft-cli accounts FILE
   ledgercraft-cli invoice-pdf FILE NUMBER [--out PDF]
+  ledgercraft-cli statement-pdf FILE CUSTOMER [--from DATE] [--to DATE] [--out PDF]
   ledgercraft-cli tax-import FILE --rates CSV --boundary CSV --zip ZIP[-PLUS4] [--location CODE] [--date DATE]
   ledgercraft-cli protect FILE         (password from LEDGERCRAFT_NEW_PASSWORD)
   ledgercraft-cli commands
@@ -23,6 +24,8 @@ usage:
 report KIND is one of: pl, balance-sheet, trial-balance, ar-aging, ap-aging, transactions, sales-tax
 dates are YYYY-MM-DD; --to is also the \"as of\" date
 invoice-pdf saves invoice NUMBER as a PDF (default: \"Invoice NUMBER.pdf\")
+statement-pdf saves CUSTOMER's (by name) statement as a PDF; the period defaults to
+  this month so far
 tax-import reads a Streamlined Sales Tax rate and boundary file (streamlinedsalestax.org)
   and adds or updates the sales taxes for a ZIP+4, grouped; a bare ZIP lists its locations
 
@@ -202,6 +205,45 @@ fn run(args: &[String]) -> Result<(), String> {
                 ledgercraft_reports::invoice_pdf(c, invoice.id, currency_symbol(&c.info.currency))?;
             let out = flag_value(rest, "--out").map_or_else(
                 || PathBuf::from(ledgercraft_reports::invoice_pdf_name(c, invoice.id)),
+                PathBuf::from,
+            );
+            std::fs::write(&out, bytes).map_err(|e| format!("{}: {e}", out.display()))?;
+            println!("{}", out.display());
+            Ok(())
+        }
+        "statement-pdf" => {
+            let file = rest.first().ok_or("statement-pdf: which file?")?;
+            let name = rest.get(1).ok_or("statement-pdf: which customer?")?;
+            let session = open(file)?;
+            let c = session.company();
+            let customer = c
+                .customers
+                .iter()
+                .find(|x| x.contact.name.trim().eq_ignore_ascii_case(name.trim()))
+                .ok_or_else(|| format!("statement-pdf: no customer named {name:?}"))?;
+            let to = match flag_value(rest, "--to") {
+                Some(s) => Date::parse(&s).map_err(|e| e.to_string())?,
+                None => Date::today(),
+            };
+            let from = match flag_value(rest, "--from") {
+                Some(s) => Date::parse(&s).map_err(|e| e.to_string())?,
+                None => to.first_of_month(),
+            };
+            let bytes = ledgercraft_reports::statement_pdf(
+                c,
+                customer.id,
+                from,
+                to,
+                currency_symbol(&c.info.currency),
+            )?;
+            let out = flag_value(rest, "--out").map_or_else(
+                || {
+                    PathBuf::from(ledgercraft_reports::statement_pdf_name(
+                        c,
+                        customer.id,
+                        to,
+                    ))
+                },
                 PathBuf::from,
             );
             std::fs::write(&out, bytes).map_err(|e| format!("{}: {e}", out.display()))?;

@@ -8,6 +8,11 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Customer statements as PDFs: Statement beside each customer, or Customers >
+  Create Statement…, picks a period and saves what they owed at its start,
+  every invoice and payment with a running balance, the amount due and an
+  aging summary (current, 1-30, 31-60, 61-90, over 90 days). Also
+  `ledgercraft-cli statement-pdf FILE CUSTOMER [--from] [--to] [--out]`.
 - The tutorial opens in a window of its own, so it can sit beside the app or
   on a second screen while the lessons are followed in the sample company.
   It stays on top while open, so Try it (which hands the app the keyboard)

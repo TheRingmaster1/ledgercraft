@@ -59,6 +59,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 * Bank and credit card reconciliation with reports (M2.2)
 * Bank feed import from OFX, QFX, QBO and CSV downloads, with matching and rules (M2.3)
 * PDF invoices, from the invoice form, Transactions or the command line (M2.5)
+* PDF customer statements with a running balance and aging (M2.5)
 
 ## Now (M1.5: solid on Windows, Linux and macOS)
 
@@ -124,7 +125,9 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 5. M2.5 Printable and PDF invoices and statements (original templates)
    - ~~PDF invoices~~ (done: Save as PDF… on the invoice form, PDF in
      Transactions, `ledgercraft-cli invoice-pdf`)
-   - Customer statements; a choice of templates and a logo
+   - ~~Customer statements~~ (done: Statement on the Customers page,
+     Customers > Create Statement…, `ledgercraft-cli statement-pdf`)
+   - A choice of templates and a logo
 6. M2.6 Credit memos, refunds, customer credits; sales receipts
 7. M2.7 Closing date and password; audit trail report
 8. M2.8 Edit and merge list entries; sub-accounts; classes

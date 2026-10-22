@@ -19,6 +19,7 @@ mod reconcile;
 mod salestax;
 mod security;
 mod start;
+mod statement;
 mod theme;
 mod tutorial;
 mod widgets;
@@ -129,6 +130,8 @@ pub(crate) enum Action {
     },
     /// Save a recorded invoice as a PDF, asking where.
     InvoicePdf(TxnId),
+    /// Customers > Create Statement…, for this customer if one is given.
+    Statement(Option<CustomerId>),
     /// Customers > Sales tax > Find from address.
     FindTaxGroup(CustomerId),
     /// A state's rate and boundary files were imported from: remember them.

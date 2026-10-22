@@ -392,8 +392,22 @@ const LESSONS: &[Lesson] = &[
                  statement. To skip it, choose a bank account under Deposit to when you \
                  receive the payment.",
             ),
+            Heading("Sending a statement"),
+            Text(
+                "A statement shows a customer everything for a period: what they owed at \
+                 the start, each invoice and payment with a running balance, what they owe \
+                 now, and how overdue their open invoices are (current, 1-30 days late, and \
+                 so on).",
+            ),
+            Steps(&[
+                "Click Statement beside the customer on the Customers page, or choose \
+                 Customers > Create Statement… and pick them.",
+                "Set From and To (this month so far to start with).",
+                "Click Save as PDF… and choose where to save it, ready to email or print.",
+            ]),
         ],
         try_it: &[
+            ("See your customers", Target::Page(Page::Customers)),
             ("Receive a payment", form(FormKind::ReceivePayment)),
             ("Make a deposit", form(FormKind::Deposit)),
         ],
