@@ -5,3 +5,5 @@
 .DS_Store
 # Company files hold real books; never commit them by accident.
 *.lcbooks
+# Update bundles shared through OneDrive; never part of the source.
+*.bundle
