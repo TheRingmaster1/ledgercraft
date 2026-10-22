@@ -158,6 +158,9 @@ pub enum Command {
         taxes: Vec<ImportedTax>,
         group: String,
         on: Date,
+        /// Also make this the customer's tax group (Find tax group).
+        #[serde(default)]
+        customer: Option<CustomerId>,
     },
 }
 
@@ -196,7 +199,7 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "taxGroup.setActive", summary: "Make a tax group active or inactive. {id, active}" },
     CommandInfo { id: "customer.setTax", summary: "A customer's tax group and exemption. {id, tax:{group?, exempt?, exemption?}}" },
     CommandInfo { id: "item.setTaxable", summary: "Mark an item taxable or not. {id, taxable}" },
-    CommandInfo { id: "tax.import", summary: "Add or update sales taxes read from a state rate file (matched by code) and group them. {taxes:[{code, name, agency?, rates:[{from, rate}]}], group, on}" },
+    CommandInfo { id: "tax.import", summary: "Add or update sales taxes read from a state rate file (matched by code) and group them. {taxes:[{code, name, agency?, rates:[{from, rate}]}], group, on, customer?}" },
     CommandInfo { id: "tax.markChecked", summary: "Record that the sales tax rates were checked on a date (stops the quarterly reminder). {on}" },
 ];
 
@@ -268,7 +271,8 @@ impl Command {
             Self::CustomerSetTax { .. } => "Customer Sales Tax".into(),
             Self::ItemSetTaxable { .. } => "Item Taxable".into(),
             Self::TaxMarkChecked { .. } => "Sales Tax Rates Checked".into(),
-            Self::TaxImport { .. } => "Import Sales Tax Rates".into(),
+            Self::TaxImport { customer: None, .. } => "Import Sales Tax Rates".into(),
+            Self::TaxImport { .. } => "Find Tax Group".into(),
         }
     }
 
@@ -453,8 +457,22 @@ impl Command {
                 c.mark_tax_rates_checked(on);
                 None
             }
-            Self::TaxImport { taxes, group, on } => {
-                Some(c.import_taxes(taxes, &group, on)?.to_string())
+            Self::TaxImport {
+                taxes,
+                group,
+                on,
+                customer,
+            } => {
+                let group = c.import_taxes(taxes, &group, on)?;
+                if let Some(id) = customer {
+                    let mut tax = c
+                        .customer(id)
+                        .map(|x| x.tax.clone())
+                        .ok_or_else(|| ledgercraft_ledger::LedgerError::NotFound(format!("Customer {id}")))?;
+                    tax.group = Some(group);
+                    c.set_customer_tax(id, tax)?;
+                }
+                Some(group.to_string())
             }
         })
     }

@@ -22,6 +22,10 @@ pub(crate) struct AppState {
     /// The window's size when the app last closed, in ui points.
     pub(crate) window: Option<WindowState>,
     pub(crate) side_bar: bool,
+    /// The Streamlined Sales Tax files last imported from, by state
+    /// abbreviation (`UT`): (rate file, boundary file). Used to find a
+    /// customer's tax group from their ZIP+4.
+    pub(crate) sst_files: std::collections::BTreeMap<String, (PathBuf, PathBuf)>,
 }
 
 impl Default for AppState {
@@ -30,6 +34,7 @@ impl Default for AppState {
             recent: Vec::new(),
             window: None,
             side_bar: true,
+            sst_files: std::collections::BTreeMap::new(),
         }
     }
 }
@@ -153,6 +158,9 @@ mod tests {
             ..AppState::default()
         };
         state.remember(&std::env::temp_dir().join("a.lcbooks"));
+        state
+            .sst_files
+            .insert("UT".into(), (PathBuf::from("UTR.csv"), PathBuf::from("UTB.csv")));
         state.save_to(&path).unwrap();
         assert_eq!(AppState::load_from(&path), state);
         std::fs::write(&path, "{ not json").unwrap();

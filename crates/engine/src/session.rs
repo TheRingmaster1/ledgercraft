@@ -321,6 +321,23 @@ mod tests {
         assert!(c.sales_tax_account().is_some());
         assert_eq!(s.undo().as_deref(), Some("New Tax Group Statewide"));
         assert!(s.company().tax_groups.is_empty());
+        // Finding a customer's group imports it and assigns it in one step.
+        let customer = s
+            .execute_json(r#"{"command":"customer.create","contact":{"name":"Cafe"}}"#)
+            .unwrap()
+            .created
+            .unwrap();
+        let cid: u64 = customer.trim_start_matches('C').parse().unwrap();
+        let find = format!(
+            r#"{{"command":"tax.import","group":"Utah location 25-090","on":"2026-10-22","customer":{cid},
+                "taxes":[{{"code":"49/45/49","name":"Utah State (file)","rates":[{{"from":"2019-04-01","rate":"4.85"}}]}}]}}"#
+        );
+        s.execute_json(&find).unwrap();
+        let c = s.company();
+        let group = c.customers[0].tax.group.and_then(|g| c.tax_group(g)).map(|g| g.name.clone());
+        assert_eq!(group.as_deref(), Some("Utah location 25-090"));
+        assert_eq!(s.undo().as_deref(), Some("Find Tax Group"));
+        assert_eq!(s.company().customers[0].tax.group, None);
         // A rate that is not a percentage is refused.
         let bad =
             format!(r#"{{"command":"tax.setRate","id":{id},"from":"2026-01-01","rate":"lots"}}"#);

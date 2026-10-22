@@ -126,6 +126,14 @@ pub(crate) enum Action {
     },
     /// Save a recorded invoice as a PDF, asking where.
     InvoicePdf(TxnId),
+    /// Customers > Sales tax > Find from address.
+    FindTaxGroup(CustomerId),
+    /// A state's rate and boundary files were imported from: remember them.
+    SstFilesUsed {
+        state: String,
+        rates: std::path::PathBuf,
+        boundary: std::path::PathBuf,
+    },
     /// Save the invoice on the form (new, or changes to a recorded one),
     /// then save it as a PDF.
     SaveInvoicePdf(Command),

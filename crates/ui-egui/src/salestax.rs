@@ -11,8 +11,8 @@ use ledgercraft_core::Date;
 use ledgercraft_engine::Command;
 use ledgercraft_file::sst;
 use ledgercraft_ledger::{
-    tax_payment_memo, AccountId, AccountLine, AccountType, Check, Company, ImportedTax, Money,
-    Party, TaxComponentId, TaxGroupId, TaxRate, TaxReview, TxnBody, VendorId,
+    tax_payment_memo, AccountId, AccountLine, AccountType, Check, Company, CustomerId, ImportedTax,
+    Money, Party, TaxComponentId, TaxGroupId, TaxRate, TaxReview, TxnBody, VendorId,
 };
 
 use crate::widgets::{self, field};
@@ -702,6 +702,8 @@ struct Found {
 }
 
 struct Preview {
+    /// The state's FIPS code, e.g. `49`.
+    state: String,
     group: String,
     taxes: Vec<sst::PlannedTax>,
     total: TaxRate,
@@ -722,6 +724,8 @@ pub(crate) struct ImportWindow {
     date: String,
     step: Step,
     error: Option<String>,
+    /// Finding this customer's tax group: the import also assigns it.
+    customer: Option<(CustomerId, String)>,
 }
 
 impl Default for ImportWindow {
@@ -733,8 +737,49 @@ impl Default for ImportWindow {
             date: Date::today().to_string(),
             step: Step::Ask,
             error: None,
+            customer: None,
         }
     }
+}
+
+impl ImportWindow {
+    /// Customers > Find from address: the customer's ZIP, and the files
+    /// last used for their state. With both, the search starts at once.
+    pub(crate) fn for_customer(
+        id: CustomerId,
+        name: &str,
+        zip: &str,
+        files: Option<(PathBuf, PathBuf)>,
+    ) -> Self {
+        let mut w = Self {
+            zip: zip.trim().to_string(),
+            customer: Some((id, name.to_string())),
+            ..Self::default()
+        };
+        if let Some((rates, boundary)) = files {
+            w.rates_path = Some(rates.clone());
+            w.boundary_path = Some(boundary.clone());
+            if sst::parse_zip(&w.zip).is_ok() {
+                w.step = Step::Reading(start_find(rates, boundary, w.zip.clone(), Date::today()));
+            }
+        }
+        w
+    }
+}
+
+/// Reads the files on their own thread; the result arrives on the receiver.
+fn start_find(
+    rates: PathBuf,
+    boundary: PathBuf,
+    zip: String,
+    date: Date,
+) -> Receiver<Result<Vec<Found>, String>> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        // The window may be closed before this finishes.
+        let _ = tx.send(find(&rates, &boundary, &zip, date));
+    });
+    rx
 }
 
 /// Reads both files and works out each location's taxes. Runs on its own
@@ -767,8 +812,9 @@ fn pick_csv(title: &str) -> Option<PathBuf> {
         .pick_file()
 }
 
-fn preview_of(plan: &sst::Plan) -> Preview {
+fn preview_of(plan: &sst::Plan, state: &str) -> Preview {
     Preview {
+        state: state.to_string(),
         group: plan.group_name.clone(),
         taxes: plan.taxes.clone(),
         total: plan.total_rate(),
@@ -786,9 +832,10 @@ pub(crate) fn import_window(
     let next = match &w.step {
         Step::Reading(rx) => match rx.try_recv() {
             Ok(Ok(found)) => {
-                let only = (found.len() == 1)
-                    .then(|| found[0].plan.as_ref().ok().map(preview_of))
-                    .flatten();
+                let only = match found.as_slice() {
+                    [one] => one.plan.as_ref().ok().map(|p| preview_of(p, &one.location.state)),
+                    _ => None,
+                };
                 Some(match only {
                     Some(p) => Step::Preview(p),
                     None => Step::Choose(found),
@@ -827,10 +874,15 @@ pub(crate) fn import_window(
                  boundary file every quarter. Download your state's two files (unzip them if \
                  they come as .zip), choose them here, and give your business's ZIP+4.",
             );
-            ui.hyperlink_to(
-                "Rate and Boundary Files at streamlinedsalestax.org",
-                SST_FILES,
-            );
+            ui.hyperlink_to("Rate and Boundary Files at streamlinedsalestax.org", SST_FILES);
+            if let Some((_, name)) = &w.customer {
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("Finding the sales tax group for {name}"))
+                        .strong()
+                        .color(theme::ACCENT),
+                );
+            }
             ui.add_space(6.0);
             match &mut w.step {
                 Step::Ask => {
@@ -874,9 +926,21 @@ pub(crate) fn import_window(
                                 taxes,
                                 group: p.group.clone(),
                                 on: Date::today(),
+                                customer: w.customer.as_ref().map(|(id, _)| *id),
                             },
                             reset: Reset::Nothing,
                         });
+                        // Remember the files for this state, for next time.
+                        let state = sst::state_abbr(&p.state);
+                        if let (false, Some(rates), Some(boundary)) =
+                            (state.is_empty(), w.rates_path.clone(), w.boundary_path.clone())
+                        {
+                            out.push(Action::SstFilesUsed {
+                                state: state.to_string(),
+                                rates,
+                                boundary,
+                            });
+                        }
                         done = true;
                     }
                     if back {
@@ -944,13 +1008,7 @@ fn ask(
         match (checked, rates.clone(), boundary.clone()) {
             (Ok(on), Some(r), Some(b)) => {
                 *error = None;
-                let (tx, rx) = mpsc::channel();
-                let zip = zip.clone();
-                std::thread::spawn(move || {
-                    // The window may be closed before this finishes.
-                    let _ = tx.send(find(&r, &b, &zip, on));
-                });
-                start = Some(Step::Reading(rx));
+                start = Some(Step::Reading(start_find(r, b, zip.clone(), on)));
             }
             (Err(e), _, _) => *error = Some(e),
             _ => {}
@@ -966,12 +1024,27 @@ fn choose(ui: &mut Ui, found: &[Found], zip: &str) -> Option<Step> {
         "{zip} covers more than one tax location. Go back and enter the full ZIP+4 to find \
          yours exactly, or pick it here (the most common first)."
     ));
-    egui::Grid::new("sst_locations")
-        .striped(true)
-        .spacing([18.0, 4.0])
-        .show(ui, |ui| {
-            for h in ["Location", "Rate", "Address ranges", ""] {
-                widgets::column_header(ui, h);
+    egui::Grid::new("sst_locations").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
+        for h in ["Location", "Rate", "Address ranges", ""] {
+            widgets::column_header(ui, h);
+        }
+        ui.end_row();
+        for f in found {
+            let code = &f.location.location_code;
+            ui.label(if code.is_empty() { "—".to_string() } else { code.clone() });
+            match &f.plan {
+                Ok(p) => {
+                    ui.label(RichText::new(p.total_rate().to_string()).strong());
+                    ui.label(muted(f.location.rows.to_string()));
+                    if ui.small_button("Use This").clicked() {
+                        next = Some(Step::Preview(preview_of(p, &f.location.state)));
+                    }
+                }
+                Err(e) => {
+                    ui.label(RichText::new(e.as_str()).color(theme::NEGATIVE));
+                    ui.label("");
+                    ui.label("");
+                }
             }
             ui.end_row();
             for f in found {
@@ -1102,6 +1175,22 @@ mod tests {
         let mut choice = Some(Reminder::Later);
         crate::theme::test_frame(&ctx, |ui| choice = reminder_window(ui.ctx(), &review));
         assert!(choice.is_none());
+    }
+
+    #[test]
+    fn finding_a_customers_group_starts_from_their_zip() {
+        let id = CustomerId(7);
+        let w = ImportWindow::for_customer(id, "Maple Street Cafe", " 84601-1100 ", None);
+        assert!(matches!(w.step, Step::Ask), "no files remembered: ask for them");
+        assert_eq!(w.zip, "84601-1100");
+        assert_eq!(w.customer.as_ref().map(|(c, _)| *c), Some(id));
+        // With the state's files remembered, the search starts at once.
+        let files = (PathBuf::from("missing-rates.csv"), PathBuf::from("missing-boundary.csv"));
+        let w = ImportWindow::for_customer(id, "Maple Street Cafe", "84601-1100", Some(files.clone()));
+        assert!(matches!(w.step, Step::Reading(_)));
+        // Without a usable ZIP it waits for one.
+        let w = ImportWindow::for_customer(id, "Maple Street Cafe", "", Some(files));
+        assert!(matches!(w.step, Step::Ask));
     }
 
     #[test]

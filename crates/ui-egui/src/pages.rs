@@ -616,6 +616,16 @@ fn customer_tax(
                         exemption: current.exemption.clone(),
                     }));
                 }
+                ui.separator();
+                if ui
+                    .button("Find from address (ZIP+4)…")
+                    .on_hover_text(
+                        "Look up their tax location in your state's rate files and use its group",
+                    )
+                    .clicked()
+                {
+                    out.push(Action::FindTaxGroup(x.id));
+                }
             });
         if current.exempt {
             let note = notes

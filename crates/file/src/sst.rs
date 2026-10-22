@@ -350,6 +350,31 @@ fn pretty_location(code: &str) -> String {
     }
 }
 
+/// A state's abbreviation (`UT`) from its FIPS code (`49`); empty when it
+/// is not an SST member state.
+pub fn state_abbr(fips: &str) -> &'static str {
+    state_info(fips).0
+}
+
+/// The FIPS code of an SST member state, from its abbreviation or name as
+/// typed in an address (`UT`, `ut`, `Utah`).
+pub fn state_fips(region: &str) -> Option<&'static str> {
+    let r = region.trim();
+    if r.is_empty() {
+        return None;
+    }
+    SST_FIPS.iter().copied().find(|f| {
+        let (abbr, name, _) = state_info(f);
+        abbr.eq_ignore_ascii_case(r) || name.eq_ignore_ascii_case(r)
+    })
+}
+
+/// The SST member states' FIPS codes.
+const SST_FIPS: [&str; 24] = [
+    "05", "13", "18", "19", "20", "21", "26", "27", "31", "32", "34", "37", "38", "39", "40", "44",
+    "46", "47", "49", "50", "53", "54", "55", "56",
+];
+
 /// The SST member states by FIPS code: abbreviation, name and tax agency.
 fn state_info(fips: &str) -> (&'static str, &'static str, &'static str) {
     match fips.trim_start_matches('0') {
@@ -483,6 +508,17 @@ mod tests {
         let state = &p.taxes[0];
         assert_eq!(state.rate, rate("4.85"));
         assert!(state.rates.windows(2).all(|w| w[0].from < w[1].from));
+    }
+
+    #[test]
+    fn states_are_found_by_abbreviation_or_name() {
+        assert_eq!(state_fips("UT"), Some("49"));
+        assert_eq!(state_fips(" utah "), Some("49"));
+        assert_eq!(state_fips("WA"), Some("53"));
+        assert_eq!(state_fips("CA"), None, "California is not an SST state");
+        assert_eq!(state_fips(""), None);
+        assert_eq!(state_abbr("49"), "UT");
+        assert_eq!(state_abbr("5"), "AR");
     }
 
     #[test]

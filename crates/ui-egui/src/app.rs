@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText};
 use ledgercraft_engine::{sample_company, Command, EngineError, Outcome, Session};
 use ledgercraft_file::FileError;
-use ledgercraft_ledger::TxnId;
+use ledgercraft_ledger::{CustomerId, TxnId};
 
 use crate::bankimport::{self, ImportState};
 use crate::company_info::{self, CompanyInfoForm, CompanyInfoOutcome};
@@ -632,6 +632,15 @@ impl LedgerApp {
                 Err(e) => self.error(e),
             },
             Action::InvoicePdf(id) => self.save_invoice_pdf(id),
+            Action::FindTaxGroup(id) => self.find_tax_group(id),
+            Action::SstFilesUsed {
+                state,
+                rates,
+                boundary,
+            } => {
+                self.state.sst_files.insert(state, (rates, boundary));
+                self.save_state();
+            }
             Action::SaveInvoicePdf(cmd) => {
                 let editing = match &cmd {
                     Command::TxnUpdate { id, .. } => Some(*id),
@@ -716,6 +725,25 @@ impl LedgerApp {
                     && t.memo.trim() == memo.trim()
                     && t.body == *body
             })
+    }
+
+    /// Opens the rate import for a customer: their ZIP from their address,
+    /// and the files last used for their state (or the only state used).
+    fn find_tax_group(&mut self, id: CustomerId) {
+        let Some(customer) = self.session.as_ref().and_then(|s| s.company().customer(id)) else {
+            return;
+        };
+        let address = &customer.contact.address;
+        let state = ledgercraft_file::sst::state_fips(&address.region)
+            .map(ledgercraft_file::sst::state_abbr);
+        let files = match state {
+            Some(abbr) => self.state.sst_files.get(abbr).cloned(),
+            None if self.state.sst_files.len() == 1 => self.state.sst_files.values().next().cloned(),
+            None => None,
+        };
+        let name = customer.contact.name.clone();
+        let zip = address.postal_code.clone();
+        self.sales_tax.import = Some(salestax::ImportWindow::for_customer(id, &name, &zip, files));
     }
 
     /// Asks where to save a recorded invoice as a PDF, and writes it.

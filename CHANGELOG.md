@@ -8,6 +8,12 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Find a customer's tax group from their address: Customers > Sales tax >
+  Find from address (ZIP+4)… looks up the customer's location in the
+  Streamlined Sales Tax files last imported for their state (remembered on
+  this computer, by state), and imports and assigns its group in one step
+  (`tax.import` takes an optional `customer`). With no files for the state,
+  or only a 5-digit ZIP, the import window opens filled in as far as it can.
 - Sales tax, part 3: the Sales Tax Liability report (Reports, and
   `ledgercraft-cli report FILE sales-tax`): total, non-taxable and taxable
   sales; tax charged by location (tax group) with its combined rate, and by
