@@ -21,7 +21,9 @@ pub enum Command {
     /// books with a password needs that password entered first.
     #[serde(rename = "company.setClosing")]
     CompanySetClosing {
-        #[serde(default)]
+        /// Required, so an empty command never reopens the books: give
+        /// `null` to reopen them.
+        #[serde(deserialize_with = "Option::deserialize")]
         date: Option<Date>,
         #[serde(default)]
         password: Option<String>,
@@ -197,7 +199,7 @@ pub struct CommandInfo {
 pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "company.rename", summary: "Rename the company. {name}" },
     CommandInfo { id: "company.setFiscalYearStart", summary: "First month of the fiscal year, 1-12. {month}" },
-    CommandInfo { id: "company.setClosing", summary: "Close the books through a date; transactions then or before are locked. {date?: YYYY-MM-DD (none reopens), password?, keep_password?}" },
+    CommandInfo { id: "company.setClosing", summary: "Close the books through a date; transactions then or before are locked. {date: YYYY-MM-DD, or null to reopen the books, password?, keep_password?}" },
     CommandInfo { id: "company.setInfo", summary: "Name and contact details printed on invoices. {name, legal_name?, email?, phone?, address?:{line1, line2, city, region, postal_code, country}, print?:{template: classic|modern|simple, logo?: base64 PNG or JPEG}}" },
     CommandInfo { id: "account.create", summary: "Add an account. {number?, name, kind, description?}" },
     CommandInfo { id: "account.update", summary: "Rename or renumber an account. {id, number?, name, description?}" },
