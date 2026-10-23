@@ -2,8 +2,9 @@ use std::fmt;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
+use ledgercraft_core::Date;
 use ledgercraft_file::{FileError, Protection};
-use ledgercraft_ledger::{Company, LedgerError};
+use ledgercraft_ledger::{AuditEntry, Company, FeedAction, LedgerError, TxnId};
 
 use crate::Command;
 
@@ -16,6 +17,8 @@ pub enum EngineError {
     BadCommand(String),
     NoPath,
     Internal(String),
+    /// The change is to closed books.
+    Closed(String),
 }
 
 impl fmt::Display for EngineError {
@@ -26,6 +29,7 @@ impl fmt::Display for EngineError {
             Self::BadCommand(e) => write!(f, "not a valid command: {e}"),
             Self::NoPath => f.write_str("choose where to save the company file first"),
             Self::Internal(e) => write!(f, "internal error, nothing was changed: {e}"),
+            Self::Closed(e) => f.write_str(e),
         }
     }
 }
@@ -61,6 +65,9 @@ pub struct Session {
     dirty: bool,
     /// The file's encryption key, when it is password protected.
     protection: Option<Protection>,
+    /// The closing date password was entered: closed books can be changed
+    /// until the company is closed.
+    closing_unlocked: bool,
 }
 
 impl Session {
@@ -72,6 +79,7 @@ impl Session {
             redo: Vec::new(),
             dirty: false,
             protection: None,
+            closing_unlocked: false,
         }
     }
 
@@ -138,15 +146,139 @@ impl Session {
         format!("{} — {file}{star}", self.company.info.name)
     }
 
+    /// Whether the closing date password has been entered this session.
+    pub fn closing_unlocked(&self) -> bool {
+        self.closing_unlocked
+    }
+
+    /// Enters the closing date password: closed books can be changed until
+    /// the company is closed. Without a password set there is nothing to
+    /// unlock: the closing date itself has to move.
+    pub fn unlock_closing(&mut self, password: &str) -> Result<(), EngineError> {
+        let check = self
+            .company
+            .closing
+            .as_ref()
+            .and_then(|c| c.password.as_deref())
+            .ok_or_else(|| EngineError::Closed("The closing date has no password.".into()))?;
+        if ledgercraft_file::password_matches(password, check) {
+            self.closing_unlocked = true;
+            Ok(())
+        } else {
+            Err(EngineError::Closed(
+                "That is not the closing date password.".into(),
+            ))
+        }
+    }
+
+    /// Refuses a change to transactions dated on or before the closing date,
+    /// unless its password has been entered.
+    fn check_closing(&self, cmd: &Command) -> Result<(), EngineError> {
+        let Some(closing) = &self.company.closing else {
+            return Ok(());
+        };
+        let has_password = closing.password.is_some();
+        if has_password && self.closing_unlocked {
+            return Ok(());
+        }
+        let txn_date = |id: &TxnId| self.company.txn(*id).map(|t| t.date);
+        let dates: Vec<Date> = match cmd {
+            Command::TxnPost { date, .. } => vec![*date],
+            Command::TxnUpdate { id, date, .. } => {
+                txn_date(id).into_iter().chain([*date]).collect()
+            }
+            Command::TxnVoid { id } => txn_date(id).into_iter().collect(),
+            Command::BankImport { entries, .. } => entries
+                .iter()
+                .filter(|e| matches!(e.action, FeedAction::Add { .. }))
+                .map(|e| e.line.date)
+                .collect(),
+            Command::CompanySetClosing { .. } if has_password => {
+                return Err(EngineError::Closed(
+                    "Enter the closing date password first (File > Closing Date…).".into(),
+                ));
+            }
+            _ => Vec::new(),
+        };
+        if dates.iter().any(|d| *d <= closing.date) {
+            let how = if has_password {
+                "enter the closing date password (File > Closing Date…) to change them"
+            } else {
+                "move the closing date (File > Closing Date…) to change them"
+            };
+            return Err(EngineError::Closed(format!(
+                "The books are closed through {}: transactions dated then or before are \
+                 locked. To change one, {how}.",
+                closing.date
+            )));
+        }
+        Ok(())
+    }
+
+    /// What an audit trail entry says a command was done to.
+    fn audit_detail(&self, cmd: &Command) -> String {
+        let describe = |date: Date, number: &str, body: &ledgercraft_ledger::TxnBody| {
+            let mut parts = vec![date.to_string(), body.label().to_string()];
+            if !number.trim().is_empty() {
+                parts.push(number.trim().to_string());
+            }
+            if let Some(party) = body.party() {
+                parts.push(self.company.party_name(party));
+            }
+            if let Some(total) = body.total() {
+                parts.push(total.to_string());
+            }
+            parts.join(" · ")
+        };
+        match cmd {
+            Command::TxnPost {
+                date, number, body, ..
+            } => describe(*date, number, body),
+            Command::TxnUpdate {
+                id,
+                date,
+                number,
+                body,
+                ..
+            } => {
+                let was = self
+                    .company
+                    .txn(*id)
+                    .map(|t| describe(t.date, &t.number, &t.body))
+                    .unwrap_or_default();
+                format!("{} (was {was})", describe(*date, number, body))
+            }
+            Command::TxnVoid { id } => self
+                .company
+                .txn(*id)
+                .map(|t| describe(t.date, &t.number, &t.body))
+                .unwrap_or_default(),
+            Command::CompanySetClosing { date: Some(d), .. } => format!("Closed through {d}"),
+            _ => String::new(),
+        }
+    }
+
+    /// Adds a line to the audit trail.
+    fn audit(&mut self, action: String, detail: String) {
+        self.company.audit.push(AuditEntry {
+            at: now_text(),
+            action,
+            detail,
+        });
+    }
+
     /// Runs a command. On any error — including a bug that panics — the books
     /// are restored exactly as they were.
     pub fn execute(&mut self, cmd: Command) -> Result<Outcome, EngineError> {
+        self.check_closing(&cmd)?;
         let id = cmd.id();
         let label = cmd.undo_label();
+        let detail = self.audit_detail(&cmd);
         let before = self.company.clone();
         let result = catch_unwind(AssertUnwindSafe(|| cmd.apply(&mut self.company)));
         match result {
             Ok(Ok(created)) => {
+                self.audit(label.clone(), detail);
                 self.undo.push((label, before));
                 if self.undo.len() > MAX_UNDO {
                     self.undo.remove(0);
@@ -185,18 +317,26 @@ impl Session {
     }
 
     /// Undoes the last command, returning its label.
+    /// Undo and redo restore the books but not the audit trail, which only
+    /// grows: they are recorded in it too.
     pub fn undo(&mut self) -> Option<String> {
         let (label, prev) = self.undo.pop()?;
+        let log = std::mem::take(&mut self.company.audit);
         let current = std::mem::replace(&mut self.company, prev);
+        self.company.audit = log;
         self.redo.push((label.clone(), current));
+        self.audit(format!("Undo {label}"), String::new());
         self.dirty = true;
         Some(label)
     }
 
     pub fn redo(&mut self) -> Option<String> {
         let (label, next) = self.redo.pop()?;
+        let log = std::mem::take(&mut self.company.audit);
         let current = std::mem::replace(&mut self.company, next);
+        self.company.audit = log;
         self.undo.push((label.clone(), current));
+        self.audit(format!("Redo {label}"), String::new());
         self.dirty = true;
         Some(label)
     }
@@ -215,6 +355,21 @@ impl Session {
         self.dirty = false;
         Ok(())
     }
+}
+
+/// Now, as the audit trail writes it: `YYYY-MM-DD HH:MM UTC`.
+fn now_text() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let time = secs % 86_400;
+    format!(
+        "{} {:02}:{:02} UTC",
+        Date::today(),
+        time / 3_600,
+        time % 3_600 / 60
+    )
 }
 
 #[cfg(test)]
@@ -384,6 +539,7 @@ mod tests {
             .company()
             .transactions
             .iter()
+            .rev()
             .find(|t| !t.voided && matches!(t.body, ledgercraft_ledger::TxnBody::Invoice(_)))
             .unwrap()
             .clone();
@@ -421,6 +577,85 @@ mod tests {
         assert_eq!(s.company().reconciled_balance(checking), ending);
         assert_eq!(s.undo().as_deref(), Some("Reconcile"));
         assert!(s.company().reconciliations_for(checking).is_empty());
+    }
+
+    /// Closing the books through March locks the sample's January
+    /// transactions until the closing date password is entered.
+    #[test]
+    fn closed_books_are_locked() {
+        use ledgercraft_core::Date;
+        let mut s = Session::new(crate::sample_company().unwrap());
+        let d = |t: &str| Date::parse(t).unwrap();
+        s.execute(crate::Command::CompanySetClosing {
+            date: Some(d("2026-03-31")),
+            password: Some("year end".into()),
+            keep_password: false,
+        })
+        .unwrap();
+        let stored = s.company().closing.clone().unwrap();
+        assert!(!stored.password.clone().unwrap().contains("year end"));
+        let january = s
+            .company()
+            .transactions
+            .iter()
+            .find(|t| t.date < d("2026-02-01") && !t.voided)
+            .unwrap()
+            .clone();
+        let edit = crate::Command::TxnUpdate {
+            id: january.id,
+            date: january.date,
+            number: january.number.clone(),
+            memo: "Changed".into(),
+            body: january.body.clone(),
+        };
+        assert!(matches!(s.execute(edit.clone()), Err(EngineError::Closed(_))));
+        assert!(matches!(
+            s.execute(crate::Command::TxnVoid { id: january.id }),
+            Err(EngineError::Closed(_))
+        ));
+        // Moving an edit out of the closed period does not get round it.
+        let mut moved = edit.clone();
+        if let crate::Command::TxnUpdate { date, .. } = &mut moved {
+            *date = d("2026-05-01");
+        }
+        assert!(s.execute(moved).is_err());
+        // Nor can the closing date change without the password.
+        let reopen = crate::Command::CompanySetClosing {
+            date: None,
+            password: None,
+            keep_password: false,
+        };
+        assert!(matches!(s.execute(reopen.clone()), Err(EngineError::Closed(_))));
+        assert!(s.unlock_closing("wrong").is_err());
+        s.unlock_closing("year end").unwrap();
+        s.execute(edit).unwrap();
+        s.execute(reopen).unwrap();
+        assert!(s.company().closing.is_none());
+    }
+
+    #[test]
+    fn every_change_goes_in_the_audit_trail() {
+        let mut s = Session::new(crate::sample_company().unwrap());
+        assert!(s.company().audit.is_empty());
+        let t = s
+            .company()
+            .transactions
+            .iter()
+            .rev()
+            .find(|t| !t.voided && matches!(t.body, ledgercraft_ledger::TxnBody::Check(_)))
+            .unwrap()
+            .clone();
+        s.execute(crate::Command::TxnVoid { id: t.id }).unwrap();
+        s.undo();
+        s.redo();
+        let log: Vec<&str> = s.company().audit.iter().map(|e| e.action.as_str()).collect();
+        let void = format!("Void {}", t.id);
+        let undo = format!("Undo {void}");
+        let redo = format!("Redo {void}");
+        assert_eq!(log, vec![void.as_str(), undo.as_str(), redo.as_str()]);
+        let first = &s.company().audit[0];
+        assert!(first.at.ends_with(" UTC") && first.date().is_some());
+        assert!(first.detail.contains(&t.date.to_string()), "{}", first.detail);
     }
 
     #[test]
@@ -510,6 +745,7 @@ mod tests {
         assert!(!c.bank_rules.is_empty());
         assert!(!c.info.legal_name.is_empty() && !c.info.phone.is_empty());
         assert!(c.info.print.logo.is_some());
+        assert!(c.closing.is_some());
 
         // A loan, partly repaid, and depreciation.
         let loan = c.account_balance(account("Loan Payable"), None);

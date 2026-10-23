@@ -6,6 +6,7 @@
 
 mod app;
 mod assoc;
+mod closing;
 mod bankimport;
 mod company_info;
 mod currency;

@@ -6,6 +6,7 @@ use ledgercraft_file::FileError;
 use ledgercraft_ledger::{CustomerId, TxnId};
 
 use crate::bankimport::{self, ImportState};
+use crate::closing::{self, ClosingForm, ClosingOutcome};
 use crate::company_info::{self, CompanyInfoForm, CompanyInfoOutcome};
 use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
@@ -45,6 +46,8 @@ pub struct LedgerApp {
     password: Option<PasswordForm>,
     /// File > Company Information…, while open.
     company_info: Option<CompanyInfoForm>,
+    /// File > Closing Date…, while open.
+    closing: Option<ClosingForm>,
     /// Customers > Create Statement…, while open.
     statement: Option<StatementForm>,
     /// Lists > Sales Tax, and its import window.
@@ -170,6 +173,7 @@ impl LedgerApp {
             unlock: None,
             password: None,
             company_info: None,
+            closing: None,
             statement: None,
             sales_tax: SalesTaxState::default(),
             tax_reminder_later: false,
@@ -446,6 +450,7 @@ impl LedgerApp {
         self.reconcile = ReconcileState::default();
         self.bank_import = ImportState::default();
         self.company_info = None;
+        self.closing = None;
         self.statement = None;
         self.sales_tax = SalesTaxState::default();
         self.tax_reminder_later = false;
@@ -462,6 +467,7 @@ impl LedgerApp {
         self.reconcile = ReconcileState::default();
         self.bank_import = ImportState::default();
         self.company_info = None;
+        self.closing = None;
         self.statement = None;
         self.sales_tax = SalesTaxState::default();
         self.tax_reminder_later = false;
@@ -963,6 +969,19 @@ impl LedgerApp {
                                 .as_ref()
                                 .map(|s| CompanyInfoForm::from_company(s.company()));
                         }
+                        let closing = ui
+                            .add_enabled(has_company, egui::Button::new("Closing Date…"))
+                            .on_hover_text(
+                                "Lock the books through a date, so finished periods stay as \
+                                 they were reported.",
+                            );
+                        if closing.clicked() {
+                            ui.close();
+                            self.closing = self
+                                .session
+                                .as_ref()
+                                .map(|s| ClosingForm::from_company(s.company()));
+                        }
                         let password = ui
                             .add_enabled(has_company, egui::Button::new("Password…"))
                             .on_hover_text(
@@ -1377,6 +1396,45 @@ impl LedgerApp {
                 }
             }
             Some(CompanyInfoOutcome::Cancel) => self.company_info = None,
+            None => {}
+        }
+
+        // File > Closing Date…
+        let locked = self.session.as_ref().is_some_and(|s| {
+            s.company().closing.as_ref().is_some_and(|c| c.password.is_some())
+                && !s.closing_unlocked()
+        });
+        let chosen = self
+            .closing
+            .as_mut()
+            .and_then(|form| closing::window(ctx, form, locked));
+        match chosen {
+            Some(ClosingOutcome::Save(cmd)) => {
+                if self.run(*cmd, Reset::Nothing).is_some() {
+                    self.closing = None;
+                }
+            }
+            Some(ClosingOutcome::Unlock(password)) => {
+                let result = self.session.as_mut().map(|s| s.unlock_closing(&password));
+                match result {
+                    Some(Ok(())) => {
+                        self.info(
+                            "Closing date password accepted: closed transactions can be \
+                             changed until the company is closed.",
+                        );
+                        if let Some(s) = self.session.as_ref() {
+                            self.closing = Some(ClosingForm::from_company(s.company()));
+                        }
+                    }
+                    Some(Err(e)) => {
+                        if let Some(form) = self.closing.as_mut() {
+                            form.set_error(e.to_string());
+                        }
+                    }
+                    None => self.closing = None,
+                }
+            }
+            Some(ClosingOutcome::Cancel) => self.closing = None,
             None => {}
         }
 

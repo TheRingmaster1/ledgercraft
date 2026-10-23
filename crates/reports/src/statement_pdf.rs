@@ -452,6 +452,7 @@ mod tests {
             customer,
             due_date: d(due),
             ar_account: c.account_by_name("Accounts Receivable").unwrap().id,
+            ship_to: None,
             tax: None,
             lines: vec![SalesLine {
                 item: None,

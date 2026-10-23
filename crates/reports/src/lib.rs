@@ -5,6 +5,7 @@
 //! the CLI and CSV export all render the same way.
 
 mod aging;
+mod audit;
 mod invoice_pdf;
 mod logo;
 mod look;
@@ -16,6 +17,7 @@ mod statements;
 mod xlsx;
 
 pub use aging::{ap_aging, ar_aging};
+pub use audit::{audit_trail, sales_by_state};
 pub use invoice_pdf::{has_pdf, invoice_pdf, invoice_pdf_name};
 pub use logo::logo_size;
 pub use report::{Cell, Report, Row, RowKind};
@@ -36,10 +38,12 @@ pub enum ReportKind {
     ApAging,
     TransactionList,
     SalesTaxLiability,
+    SalesByState,
+    AuditTrail,
 }
 
 impl ReportKind {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 9] = [
         Self::ProfitAndLoss,
         Self::BalanceSheet,
         Self::TrialBalance,
@@ -47,6 +51,8 @@ impl ReportKind {
         Self::ApAging,
         Self::TransactionList,
         Self::SalesTaxLiability,
+        Self::SalesByState,
+        Self::AuditTrail,
     ];
 
     pub fn label(self) -> &'static str {
@@ -58,6 +64,8 @@ impl ReportKind {
             Self::ApAging => "A/P Aging Summary",
             Self::TransactionList => "Transaction List",
             Self::SalesTaxLiability => "Sales Tax Liability",
+            Self::SalesByState => "Sales by State",
+            Self::AuditTrail => "Audit Trail",
         }
     }
 
@@ -71,6 +79,8 @@ impl ReportKind {
             Self::ApAging => "ap-aging",
             Self::TransactionList => "transactions",
             Self::SalesTaxLiability => "sales-tax",
+            Self::SalesByState => "sales-by-state",
+            Self::AuditTrail => "audit",
         }
     }
 
@@ -82,7 +92,11 @@ impl ReportKind {
     pub fn uses_period(self) -> bool {
         matches!(
             self,
-            Self::ProfitAndLoss | Self::TransactionList | Self::SalesTaxLiability
+            Self::ProfitAndLoss
+                | Self::TransactionList
+                | Self::SalesTaxLiability
+                | Self::SalesByState
+                | Self::AuditTrail
         )
     }
 
@@ -100,6 +114,8 @@ impl ReportKind {
             Self::ApAging => ap_aging(company, to),
             Self::TransactionList => transaction_list(company, from, to),
             Self::SalesTaxLiability => sales_tax_liability(company, from, to),
+            Self::SalesByState => sales_by_state(company, from, to),
+            Self::AuditTrail => audit_trail(company, from, to),
         }
     }
 }

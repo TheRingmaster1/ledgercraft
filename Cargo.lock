@@ -2017,7 +2017,7 @@ checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
 name = "ledgercraft"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eframe",
  "ledgercraft-engine",
@@ -2028,7 +2028,7 @@ dependencies = [
 
 [[package]]
 name = "ledgercraft-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ledgercraft-core",
  "ledgercraft-engine",
@@ -2039,7 +2039,7 @@ dependencies = [
 
 [[package]]
 name = "ledgercraft-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -2047,7 +2047,7 @@ dependencies = [
 
 [[package]]
 name = "ledgercraft-engine"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ledgercraft-core",
  "ledgercraft-file",
@@ -2058,7 +2058,7 @@ dependencies = [
 
 [[package]]
 name = "ledgercraft-file"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argon2",
  "base64",
@@ -2072,7 +2072,7 @@ dependencies = [
 
 [[package]]
 name = "ledgercraft-ledger"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ledgercraft-core",
  "serde",
@@ -2081,7 +2081,7 @@ dependencies = [
 
 [[package]]
 name = "ledgercraft-reports"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ledgercraft-core",
  "ledgercraft-ledger",
@@ -2091,7 +2091,7 @@ dependencies = [
 
 [[package]]
 name = "ledgercraft-ui-egui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eframe",
  "image",
@@ -4839,7 +4839,7 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xtask"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "yeslogic-fontconfig-sys"

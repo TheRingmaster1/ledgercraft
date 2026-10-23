@@ -15,7 +15,11 @@ pub struct Address {
 
 impl Address {
     pub fn is_empty(&self) -> bool {
-        self.line1.is_empty() && self.line2.is_empty() && self.city.is_empty()
+        self.line1.is_empty()
+            && self.line2.is_empty()
+            && self.city.is_empty()
+            && self.region.is_empty()
+            && self.postal_code.is_empty()
     }
 
     pub fn lines(&self) -> Vec<String> {
@@ -57,6 +61,9 @@ pub struct Contact {
     /// Payment terms in days (Net 30 = 30). Zero means due on receipt.
     pub terms_days: u32,
     pub notes: String,
+    /// Where goods go, when not to `address` (customers only).
+    #[serde(default, skip_serializing_if = "Address::is_empty")]
+    pub ship_to: Address,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

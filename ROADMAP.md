@@ -1,9 +1,11 @@
 # LedgerCraft roadmap
 
-Stage: **pre-alpha 0.2** (version 0.2.0, released 2026-10-21; releases go
+Stage: **pre-alpha 0.2** (version 0.2.1, released 2026-10-23; releases go
 0.1 → 0.2 → 0.3 …, see docs/releasing.md) — the double-entry core, the everyday
 customer, vendor and banking forms, the core reports, encrypted company files
-and a first-run experience. Last updated 2026-10-21.
+and a first-run experience; 0.2.1 adds sales tax, sales receipts, credit memos,
+PDFs with templates and a logo, closing the books and an audit trail. Last
+updated 2026-10-23.
 
 Platforms: **Windows 10/11 x64 and Linux x86_64** are tested and supported
 (Linux first tested on Arch, XFCE/X11, in a virtual machine). **macOS** is in
@@ -61,6 +63,8 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 * PDF invoices, from the invoice form, Transactions or the command line (M2.5)
 * PDF customer statements with a running balance and aging (M2.5)
 * PDF templates (Classic, Modern, Simple) and a company logo (M2.5)
+* Closing date with an optional password, and an audit trail report (M2.7)
+* Ship-to addresses on customers and invoices; Sales by State report
 * Sales receipts, credit memos (applied to invoices or kept as credit) and
   refunds, with sales tax and PDFs (M2.6)
 
@@ -133,7 +137,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
    - ~~A choice of templates and a logo~~ (done: Classic, Modern and Simple;
      a PNG or JPEG logo, in File > Company Information…)
 6. ~~M2.6 Credit memos, refunds, customer credits; sales receipts~~ (done)
-7. M2.7 Closing date and password; audit trail report
+7. ~~M2.7 Closing date and password; audit trail report~~ (done)
 8. M2.8 Edit and merge list entries; sub-accounts; classes
 9. M2.9 Native file dialogs that remember locations, recent files, auto-backup
 

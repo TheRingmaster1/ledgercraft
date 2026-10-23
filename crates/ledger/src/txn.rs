@@ -99,6 +99,9 @@ pub struct Invoice {
     /// The sales tax charged, as worked out when the invoice was recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tax: Option<InvoiceTax>,
+    /// Where the goods go, when not to the customer's own address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ship_to: Option<crate::Address>,
 }
 
 impl Invoice {

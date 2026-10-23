@@ -80,6 +80,12 @@ pub struct Company {
     /// When the sales tax rates were last checked or changed.
     #[serde(default)]
     pub tax_rates_checked: Option<Date>,
+    /// The books are closed through this date, if they have been closed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closing: Option<crate::Closing>,
+    /// Every change made to the books, oldest first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub audit: Vec<crate::AuditEntry>,
     #[serde(default)]
     next_id: u64,
 }
@@ -109,6 +115,8 @@ impl Company {
             tax_components: Vec::new(),
             tax_groups: Vec::new(),
             tax_rates_checked: None,
+            closing: None,
+            audit: Vec::new(),
             next_id: 0,
         }
     }
@@ -1164,6 +1172,7 @@ mod tests {
             customer: cust,
             due_date: d("2026-02-01"),
             ar_account: acct(c, "Accounts Receivable"),
+            ship_to: None,
             tax: None,
             lines: vec![SalesLine {
                 item: None,
@@ -1326,6 +1335,7 @@ mod tests {
             customer: cust,
             due_date: d("2026-02-01"),
             ar_account: acct(&c, "Accounts Receivable"),
+            ship_to: None,
             tax: None,
             lines: Vec::new(),
         });
