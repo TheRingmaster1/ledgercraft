@@ -12,6 +12,7 @@ repository.workspace = true
 ledgercraft-core.workspace = true
 ledgercraft-ledger.workspace = true
 rust_xlsxwriter.workspace = true
+miniz_oxide.workspace = true
 
 [lints]
 workspace = true

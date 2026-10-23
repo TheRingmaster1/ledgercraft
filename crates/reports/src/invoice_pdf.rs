@@ -10,7 +10,8 @@
 use ledgercraft_core::Money;
 use ledgercraft_ledger::{Company, CustomerId, Sale, Transaction, TxnBody, TxnId};
 
-use crate::pdf::{finish, wrap, Align, Font, Page, Rgb};
+use crate::look::{letterhead, Look};
+use crate::pdf::{finish_with, wrap, Align, Font, Image, Page, Rgb};
 
 pub(crate) const LEFT: f32 = 50.0;
 pub(crate) const RIGHT: f32 = 562.0;
@@ -51,6 +52,10 @@ struct TotalLine {
 
 /// Everything the page shows, gathered from the books first.
 struct Sheet {
+    /// The template's colours and style.
+    look: Look,
+    /// The company's logo, drawn as image 0.
+    logo: Option<Image>,
     /// INVOICE, SALES RECEIPT or CREDIT MEMO.
     heading: &'static str,
     /// Invoice, Sales Receipt or Credit Memo, for "continued" lines.
@@ -108,7 +113,7 @@ pub fn invoice_pdf(company: &Company, id: TxnId, currency: &str) -> Result<Vec<u
     } else {
         format!("{} {}", sheet.kind, sheet.number)
     };
-    Ok(finish(&layout(&sheet), &title))
+    Ok(finish_with(&layout(&sheet), &title, sheet.logo.as_slice()))
 }
 
 /// The company's contact lines under its name: legal name (if different),
@@ -290,6 +295,8 @@ fn gather(c: &Company, t: &Transaction, sale: &Sale<'_>, currency: &str) -> Resu
     }
 
     Ok(Sheet {
+        look: Look::of(c.info.print.template),
+        logo: crate::look::logo(c),
         heading,
         kind: t.body.label(),
         to_label,
@@ -356,7 +363,7 @@ fn layout(s: &Sheet) -> Vec<Page> {
     totals(p, s, y + 22.0);
     if !note.is_empty() {
         let mut ny = y + 22.0;
-        p.text(LEFT, ny, "NOTE", Font::bold(8.5), ACCENT, Align::Left);
+        p.text(LEFT, ny, "NOTE", Font::bold(8.5), s.look.accent, Align::Left);
         ny += 14.0;
         for l in &note {
             p.text(LEFT, ny, l, Font::regular(9.5), INK, Align::Left);
@@ -430,25 +437,19 @@ fn line_rows(line: &PrintLine) -> Vec<(String, Font, Rgb)> {
 /// The first page's heading, Bill To and column headings; returns where
 /// the lines start.
 fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
-    p.text(LEFT, 64.0, &s.company, Font::bold(18.0), INK, Align::Left);
-    let mut y = 82.0;
-    for l in &s.company_lines {
-        p.text(LEFT, y, l, Font::regular(9.5), MUTED, Align::Left);
-        y += LINE_HEIGHT;
-    }
-    let left_bottom = y;
+    let left_bottom = letterhead(p, s.logo.as_ref(), &s.company, &s.company_lines);
 
     p.text(
         RIGHT,
         66.0,
         s.heading,
         Font::bold(24.0),
-        ACCENT,
+        s.look.accent,
         Align::Right,
     );
     let mut ry = 90.0;
     if s.void {
-        p.text(RIGHT, ry, "VOID", Font::bold(12.0), RED, Align::Right);
+        p.text(RIGHT, ry, "VOID", Font::bold(12.0), s.look.warning, Align::Right);
         ry += 16.0;
     }
     for (label, value) in &s.facts {
@@ -466,7 +467,7 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
 
     let mut y = left_bottom.max(ry) + 18.0;
     if !s.bill_to.is_empty() {
-        p.text(LEFT, y, s.to_label, Font::bold(8.5), ACCENT, Align::Left);
+        p.text(LEFT, y, s.to_label, Font::bold(8.5), s.look.accent, Align::Left);
         y += 15.0;
     }
     for (i, l) in s.bill_to.iter().enumerate() {
@@ -478,7 +479,7 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
         p.text(LEFT, y, l, font, color, Align::Left);
         y += 13.5;
     }
-    column_headings(p, y + 14.0)
+    column_headings(p, s, y + 14.0)
 }
 
 /// A later page's heading; returns where the lines continue.
@@ -490,18 +491,21 @@ fn continued_top(p: &mut Page, s: &Sheet) -> f32 {
         format!("{} {} (continued)", s.kind, s.number)
     };
     p.text(RIGHT, 60.0, &label, Font::regular(9.5), MUTED, Align::Right);
-    column_headings(p, 76.0)
+    column_headings(p, s, 76.0)
 }
 
-fn column_headings(p: &mut Page, y: f32) -> f32 {
-    p.rect(LEFT, y, RIGHT - LEFT, 20.0, ACCENT);
-    let baseline = y + 13.5;
-    let font = Font::bold(9.0);
-    p.text(DESC_X, baseline, "Description", font, WHITE, Align::Left);
-    p.text(QTY_RIGHT, baseline, "Qty", font, WHITE, Align::Right);
-    p.text(RATE_RIGHT, baseline, "Rate", font, WHITE, Align::Right);
-    p.text(AMOUNT_RIGHT, baseline, "Amount", font, WHITE, Align::Right);
-    y + 20.0
+fn column_headings(p: &mut Page, s: &Sheet, y: f32) -> f32 {
+    s.look.headings(
+        p,
+        y,
+        9.0,
+        &[
+            (DESC_X, "Description", Align::Left),
+            (QTY_RIGHT, "Qty", Align::Right),
+            (RATE_RIGHT, "Rate", Align::Right),
+            (AMOUNT_RIGHT, "Amount", Align::Right),
+        ],
+    )
 }
 
 fn totals(p: &mut Page, s: &Sheet, top: f32) {
@@ -528,7 +532,7 @@ fn totals(p: &mut Page, s: &Sheet, top: f32) {
             y + 2.0,
             "Paid in full. Thank you!",
             font,
-            GREEN,
+            s.look.good,
             Align::Right,
         );
     }
@@ -761,5 +765,39 @@ mod tests {
         assert!(text.contains("(Paid in full. Thank you!) Tj"));
         assert!(!text.contains("(SOLD TO) Tj"));
         assert!(!text.contains("(Balance due) Tj"));
+    }
+
+    #[test]
+    fn templates_change_the_look() {
+        let (mut c, inv, _) = books();
+        let accent_fill = "0.122 0.435 0.545 rg";
+        let classic = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        // Classic: column headings on a filled band.
+        assert!(classic.contains(accent_fill) && classic.contains(" re f"));
+        c.info.print.template = ledgercraft_ledger::PdfTemplate::Modern;
+        let modern = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        assert!(modern.contains(accent_fill) && !modern.contains(" re f"));
+        c.info.print.template = ledgercraft_ledger::PdfTemplate::Simple;
+        let simple = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        assert!(!simple.contains(accent_fill) && !simple.contains(" re f"));
+        assert!(simple.contains("(INVOICE) Tj"));
+    }
+
+    #[test]
+    fn the_logo_prints_at_the_top() {
+        let (mut c, inv, _) = books();
+        // A 2 x 1 PNG, one pixel see-through.
+        let png = crate::logo::tests::png_file(2, 1, 8, 6, &[0, 255, 0, 0, 0, 0, 0, 255, 255]);
+        c.info.print.logo = Some(ledgercraft_ledger::Logo(png));
+        let text = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        assert!(text.contains("/XObject << /Im1 "));
+        assert!(text.contains("/Subtype /Image /Width 2 /Height 1"));
+        assert!(text.contains("/SMask "), "its transparency comes along");
+        assert!(text.contains("/Im1 Do"));
+        // A logo that cannot be read is left off; the invoice still prints.
+        c.info.print.logo = Some(ledgercraft_ledger::Logo(b"not an image".to_vec()));
+        let text = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        assert!(!text.contains("/Im1 Do"));
+        assert!(text.contains("(INVOICE) Tj"));
     }
 }

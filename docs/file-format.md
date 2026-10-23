@@ -33,6 +33,10 @@ A company file is UTF-8 JSON:
 * Amounts (`rate`, `amount`, `debit`, `credit`) are integers in **cents**.
 * Quantities (`qty`) are integers in **thousandths** (`1000` = 1).
 * Dates are `YYYY-MM-DD`.
+* `info.print` is how printed documents look: `template` (`classic`,
+  `modern` or `simple`) and, if one was chosen, `logo`: the PNG or JPEG file
+  as base64 text (1 MB at most). Older files without it print the classic
+  look with no logo.
 * Ids are unique across the whole file.
 * `tax_components` are the sales taxes: id, `name`, `agency`, `code` (a
   state rate file's jurisdiction code, when imported), `rates` (each

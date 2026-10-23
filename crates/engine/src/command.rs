@@ -27,6 +27,9 @@ pub enum Command {
         phone: String,
         #[serde(default)]
         address: Address,
+        /// The PDF template and logo; left as they are when not given.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        print: Option<ledgercraft_ledger::PrintStyle>,
     },
     #[serde(rename = "account.create")]
     AccountCreate {
@@ -181,7 +184,7 @@ pub struct CommandInfo {
 pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "company.rename", summary: "Rename the company. {name}" },
     CommandInfo { id: "company.setFiscalYearStart", summary: "First month of the fiscal year, 1-12. {month}" },
-    CommandInfo { id: "company.setInfo", summary: "Name and contact details printed on invoices. {name, legal_name?, email?, phone?, address?:{line1, line2, city, region, postal_code, country}}" },
+    CommandInfo { id: "company.setInfo", summary: "Name and contact details printed on invoices. {name, legal_name?, email?, phone?, address?:{line1, line2, city, region, postal_code, country}, print?:{template: classic|modern|simple, logo?: base64 PNG or JPEG}}" },
     CommandInfo { id: "account.create", summary: "Add an account. {number?, name, kind, description?}" },
     CommandInfo { id: "account.update", summary: "Rename or renumber an account. {id, number?, name, description?}" },
     CommandInfo { id: "account.setActive", summary: "Make an account active or inactive. {id, active}" },
@@ -313,6 +316,7 @@ impl Command {
                 email,
                 phone,
                 address,
+                print,
             } => {
                 let name = name.trim();
                 if name.is_empty() {
@@ -331,6 +335,18 @@ impl Command {
                     postal_code: tidy(&address.postal_code),
                     country: tidy(&address.country),
                 };
+                if let Some(print) = print {
+                    if print
+                        .logo
+                        .as_ref()
+                        .is_some_and(|l| l.0.len() > ledgercraft_ledger::LOGO_MAX_BYTES)
+                    {
+                        return Err(ledgercraft_ledger::LedgerError::Invalid(
+                            "The logo file is too large (1 MB at most)".into(),
+                        ));
+                    }
+                    c.info.print = print;
+                }
                 None
             }
             Self::CompanySetFiscalYearStart { month } => {

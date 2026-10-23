@@ -27,6 +27,9 @@ pub struct CompanyInfo {
     pub fiscal_year_start_month: u32,
     #[serde(default = "usd")]
     pub currency: String,
+    /// The look of printed documents, and the logo on them.
+    #[serde(default)]
+    pub print: crate::PrintStyle,
 }
 
 fn january() -> u32 {
@@ -93,6 +96,7 @@ impl Company {
                 phone: String::new(),
                 fiscal_year_start_month: 1,
                 currency: usd(),
+                print: crate::PrintStyle::default(),
             },
             accounts: Vec::new(),
             customers: Vec::new(),

@@ -1,9 +1,9 @@
 //! File > Company Information…: the company's name and the contact details
-//! printed on invoices.
+//! printed on invoices, and how printed documents look (template and logo).
 
 use eframe::egui::{self, RichText};
 use ledgercraft_engine::Command;
-use ledgercraft_ledger::{Address, Company};
+use ledgercraft_ledger::{Address, Company, Logo, PdfTemplate, PrintStyle, LOGO_MAX_BYTES};
 
 use crate::theme;
 
@@ -20,6 +20,10 @@ pub(crate) struct CompanyInfoForm {
     region: String,
     postal_code: String,
     country: String,
+    template: PdfTemplate,
+    logo: Option<Logo>,
+    /// What the logo is: its file name and size, once chosen.
+    logo_note: String,
     error: Option<String>,
 }
 
@@ -45,7 +49,47 @@ impl CompanyInfoForm {
             region: a.region.clone(),
             postal_code: a.postal_code.clone(),
             country: a.country.clone(),
+            template: info.print.template,
+            logo: info.print.logo.clone(),
+            logo_note: info
+                .print
+                .logo
+                .as_ref()
+                .and_then(|l| ledgercraft_reports::logo_size(&l.0).ok())
+                .map(|(w, h)| format!("{w} x {h} pixels"))
+                .unwrap_or_default(),
             error: None,
+        }
+    }
+
+    /// Asks for a PNG or JPEG file and takes it as the logo, or says why not.
+    fn choose_logo(&mut self) {
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("Image (PNG or JPEG)", &["png", "jpg", "jpeg"])
+            .pick_file()
+        else {
+            return;
+        };
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        match std::fs::read(&path) {
+            Ok(bytes) if bytes.len() > LOGO_MAX_BYTES => {
+                self.error = Some(format!(
+                    "{name} is larger than 1 MB: use a smaller image (a few hundred pixels \
+                     across is plenty)."
+                ));
+            }
+            Ok(bytes) => match ledgercraft_reports::logo_size(&bytes) {
+                Ok((w, h)) => {
+                    self.logo = Some(Logo(bytes));
+                    self.logo_note = format!("{name}, {w} x {h} pixels");
+                    self.error = None;
+                }
+                Err(e) => self.error = Some(format!("{name}: {e}")),
+            },
+            Err(e) => self.error = Some(format!("Could not read {name}: {e}")),
         }
     }
 
@@ -66,6 +110,10 @@ impl CompanyInfoForm {
                 postal_code: self.postal_code.clone(),
                 country: self.country.clone(),
             },
+            print: Some(PrintStyle {
+                template: self.template,
+                logo: self.logo.clone(),
+            }),
         })
     }
 }
@@ -121,6 +169,52 @@ pub(crate) fn window(
                         ui.end_row();
                     }
                 });
+            ui.add_space(8.0);
+            ui.separator();
+            ui.label(RichText::new("Printed documents").strong());
+            ui.label(
+                RichText::new("Invoices, sales receipts, credit memos and statements.")
+                    .color(theme::MUTED),
+            );
+            ui.add_space(4.0);
+            egui::Grid::new("company_print")
+                .num_columns(2)
+                .spacing([12.0, 6.0])
+                .show(ui, |ui| {
+                    ui.label("Template");
+                    ui.horizontal(|ui| {
+                        egui::ComboBox::from_id_salt("pdf_template")
+                            .selected_text(form.template.label())
+                            .show_ui(ui, |ui| {
+                                for t in PdfTemplate::ALL {
+                                    ui.selectable_value(&mut form.template, t, t.label())
+                                        .on_hover_text(t.description());
+                                }
+                            });
+                        ui.label(RichText::new(form.template.description()).color(theme::MUTED));
+                    });
+                    ui.end_row();
+                    ui.label("Logo");
+                    ui.horizontal(|ui| {
+                        if form.logo.is_some() {
+                            ui.label(form.logo_note.as_str());
+                        } else {
+                            ui.label(RichText::new("None").color(theme::MUTED));
+                        }
+                        if ui
+                            .button("Choose…")
+                            .on_hover_text("A PNG or JPEG, printed at the top left")
+                            .clicked()
+                        {
+                            form.choose_logo();
+                        }
+                        if form.logo.is_some() && ui.button("Remove").clicked() {
+                            form.logo = None;
+                            form.logo_note.clear();
+                        }
+                    });
+                    ui.end_row();
+                });
             if let Some(e) = &form.error {
                 ui.add_space(4.0);
                 ui.label(RichText::new(e.as_str()).color(theme::NEGATIVE));
@@ -160,6 +254,7 @@ mod tests {
             email: info.email.clone(),
             phone: info.phone.clone(),
             address: info.address.clone(),
+            print: Some(info.print.clone()),
         };
         assert_eq!(form.command(), Ok(expected));
     }

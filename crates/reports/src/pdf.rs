@@ -79,6 +79,16 @@ impl Page {
         ));
     }
 
+    /// Draws image number `index` (counting from 0, in the list given to
+    /// [`finish_with`]) `w` by `h` points, its top-left corner at `x`, `y`.
+    pub(crate) fn image(&mut self, index: usize, x: f32, y: f32, w: f32, h: f32) {
+        self.ops.push(format!(
+            "q {w:.2} 0 0 {h:.2} {x:.2} {:.2} cm /Im{} Do Q",
+            PAGE_HEIGHT - y - h,
+            index + 1
+        ));
+    }
+
     /// A horizontal rule from `x1` to `x2`.
     pub(crate) fn rule(&mut self, x1: f32, x2: f32, y: f32, color: Rgb, thickness: f32) {
         let Rgb(r, g, b) = color;
@@ -215,8 +225,35 @@ pub(crate) fn wrap(text: &str, font: Font, max: f32) -> Vec<String> {
     lines
 }
 
-/// The finished file. `title` shows in the reader's title bar.
-pub(crate) fn finish(pages: &[Page], title: &str) -> Vec<u8> {
+/// A picture for the pages, such as a logo, ready to put in the file.
+pub(crate) struct Image {
+    pub width: u32,
+    pub height: u32,
+    pub data: ImageData,
+}
+
+pub(crate) enum ImageData {
+    /// A JPEG file as it is (PDF readers decode it); `gray` for one channel.
+    Jpeg { bytes: Vec<u8>, gray: bool },
+    /// 8-bit RGB pixels, zlib-compressed, and the same for its transparency
+    /// (one byte a pixel) when it has any.
+    Rgb {
+        pixels: Vec<u8>,
+        alpha: Option<Vec<u8>>,
+    },
+}
+
+/// An image object: its dictionary and data.
+fn image_object(dict: &str, data: &[u8]) -> Vec<u8> {
+    let mut out = format!("<< {dict} /Length {} >>\nstream\n", data.len()).into_bytes();
+    out.extend_from_slice(data);
+    out.extend_from_slice(b"\nendstream");
+    out
+}
+
+/// The finished file, with `images` for the pages to draw. `title` shows
+/// in the reader's title bar.
+pub(crate) fn finish_with(pages: &[Page], title: &str, images: &[Image]) -> Vec<u8> {
     let mut objects: Vec<Vec<u8>> = Vec::new();
     objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
     let kids: Vec<String> = (0..pages.len())
@@ -246,11 +283,37 @@ pub(crate) fn finish(pages: &[Page], title: &str) -> Vec<u8> {
         )
         .into_bytes(),
     );
+    // Images come after the pages: each takes one object, and one more for
+    // its transparency if it has any.
+    let mut next = 6 + 2 * pages.len();
+    let mut numbers = Vec::new();
+    for image in images {
+        let own = next;
+        next += 1;
+        let mask = match &image.data {
+            ImageData::Rgb { alpha: Some(_), .. } => {
+                next += 1;
+                Some(own + 1)
+            }
+            _ => None,
+        };
+        numbers.push((own, mask));
+    }
+    let xobjects = if images.is_empty() {
+        String::new()
+    } else {
+        let names: Vec<String> = numbers
+            .iter()
+            .enumerate()
+            .map(|(i, (own, _))| format!("/Im{} {own} 0 R", i + 1))
+            .collect();
+        format!(" /XObject << {} >>", names.join(" "))
+    };
     for (i, page) in pages.iter().enumerate() {
         objects.push(
             format!(
                 "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_WIDTH} {PAGE_HEIGHT}] \
-                 /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {} 0 R >>",
+                 /Resources << /Font << /F1 3 0 R /F2 4 0 R >>{xobjects} >> /Contents {} 0 R >>",
                 7 + 2 * i
             )
             .into_bytes(),
@@ -260,6 +323,28 @@ pub(crate) fn finish(pages: &[Page], title: &str) -> Vec<u8> {
         stream.extend_from_slice(body.as_bytes());
         stream.extend_from_slice(b"\nendstream");
         objects.push(stream);
+    }
+    for (image, (_, mask)) in images.iter().zip(&numbers) {
+        let size = format!(
+            "/Type /XObject /Subtype /Image /Width {} /Height {} /BitsPerComponent 8",
+            image.width, image.height
+        );
+        match &image.data {
+            ImageData::Jpeg { bytes, gray } => {
+                let space = if *gray { "/DeviceGray" } else { "/DeviceRGB" };
+                let dict = format!("{size} /ColorSpace {space} /Filter /DCTDecode");
+                objects.push(image_object(&dict, bytes));
+            }
+            ImageData::Rgb { pixels, alpha } => {
+                let smask = mask.map_or_else(String::new, |m| format!(" /SMask {m} 0 R"));
+                let dict = format!("{size} /ColorSpace /DeviceRGB /Filter /FlateDecode{smask}");
+                objects.push(image_object(&dict, pixels));
+                if let Some(alpha) = alpha {
+                    let dict = format!("{size} /ColorSpace /DeviceGray /Filter /FlateDecode");
+                    objects.push(image_object(&dict, alpha));
+                }
+            }
+        }
     }
 
     let mut out = b"%PDF-1.4\n".to_vec();
@@ -368,7 +453,7 @@ mod tests {
             Align::Left,
         );
         page.rule(50.0, 100.0, 70.0, Rgb(0.5, 0.5, 0.5), 1.0);
-        let pdf = finish(&[page, Page::default()], "Test");
+        let pdf = finish_with(&[page, Page::default()], "Test", &[]);
         let text = String::from_utf8(pdf).unwrap();
         assert!(text.starts_with("%PDF-1.4\n") && text.ends_with("%%EOF\n"));
         let xref_at: usize = text.lines().rev().nth(1).unwrap().parse().unwrap();
