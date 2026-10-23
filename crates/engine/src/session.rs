@@ -584,7 +584,9 @@ mod tests {
     #[test]
     fn reopening_the_books_has_to_be_asked_for() {
         let mut s = Session::new(crate::sample_company().unwrap());
-        assert!(s.execute_json(r#"{"command":"company.setClosing"}"#).is_err());
+        assert!(s
+            .execute_json(r#"{"command":"company.setClosing"}"#)
+            .is_err());
         assert!(s.company().closing.is_some());
         s.execute_json(r#"{"command":"company.setClosing","date":null}"#)
             .unwrap();
