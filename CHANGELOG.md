@@ -18,6 +18,10 @@ fixes to a release. See docs/releasing.md.
   go in as they are, PNGs (any colour type, transparency kept) are decoded
   with `miniz_oxide`, already part of the build. The sample company has a
   logo. The `company.setInfo` command takes an optional `print` object.
+- Company Information shows a preview of the chosen logo on a small white
+  card, as it sits on paper (scaled to fit, never enlarged). It is decoded
+  with the `image` crate, already in the build through eframe, with JPEG
+  support added.
 - Sales receipts, credit memos and refunds (M2.6). Customers > Enter Sales
   Receipt records a sale paid on the spot (customer optional, deposited to a
   bank or Undeposited Funds). Create Credit Memo credits a customer for a
