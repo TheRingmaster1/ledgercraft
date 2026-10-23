@@ -363,7 +363,14 @@ fn layout(s: &Sheet) -> Vec<Page> {
     totals(p, s, y + 22.0);
     if !note.is_empty() {
         let mut ny = y + 22.0;
-        p.text(LEFT, ny, "NOTE", Font::bold(8.5), s.look.accent, Align::Left);
+        p.text(
+            LEFT,
+            ny,
+            "NOTE",
+            Font::bold(8.5),
+            s.look.accent,
+            Align::Left,
+        );
         ny += 14.0;
         for l in &note {
             p.text(LEFT, ny, l, Font::regular(9.5), INK, Align::Left);
@@ -449,7 +456,14 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
     );
     let mut ry = 90.0;
     if s.void {
-        p.text(RIGHT, ry, "VOID", Font::bold(12.0), s.look.warning, Align::Right);
+        p.text(
+            RIGHT,
+            ry,
+            "VOID",
+            Font::bold(12.0),
+            s.look.warning,
+            Align::Right,
+        );
         ry += 16.0;
     }
     for (label, value) in &s.facts {
@@ -467,7 +481,14 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
 
     let mut y = left_bottom.max(ry) + 18.0;
     if !s.bill_to.is_empty() {
-        p.text(LEFT, y, s.to_label, Font::bold(8.5), s.look.accent, Align::Left);
+        p.text(
+            LEFT,
+            y,
+            s.to_label,
+            Font::bold(8.5),
+            s.look.accent,
+            Align::Left,
+        );
         y += 15.0;
     }
     for (i, l) in s.bill_to.iter().enumerate() {

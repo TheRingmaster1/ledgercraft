@@ -15,8 +15,8 @@
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_ledger::{
     tax_payment_memo, AccountId, AccountLine, AccountType, Address, Applied, BankRule, Bill, Check,
-    Company, Contact, CreditMemo, Logo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
-    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Party, PayBill,
+    Company, Contact, CreditMemo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
+    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Logo, Party, PayBill,
     ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, TaxRate, TxnBody, TxnId, VendorId,
 };
 

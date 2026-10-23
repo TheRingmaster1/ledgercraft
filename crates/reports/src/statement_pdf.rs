@@ -11,8 +11,7 @@ use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{AccountType, Company, CustomerId, Party, TxnBody, TxnId};
 
 use crate::invoice_pdf::{
-    bill_to, company_lines, page_mut, row_count, BOTTOM, INK, LEFT, LINE_HEIGHT, MUTED, RIGHT,
-    RULE,
+    bill_to, company_lines, page_mut, row_count, BOTTOM, INK, LEFT, LINE_HEIGHT, MUTED, RIGHT, RULE,
 };
 use crate::look::{letterhead, Look};
 use crate::pdf::{finish_with, wrap, Align, Font, Image, Page};

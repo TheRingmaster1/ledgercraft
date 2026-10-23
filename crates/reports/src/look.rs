@@ -45,7 +45,13 @@ impl Look {
 
     /// A row of column headings `(x, label, align)` with its top at `y`, and
     /// at `size` points; returns the y below it.
-    pub(crate) fn headings(&self, p: &mut Page, y: f32, size: f32, cells: &[(f32, &str, Align)]) -> f32 {
+    pub(crate) fn headings(
+        &self,
+        p: &mut Page,
+        y: f32,
+        size: f32,
+        cells: &[(f32, &str, Align)],
+    ) -> f32 {
         let font = Font::bold(size);
         let baseline = y + 13.5;
         if self.band {
@@ -88,7 +94,12 @@ fn fit(width: u32, height: u32) -> (f32, f32) {
 
 /// The top left of a document's first page: the logo (image 0) if there is
 /// one, then the company's name and contact lines. Returns the y below.
-pub(crate) fn letterhead(p: &mut Page, logo: Option<&Image>, company: &str, lines: &[String]) -> f32 {
+pub(crate) fn letterhead(
+    p: &mut Page,
+    logo: Option<&Image>,
+    company: &str,
+    lines: &[String],
+) -> f32 {
     let mut name_y = 64.0;
     if let Some(image) = logo {
         let (w, h) = fit(image.width, image.height);

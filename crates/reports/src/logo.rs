@@ -313,7 +313,10 @@ pub(crate) mod tests {
         for (kind, body) in extra {
             chunk(*kind, body);
         }
-        chunk(b"IDAT", &miniz_oxide::deflate::compress_to_vec_zlib(rows, 6));
+        chunk(
+            b"IDAT",
+            &miniz_oxide::deflate::compress_to_vec_zlib(rows, 6),
+        );
         chunk(b"IEND", &[]);
         out
     }

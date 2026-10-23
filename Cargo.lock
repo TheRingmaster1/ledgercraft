@@ -2083,6 +2083,7 @@ version = "0.2.0"
 dependencies = [
  "ledgercraft-core",
  "ledgercraft-ledger",
+ "miniz_oxide 0.8.9",
  "rust_xlsxwriter",
 ]
 
