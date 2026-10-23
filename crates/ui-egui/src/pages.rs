@@ -47,6 +47,13 @@ pub(crate) struct ContactInput {
     pub country: String,
     pub terms: String,
     pub notes: String,
+    /// Ship to, when not to the address (customers only).
+    pub ship_line1: String,
+    pub ship_line2: String,
+    pub ship_city: String,
+    pub ship_region: String,
+    pub ship_postal_code: String,
+    pub ship_country: String,
 }
 
 impl ContactInput {
@@ -70,6 +77,12 @@ impl ContactInput {
                 c.terms_days.to_string()
             },
             notes: c.notes.clone(),
+            ship_line1: c.ship_to.line1.clone(),
+            ship_line2: c.ship_to.line2.clone(),
+            ship_city: c.ship_to.city.clone(),
+            ship_region: c.ship_to.region.clone(),
+            ship_postal_code: c.ship_to.postal_code.clone(),
+            ship_country: c.ship_to.country.clone(),
         }
     }
 
@@ -97,6 +110,14 @@ impl ContactInput {
             },
             terms_days,
             notes: self.notes.trim().to_string(),
+            ship_to: Address {
+                line1: self.ship_line1.trim().to_string(),
+                line2: self.ship_line2.trim().to_string(),
+                city: self.ship_city.trim().to_string(),
+                region: self.ship_region.trim().to_string(),
+                postal_code: self.ship_postal_code.trim().to_string(),
+                country: self.ship_country.trim().to_string(),
+            },
         })
     }
 }
@@ -684,7 +705,8 @@ pub(crate) fn register(ui: &mut Ui, c: &Company, account: AccountId, out: &mut V
 
 // ----- customers / vendors -----------------------------------------------------------
 
-fn contact_editor(ui: &mut Ui, salt: &str, n: &mut ContactInput) {
+/// The contact fields; with `ship_to`, a customer's ship-to address too.
+fn contact_editor(ui: &mut Ui, salt: &str, n: &mut ContactInput, ship_to: bool) {
     egui::Grid::new(salt)
         .num_columns(4)
         .spacing([10.0, 4.0])
@@ -720,6 +742,34 @@ fn contact_editor(ui: &mut Ui, salt: &str, n: &mut ContactInput) {
             field(ui, &mut n.notes, 200.0, "");
             ui.end_row();
         });
+    if ship_to {
+        let filled = !n.ship_line1.trim().is_empty() || !n.ship_city.trim().is_empty();
+        egui::CollapsingHeader::new("Ship to (if not the address above)")
+            .id_salt((salt, "ship_to"))
+            .default_open(filled)
+            .show(ui, |ui| {
+                egui::Grid::new((salt, "ship_grid"))
+                    .num_columns(4)
+                    .spacing([10.0, 4.0])
+                    .show(ui, |ui| {
+                        widgets::hint_label(ui, "Street");
+                        field(ui, &mut n.ship_line1, 200.0, "");
+                        widgets::hint_label(ui, "City");
+                        field(ui, &mut n.ship_city, 200.0, "");
+                        ui.end_row();
+                        widgets::hint_label(ui, "Line 2");
+                        field(ui, &mut n.ship_line2, 200.0, "");
+                        widgets::hint_label(ui, "State / region");
+                        field(ui, &mut n.ship_region, 80.0, "");
+                        ui.end_row();
+                        widgets::hint_label(ui, "Postal code");
+                        field(ui, &mut n.ship_postal_code, 100.0, "");
+                        widgets::hint_label(ui, "Country");
+                        field(ui, &mut n.ship_country, 160.0, "if not your own");
+                        ui.end_row();
+                    });
+            });
+    }
 }
 
 /// What was clicked under an edit panel.
@@ -777,7 +827,7 @@ fn edit_customer(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Acti
     let mut close = false;
     egui::Frame::group(ui.style()).show(ui, |ui| {
         ui.label(RichText::new(format!("Edit customer: {}", x.contact.name)).strong());
-        contact_editor(ui, "edit_customer", input);
+        contact_editor(ui, "edit_customer", input, true);
         match edit_buttons(ui, x.active) {
             EditChoice::Save => match input.build() {
                 Ok(contact) => out.push(Action::Run {
@@ -813,7 +863,7 @@ fn edit_vendor(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action
     let mut close = false;
     egui::Frame::group(ui.style()).show(ui, |ui| {
         ui.label(RichText::new(format!("Edit vendor: {}", x.contact.name)).strong());
-        contact_editor(ui, "edit_vendor", input);
+        contact_editor(ui, "edit_vendor", input, false);
         match edit_buttons(ui, x.active) {
             EditChoice::Save => match input.build() {
                 Ok(contact) => out.push(Action::Run {
@@ -843,7 +893,7 @@ pub(crate) fn customers(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut V
     egui::CollapsingHeader::new("New customer")
         .default_open(c.customers.is_empty())
         .show(ui, |ui| {
-            contact_editor(ui, "new_customer", &mut s.new_customer);
+            contact_editor(ui, "new_customer", &mut s.new_customer, true);
             if ui.button("Add customer").clicked() {
                 match s.new_customer.build() {
                     Ok(contact) => out.push(Action::Run {
@@ -919,7 +969,7 @@ pub(crate) fn vendors(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
     egui::CollapsingHeader::new("New vendor")
         .default_open(c.vendors.is_empty())
         .show(ui, |ui| {
-            contact_editor(ui, "new_vendor", &mut s.new_vendor);
+            contact_editor(ui, "new_vendor", &mut s.new_vendor, false);
             if ui.button("Add vendor").clicked() {
                 match s.new_vendor.build() {
                     Ok(contact) => out.push(Action::Run {
@@ -1383,6 +1433,12 @@ mod tests {
             },
             terms_days: 30,
             notes: "Delivers on Fridays".into(),
+            ship_to: Address {
+                line1: "40 Warehouse Row".into(),
+                city: "Orem".into(),
+                region: "UT".into(),
+                ..Address::default()
+            },
         };
         assert_eq!(ContactInput::from_contact(&contact).build(), Ok(contact));
     }

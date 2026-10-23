@@ -258,6 +258,9 @@ const LESSONS: &[Lesson] = &[
                 "Edit beside a name changes it, its address, terms or notes. Make inactive \
                  there leaves someone you no longer deal with off the forms; their history \
                  and balance stay, and Show inactive lists them again.",
+                "A customer whose goods go somewhere else (a warehouse, another office) gets \
+                 a Ship to address under the address. Their invoices start with it, it \
+                 prints beside Bill To, and Sales by State counts the sale there.",
             ]),
             Heading("Products and services"),
             Text(
@@ -699,6 +702,12 @@ const LESSONS: &[Lesson] = &[
                 "A/R Aging Summary: what each customer owes, grouped by how overdue it is.",
                 "A/P Aging Summary: what you owe each vendor, grouped the same way.",
                 "Transaction List: everything recorded in a date range.",
+                "Sales Tax Liability: sales, the taxable part and the tax by location and \
+                 agency, and what is owed.",
+                "Sales by State: sales, taxable sales and tax by the state they were sold \
+                 into (where they shipped, else the customer's address).",
+                "Audit Trail: every change made to the books (added, edited, voided, undone \
+                 or redone), when, and to what.",
             ]),
             Heading("Using reports"),
             Bullets(&[
@@ -709,6 +718,34 @@ const LESSONS: &[Lesson] = &[
                 "Export to Excel saves a formatted workbook; Export CSV saves plain values \
                  for other programs.",
             ]),
+        ],
+        try_it: &[("Open Reports", Target::Page(Page::Reports))],
+    },
+    Lesson {
+        title: "Closing the books",
+        blocks: &[
+            Text(
+                "Once a period is finished (taxes filed, reports sent to your accountant), \
+                 close it so it stays as it was reported: nothing dated on or before the \
+                 closing date can be added, changed or voided.",
+            ),
+            Steps(&[
+                "Open File > Closing Date… and tick Close the books through.",
+                "Type the last day of the finished period, such as 2026-06-30.",
+                "Add a closing date password if you like, then Save.",
+            ]),
+            Bullets(&[
+                "With a password, changing a closed transaction needs it: enter it in File \
+                 > Closing Date… (Unlock), and closed transactions can be changed until you \
+                 close the company. Changing the closing date needs it too.",
+                "Without a password, move the closing date back to change something closed.",
+                "Every change is kept in Reports > Audit Trail, with when it was made. Undo \
+                 and redo are recorded too, so the trail only ever grows.",
+            ]),
+            Tip(
+                "The sample company is closed through February. Try editing a January \
+                 invoice, then open File > Closing Date… to see why it is locked.",
+            ),
         ],
         try_it: &[("Open Reports", Target::Page(Page::Reports))],
     },

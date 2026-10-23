@@ -6,7 +6,8 @@ automatically from `main`.
 ## Version numbers
 
 * Releases go 0.1.0 → 0.2.0 → 0.3.0 … and are referred to as "0.1", "0.2", …
-* A patch (0.2.1) is only for an urgent fix to an already-released version.
+* A point release (0.2.1) ships finished work, or an urgent fix, between
+  minor releases, when the maintainer calls one. The steps are the same.
 * The version lives in one place: `[workspace.package] version` in the root
   `Cargo.toml`. Every crate and app inherits it, and the About window and
   `--version` read it at build time.

@@ -921,6 +921,7 @@ mod tests {
             customer,
             due_date: date,
             ar_account: c.first_account_of(AccountType::AccountsReceivable).unwrap(),
+            ship_to: None,
             lines: vec![line(100, true), line(50, false)],
             tax: Some(tax),
         };
@@ -966,6 +967,7 @@ mod tests {
             customer,
             due_date: date,
             ar_account: c.first_account_of(AccountType::AccountsReceivable).unwrap(),
+            ship_to: None,
             lines: vec![SalesLine {
                 item: None,
                 description: String::new(),

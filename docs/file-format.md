@@ -33,6 +33,13 @@ A company file is UTF-8 JSON:
 * Amounts (`rate`, `amount`, `debit`, `credit`) are integers in **cents**.
 * Quantities (`qty`) are integers in **thousandths** (`1000` = 1).
 * Dates are `YYYY-MM-DD`.
+* `closing`, when the books are closed: `date` (transactions dated then or
+  before are locked) and, if set, `password`: a one-way Argon2id check value
+  (`argon2id$memory$passes$lanes$salt$hash`), never the password itself.
+* `audit` is the audit trail, oldest first: `at` (`YYYY-MM-DD HH:MM UTC`),
+  `action` and `detail` for every change, undo and redo.
+* A customer's `contact.ship_to` and an invoice's `ship_to` are an address
+  goods go to when not the customer's own; both are left out when empty.
 * `info.print` is how printed documents look: `template` (`classic`,
   `modern` or `simple`) and, if one was chosen, `logo`: the PNG or JPEG file
   as base64 text (1 MB at most). Older files without it print the classic

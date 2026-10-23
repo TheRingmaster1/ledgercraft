@@ -274,6 +274,7 @@ fn add_party(company: &mut Company, r: &Record, customer: bool, summary: &mut Im
         },
         terms_days: terms_days(r.get(&["TERMS", "PAYMENT TERMS"])),
         notes: r.get(&["NOTE", "NOTES"]).to_string(),
+        ship_to: Address::default(),
     };
     let result = if customer {
         company.add_customer(contact).map(|_| ())

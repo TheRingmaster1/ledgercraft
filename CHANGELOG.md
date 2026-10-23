@@ -2,12 +2,34 @@
 
 All notable changes to LedgerCraft are listed here. Versions follow
 `0.MINOR.PATCH` until 1.0: each release the maintainer calls is the next
-minor version (0.1, 0.2, 0.3, …); patch versions (0.1.1) are only for urgent
-fixes to a release. See docs/releasing.md.
+minor version (0.1, 0.2, 0.3, …); point releases (0.2.1) ship finished work
+or urgent fixes in between, when the maintainer calls one. See
+docs/releasing.md.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-23
+
 ### Added
+- Closing the books and an audit trail (M2.7). File > Closing Date… locks
+  the books through a date: nothing dated then or before can be added,
+  changed or voided (nor a bank line dated then imported). An optional
+  closing date password (stored as an Argon2id check, never the password)
+  unlocks closed transactions for the session when entered; without one, the
+  date has to move. Every change, undo and redo goes into the company file's
+  audit trail, with when and what (date, number, name, amount; edits say
+  what they were), and Reports > Audit Trail lists it for a period. New
+  `company.setClosing` command; `ledgercraft-cli report FILE audit`.
+- Ship-to addresses. A customer can have a Ship to address (under their
+  address); their new invoices start with it, the invoice form shows it
+  (with a button to ship to the bill-to address instead), and it prints as
+  SHIP TO beside BILL TO.
+- Sales by State report: sales, taxable sales and tax by the state sold
+  into (where it shipped, else the customer's address; walk-in sales count
+  where the company is). `ledgercraft-cli report FILE sales-by-state`.
+- The sample company is closed through February, ships Summit Ridge
+  Academy's furniture to its west campus and Harbor Design Studio's to its
+  showroom in Boise, Idaho.
 - PDF templates and a logo (finishing M2.5). File > Company Information…
   has a Printed documents section: choose Classic (coloured headings and
   column bands, as before), Modern (lighter: coloured headings over thin
@@ -159,6 +181,48 @@ fixes to a release. See docs/releasing.md.
   Reconciliation. New engine commands `account.reconcile` and
   `account.undoReconciliation`; company files keep their reconciliations
   (older files open with none). A new tutorial lesson explains it.
+- Help > Preferences > Text > Hinting: sharpen letters (on, the default) or
+  turn it off for smoother, more print-like text.
+- Edit recorded transactions. Open an invoice, payment, bill, bill payment,
+  check, deposit or journal entry from the Transactions page (Edit, or
+  double-click the row), an account register or the Transaction List report
+  (click the date, or double-click the row). It opens in its form titled
+  "Edit …"; Save Changes replaces it in place and returns to where it was
+  opened from, Cancel leaves it unchanged, and Edit > Undo puts the original
+  back. The transaction keeps its id, so payments stay applied. Edits are
+  checked like new entries, an invoice or bill cannot drop below what has
+  been paid on it or change customer or vendor while payments are applied,
+  the type cannot change, and void transactions cannot be edited. The CLI and
+  agents get the same as the `txn.update` command.
+- Recent companies: the start page lists the company files opened last
+  (click to open, right-click to remove one), and File > Open Previous
+  Company lists them too. A file that has been moved or deleted is reported
+  and dropped from the list.
+- LedgerCraft reopens the company that was open last when it starts (asking
+  for its password if it has one). Help > Preferences > Open The Last Company
+  At Startup turns this off.
+- The window size, maximized state and side bar are remembered between
+  launches.
+- Show / Hide button beside the password boxes (Create a Company, File >
+  Password… and the password prompt when opening a protected company), to
+  check what was typed. Every window opens with passwords hidden.
+- The Confirm password box says "Doesn't match" (red) or "Matches" (green)
+  to its right as you type, in Create a Company and File > Password….
+- Password strength meter on every new password (Create a Company and File >
+  Password…), using zxcvbn. Passwords that are easy to guess (common
+  passwords, names, dates, keyboard runs, repeated characters, or the
+  company's own name) are refused, with a passphrase tip.
+- Double-clicking a .lcbooks file opens it in LedgerCraft. Windows: Help >
+  Preferences > Files registers the file type for your account (no
+  administrator rights needed). Linux: install.sh registers it, with the
+  LedgerCraft icon on company files.
+- Linux is tested and supported (x86_64; first run on Arch Linux with XFCE).
+  CI now runs every gate on Linux as well as Windows, and releases include
+  `ledgercraft-<version>-x86_64-unknown-linux-gnu.tar.gz` with an `install.sh`
+  that adds LedgerCraft to the Applications menu with its icon for the
+  current user.
+- The window identifies itself as `ledgercraft` to Linux desktops, so the
+  taskbar and dock match it to the menu entry and icon (including Wayland).
 
 ### Changed
 - The side bar's hide and show buttons are a drawn icon (a little window
@@ -218,85 +282,6 @@ fixes to a release. See docs/releasing.md.
   is chosen; Open Menus On Hover opens the hovered menu and closes it like
   any menu, by choosing an item or clicking elsewhere. The side bar can also
   be dragged open or shut.
-
-### Added
-- Help > Preferences > Text > Hinting: sharpen letters (on, the default) or
-  turn it off for smoother, more print-like text.
-- Edit recorded transactions. Open an invoice, payment, bill, bill payment,
-  check, deposit or journal entry from the Transactions page (Edit, or
-  double-click the row), an account register or the Transaction List report
-  (click the date, or double-click the row). It opens in its form titled
-  "Edit …"; Save Changes replaces it in place and returns to where it was
-  opened from, Cancel leaves it unchanged, and Edit > Undo puts the original
-  back. The transaction keeps its id, so payments stay applied. Edits are
-  checked like new entries, an invoice or bill cannot drop below what has
-  been paid on it or change customer or vendor while payments are applied,
-  the type cannot change, and void transactions cannot be edited. The CLI and
-  agents get the same as the `txn.update` command.
-- Recent companies: the start page lists the company files opened last
-  (click to open, right-click to remove one), and File > Open Previous
-  Company lists them too. A file that has been moved or deleted is reported
-  and dropped from the list.
-- LedgerCraft reopens the company that was open last when it starts (asking
-  for its password if it has one). Help > Preferences > Open The Last Company
-  At Startup turns this off.
-- The window size, maximized state and side bar are remembered between
-  launches.
-- Show / Hide button beside the password boxes (Create a Company, File >
-  Password… and the password prompt when opening a protected company), to
-  check what was typed. Every window opens with passwords hidden.
-- The Confirm password box says "Doesn't match" (red) or "Matches" (green)
-  to its right as you type, in Create a Company and File > Password….
-- Password strength meter on every new password (Create a Company and File >
-  Password…), using zxcvbn. Passwords that are easy to guess (common
-  passwords, names, dates, keyboard runs, repeated characters, or the
-  company's own name) are refused, with a passphrase tip.
-- Double-clicking a .lcbooks file opens it in LedgerCraft. Windows: Help >
-  Preferences > Files registers the file type for your account (no
-  administrator rights needed). Linux: install.sh registers it, with the
-  LedgerCraft icon on company files.
-- Linux is tested and supported (x86_64; first run on Arch Linux with XFCE).
-  CI now runs every gate on Linux as well as Windows, and releases include
-  `ledgercraft-<version>-x86_64-unknown-linux-gnu.tar.gz` with an `install.sh`
-  that adds LedgerCraft to the Applications menu with its icon for the
-  current user.
-- The window identifies itself as `ledgercraft` to Linux desktops, so the
-  taskbar and dock match it to the menu entry and icon (including Wayland).
-
-### Fixed
-- The app no longer stops at start-up on Windows with "wgpu-hal WGL Instance
-  Thread has overflowed its stack": wgpu's OpenGL fallback is not started;
-  LedgerCraft draws with DirectX 12, Vulkan or Metal (WGPU_BACKEND=gl still
-  selects OpenGL where needed).
-- Entry boxes are easy to see: white with a thin grey outline (the accent
-  outline when focused), instead of near-white boxes with no edge that all
-  but vanished on unshaded rows. Buttons and drop-downs get the same outline.
-- Form lines grow as you type: Create Invoice, Enter Bill, Write Check,
-  Make Deposit and Journal Entry start with one empty line (two for a journal
-  entry) and add the next as soon as you type in the last, always keeping one
-  empty line ready. The "+ Add line" buttons are gone.
-- Create Invoice: each line's Amount (Qty x Rate) shows from the start
-  ($0.00 on a blank line) instead of staying empty until a rate was typed,
-  which made the column look missing. Text that is not a number shows
-  "check qty / rate".
-- Form lines you type into (invoice, bill, check, deposit and journal entry
-  lines) are no longer shaded in alternating grey bars; Row Shading still
-  applies to lists, registers and reports, where it helps reading.
-- The status bar no longer overlaps itself in a narrow window. Messages on
-  the left clear themselves after a few seconds (errors after 20), the right
-  side shows the company's file name rather than its whole path (hover for
-  the full path), and both shorten with "…" instead of running into each
-  other.
-- The password meter applies the 12-character minimum first: a short
-  password shows "Too short: 9 of 12 characters" instead of "Good" (it
-  showed "Good" for "beautiful", which Create then refused).
-- Create a Company no longer runs off the bottom of a small LedgerCraft
-  window. The company details are on the left and the password and imports on
-  the right; if the window is still too short, the fields scroll while the
-  Create Company and Cancel buttons stay in view. (A window too narrow for two
-  columns gets one scrolling column.)
-
-### Changed
 - Help > Preferences is a fixed-size window with its pages listed on the left
   (General, Currency, Text, Files, styled like the side bar) and the chosen
   page's settings on the right, instead of one column that grew with every
@@ -332,6 +317,39 @@ fixes to a release. See docs/releasing.md.
   and macOS (in testing), how to install a release, and an updated "What works
   today" table. ROADMAP updated for 0.2 and the new platforms, with a
   security hardening list.
+
+### Fixed
+- The app no longer stops at start-up on Windows with "wgpu-hal WGL Instance
+  Thread has overflowed its stack": wgpu's OpenGL fallback is not started;
+  LedgerCraft draws with DirectX 12, Vulkan or Metal (WGPU_BACKEND=gl still
+  selects OpenGL where needed).
+- Entry boxes are easy to see: white with a thin grey outline (the accent
+  outline when focused), instead of near-white boxes with no edge that all
+  but vanished on unshaded rows. Buttons and drop-downs get the same outline.
+- Form lines grow as you type: Create Invoice, Enter Bill, Write Check,
+  Make Deposit and Journal Entry start with one empty line (two for a journal
+  entry) and add the next as soon as you type in the last, always keeping one
+  empty line ready. The "+ Add line" buttons are gone.
+- Create Invoice: each line's Amount (Qty x Rate) shows from the start
+  ($0.00 on a blank line) instead of staying empty until a rate was typed,
+  which made the column look missing. Text that is not a number shows
+  "check qty / rate".
+- Form lines you type into (invoice, bill, check, deposit and journal entry
+  lines) are no longer shaded in alternating grey bars; Row Shading still
+  applies to lists, registers and reports, where it helps reading.
+- The status bar no longer overlaps itself in a narrow window. Messages on
+  the left clear themselves after a few seconds (errors after 20), the right
+  side shows the company's file name rather than its whole path (hover for
+  the full path), and both shorten with "…" instead of running into each
+  other.
+- The password meter applies the 12-character minimum first: a short
+  password shows "Too short: 9 of 12 characters" instead of "Good" (it
+  showed "Good" for "beautiful", which Create then refused).
+- Create a Company no longer runs off the bottom of a small LedgerCraft
+  window. The company details are on the left and the password and imports on
+  the right; if the window is still too short, the fields scroll while the
+  Create Company and Cancel buttons stay in view. (A window too narrow for two
+  columns gets one scrolling column.)
 
 ## [0.2.0] - 2026-10-21
 

@@ -85,6 +85,7 @@ impl Who<'_> {
             },
             terms_days: self.terms,
             notes: self.notes.into(),
+            ship_to: Address::default(),
         }
     }
 }
@@ -120,6 +121,11 @@ fn invoice(
 ) -> LedgerResult<TxnId> {
     let (lines, tax) = sale_lines(c, date, group, lines)?;
     let ar_account = acct(c, "Accounts Receivable")?;
+    // Shipped where the customer ships to, if not their own address.
+    let ship_to = c
+        .customer(customer)
+        .map(|x| x.contact.ship_to.clone())
+        .filter(|a| !a.is_empty());
     c.post(
         date,
         number,
@@ -128,6 +134,7 @@ fn invoice(
             customer,
             due_date: date.add_days(terms),
             ar_account,
+            ship_to,
             tax,
             lines,
         }),
@@ -572,6 +579,7 @@ pub fn sample_company() -> LedgerResult<Company> {
             customer: maple,
             due_date: d(2026, 2, 11)?,
             ar_account: ar,
+            ship_to: None,
             tax: None,
             lines: vec![
                 line(table, "Communal table, 10 ft", 2, dollars(2_400), sales),
@@ -588,6 +596,7 @@ pub fn sample_company() -> LedgerResult<Company> {
             customer: harbor,
             due_date: d(2026, 2, 4)?,
             ar_account: ar,
+            ship_to: None,
             tax: None,
             lines: vec![line(
                 design,
@@ -720,6 +729,7 @@ pub fn sample_company() -> LedgerResult<Company> {
             customer: lin,
             due_date: d(2026, 2, 20)?,
             ar_account: ar,
+            ship_to: None,
             tax: None,
             lines: vec![
                 line(table, "Round kitchen table", 1, dollars(2_150), sales),
@@ -758,6 +768,7 @@ pub fn sample_company() -> LedgerResult<Company> {
             customer: harbor,
             due_date: d(2026, 3, 24)?,
             ar_account: ar,
+            ship_to: None,
             tax: None,
             lines: vec![
                 line(design, "Reception desk design", 10, dollars(85), service),
@@ -897,6 +908,38 @@ fn rest_of_year(
         }
         .contact(),
     )?;
+
+    // Summit Ridge's furniture goes to its west campus; Harbor's to its
+    // showroom across the state line in Idaho (see Sales by State).
+    for (id, ship_to) in [
+        (
+            summit,
+            Address {
+                line1: "West Campus, 450 Mountain View Road".into(),
+                city: "Mapleton".into(),
+                region: "UT".into(),
+                postal_code: "84664".into(),
+                ..Address::default()
+            },
+        ),
+        (
+            harbor,
+            Address {
+                line1: "Harbor Showroom, 210 Main Street".into(),
+                city: "Boise".into(),
+                region: "ID".into(),
+                postal_code: "83702".into(),
+                ..Address::default()
+            },
+        ),
+    ] {
+        let mut contact = c
+            .customer(id)
+            .map(|x| x.contact.clone())
+            .ok_or_else(|| LedgerError::NotFound(format!("Customer {id}")))?;
+        contact.ship_to = ship_to;
+        c.update_customer(id, contact)?;
+    }
 
     let vendor = |name: &str, email: &str, city: &str, terms: u32, notes: &str| {
         Who {
@@ -1865,6 +1908,13 @@ fn rest_of_year(
         card,
         vec![line(supplies, "Finish and sandpaper", cents(22_764))],
     )?;
+
+    // January and February are closed (no password, so moving the date
+    // reopens them). March stays open for the bank download lesson.
+    c.closing = Some(ledgercraft_ledger::Closing {
+        date: d(2026, 2, 28)?,
+        password: None,
+    });
 
     // The card statement through August and the savings statement through
     // September are reconciled; Checking is left for the Reconcile lesson.

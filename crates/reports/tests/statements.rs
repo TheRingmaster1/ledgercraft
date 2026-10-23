@@ -30,6 +30,7 @@ fn books() -> Company {
         customer: cust,
         due_date: d("2025-07-01"),
         ar_account: id(&c, "Accounts Receivable"),
+        ship_to: None,
         tax: None,
         lines: vec![SalesLine {
             item: None,

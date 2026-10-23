@@ -11,7 +11,9 @@ pub mod crypto;
 pub mod import;
 pub mod sst;
 
-pub use crypto::{check_new_password, Protection, MIN_PASSWORD_CHARS};
+pub use crypto::{
+    check_new_password, password_check, password_matches, Protection, MIN_PASSWORD_CHARS,
+};
 
 use std::fmt;
 use std::fs;
@@ -333,6 +335,20 @@ mod tests {
         ));
         assert!(check_new_password("long enough now").is_ok());
         assert!(check_new_password("eleven char").is_err());
+    }
+
+    #[test]
+    fn password_checks_match_only_their_password() {
+        let check = password_check("close the books").unwrap();
+        assert!(check.starts_with("argon2id$"));
+        assert!(!check.contains("close the books"));
+        assert!(password_matches("close the books", &check));
+        assert!(!password_matches("close the book", &check));
+        assert!(!password_matches("close the books", "argon2id$1$2$3"));
+        assert!(!password_matches("close the books", "not a check"));
+        assert!(password_check("   ").is_err());
+        // Each check has its own salt.
+        assert_ne!(check, password_check("close the books").unwrap());
     }
 
     #[test]

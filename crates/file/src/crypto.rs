@@ -178,6 +178,67 @@ pub fn check_new_password(password: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// A one-way check value for a password that guards something inside the
+/// books (the closing date): `argon2id$memory$passes$lanes$salt$hash`. The
+/// password cannot be read back from it.
+pub fn password_check(password: &str) -> Result<String, FileError> {
+    if password.trim().is_empty() {
+        return Err(FileError::WeakPassword("Enter a password.".into()));
+    }
+    let mut salt = [0u8; 16];
+    getrandom::getrandom(&mut salt).map_err(|e| FileError::Crypto(e.to_string()))?;
+    let p = KdfParams::default();
+    let key = derive(password, &salt, p)?;
+    Ok(format!(
+        "{KDF}${}${}${}${}${}",
+        p.memory_kib,
+        p.iterations,
+        p.parallelism,
+        B64.encode(salt),
+        B64.encode(&key[..])
+    ))
+}
+
+/// Whether `password` is the one a [`password_check`] value was made from.
+pub fn password_matches(password: &str, check: &str) -> bool {
+    let parts: Vec<&str> = check.split('$').collect();
+    let [kdf, memory, passes, lanes, salt, hash] = parts.as_slice() else {
+        return false;
+    };
+    if *kdf != KDF {
+        return false;
+    }
+    let (Ok(memory_kib), Ok(iterations), Ok(parallelism)) =
+        (memory.parse(), passes.parse(), lanes.parse())
+    else {
+        return false;
+    };
+    let params = KdfParams {
+        memory_kib,
+        iterations,
+        parallelism,
+    };
+    if params.check().is_err() {
+        return false;
+    }
+    let (Ok(salt), Ok(hash)) = (B64.decode(salt), B64.decode(hash)) else {
+        return false;
+    };
+    match derive(password, &salt, params) {
+        // Compare every byte, so the time taken says nothing about how
+        // close a guess was.
+        Ok(key) => {
+            key.len() == hash.len()
+                && key
+                    .iter()
+                    .zip(&hash)
+                    .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+                    == 0
+        }
+        Err(_) => false,
+    }
+}
+
 fn derive(password: &str, salt: &[u8], p: KdfParams) -> Result<Zeroizing<[u8; 32]>, FileError> {
     let params = Params::new(p.memory_kib, p.iterations, p.parallelism, Some(32))
         .map_err(|e| FileError::Crypto(e.to_string()))?;

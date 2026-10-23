@@ -8,7 +8,7 @@ use eframe::egui::{self, RichText, Ui};
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
-    AccountId, AccountLine, AccountType, Applied, Bill, Check, Company, CreditMemo, CustomerId,
+    AccountId, Address, AccountLine, AccountType, Applied, Bill, Check, Company, CreditMemo, CustomerId,
     Deposit, Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill,
     ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, Transaction, TxnBody, TxnId,
     VendorId,
@@ -68,6 +68,8 @@ pub(crate) struct InvoiceForm {
     pub method: String,
     /// Credit memo: what it pays on each open invoice.
     pub amounts: BTreeMap<TxnId, String>,
+    /// Invoice: where the goods go, when not to the customer's address.
+    pub ship_to: Option<Address>,
 }
 
 impl Default for InvoiceForm {
@@ -85,6 +87,7 @@ impl Default for InvoiceForm {
             deposit_to: None,
             method: String::new(),
             amounts: BTreeMap::new(),
+            ship_to: None,
         }
     }
 }
@@ -292,6 +295,7 @@ impl Forms {
             TxnBody::Invoice(inv) => {
                 self.invoice = InvoiceForm {
                     due: inv.due_date.to_string(),
+                    ship_to: inv.ship_to.clone(),
                     ..sale_form(Some(inv.customer), &inv.lines, &inv.tax)
                 };
                 FormKind::Invoice
@@ -691,6 +695,12 @@ fn sales_form(
             set_due_from_terms(c, f);
             f.tax_group = default_tax_group(c, f.customer);
             f.amounts.clear();
+            // A new customer's own ship-to address, if they have one.
+            f.ship_to = f
+                .customer
+                .and_then(|id| c.customer(id))
+                .map(|x| x.contact.ship_to.clone())
+                .filter(|a| !a.is_empty());
         }
         pairs.end(ui, false);
         widgets::hint_label(ui, number_label);
@@ -730,6 +740,22 @@ fn sales_form(
         let addr = cust.contact.address.lines().join(", ");
         if !addr.is_empty() {
             ui.label(RichText::new(format!("Bill to: {addr}")).color(theme::MUTED));
+        }
+    }
+    if kind == FormKind::Invoice {
+        if let Some(ship) = &f.ship_to {
+            let text = format!("Ship to: {}", ship.lines().join(", "));
+            let mut clear = false;
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(text).color(theme::MUTED));
+                clear = ui
+                    .small_button("Bill-to address")
+                    .on_hover_text("Ship to the customer's own address instead")
+                    .clicked();
+            });
+            if clear {
+                f.ship_to = None;
+            }
         }
     }
     // Sales tax: once the company has any.
@@ -1109,6 +1135,7 @@ fn build_sale(c: &Company, f: &InvoiceForm, kind: FormKind) -> Result<Command, S
             customer,
             due_date,
             ar_account,
+            ship_to: f.ship_to.clone(),
             tax,
             lines,
         }),

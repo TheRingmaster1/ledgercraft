@@ -238,6 +238,7 @@ mod tests {
             customer,
             due_date: date,
             ar_account: ar,
+            ship_to: None,
             lines: vec![line(1000, true), line(200, false)],
             tax: Some(tax),
         };
@@ -246,6 +247,7 @@ mod tests {
             customer,
             due_date: date,
             ar_account: ar,
+            ship_to: None,
             lines: vec![line(300, true)],
             tax: None,
         };

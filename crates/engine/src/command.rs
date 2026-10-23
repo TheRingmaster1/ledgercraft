@@ -15,6 +15,19 @@ pub enum Command {
     CompanyRename { name: String },
     #[serde(rename = "company.setFiscalYearStart")]
     CompanySetFiscalYearStart { month: u32 },
+    /// Close the books through `date` (`None` opens them again). With
+    /// `keep_password` the closing date password stays as it is; otherwise
+    /// `password` sets it (`None` removes it). Changing the closing date of
+    /// books with a password needs that password entered first.
+    #[serde(rename = "company.setClosing")]
+    CompanySetClosing {
+        #[serde(default)]
+        date: Option<Date>,
+        #[serde(default)]
+        password: Option<String>,
+        #[serde(default)]
+        keep_password: bool,
+    },
     /// The name and contact details printed on invoices.
     #[serde(rename = "company.setInfo")]
     CompanySetInfo {
@@ -184,6 +197,7 @@ pub struct CommandInfo {
 pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "company.rename", summary: "Rename the company. {name}" },
     CommandInfo { id: "company.setFiscalYearStart", summary: "First month of the fiscal year, 1-12. {month}" },
+    CommandInfo { id: "company.setClosing", summary: "Close the books through a date; transactions then or before are locked. {date?: YYYY-MM-DD (none reopens), password?, keep_password?}" },
     CommandInfo { id: "company.setInfo", summary: "Name and contact details printed on invoices. {name, legal_name?, email?, phone?, address?:{line1, line2, city, region, postal_code, country}, print?:{template: classic|modern|simple, logo?: base64 PNG or JPEG}}" },
     CommandInfo { id: "account.create", summary: "Add an account. {number?, name, kind, description?}" },
     CommandInfo { id: "account.update", summary: "Rename or renumber an account. {id, number?, name, description?}" },
@@ -223,6 +237,7 @@ impl Command {
         match self {
             Self::CompanyRename { .. } => "company.rename",
             Self::CompanySetFiscalYearStart { .. } => "company.setFiscalYearStart",
+            Self::CompanySetClosing { .. } => "company.setClosing",
             Self::CompanySetInfo { .. } => "company.setInfo",
             Self::AccountCreate { .. } => "account.create",
             Self::AccountUpdate { .. } => "account.update",
@@ -265,6 +280,8 @@ impl Command {
                 "Company Settings".into()
             }
             Self::CompanySetInfo { .. } => "Company Information".into(),
+            Self::CompanySetClosing { date: Some(date), .. } => format!("Closing Date {date}"),
+            Self::CompanySetClosing { date: None, .. } => "Remove Closing Date".into(),
             Self::AccountCreate { name, .. } => format!("New Account {name}"),
             Self::AccountUpdate { name, .. } => format!("Edit Account {name}"),
             Self::AccountSetActive { .. } => "Account Status".into(),
@@ -356,6 +373,24 @@ impl Command {
                     ));
                 }
                 c.info.fiscal_year_start_month = month;
+                None
+            }
+            Self::CompanySetClosing {
+                date,
+                password,
+                keep_password,
+            } => {
+                let kept = c.closing.as_ref().and_then(|x| x.password.clone());
+                let password = match (keep_password, password) {
+                    (true, _) => kept,
+                    (false, Some(p)) => Some(
+                        ledgercraft_file::password_check(&p).map_err(|e| {
+                            ledgercraft_ledger::LedgerError::Invalid(e.to_string())
+                        })?,
+                    ),
+                    (false, None) => None,
+                };
+                c.closing = date.map(|date| ledgercraft_ledger::Closing { date, password });
                 None
             }
             Self::AccountCreate {

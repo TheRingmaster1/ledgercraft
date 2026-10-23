@@ -41,6 +41,16 @@ Sales receipts and credit memos carry sales tax the same way invoices do:
 receipts collect it, credit memos give it back, and both count on the Sales
 Tax Liability report and in what Pay Sales Tax says is owed.
 
+## Closing the books
+
+A closing date locks the books through that date: no transaction dated on or
+before it can be posted, edited (from or to a closed date) or voided, and no
+bank line dated then can be added. With a closing date password, entering it
+unlocks closed transactions until the company is closed; without one, the
+closing date has to move. Changing the closing date of books with a password
+needs the password too. Every change, undo and redo is kept in the audit
+trail, which undo never removes.
+
 ## Voiding
 
 Voiding keeps the transaction on file for the audit trail and removes all of

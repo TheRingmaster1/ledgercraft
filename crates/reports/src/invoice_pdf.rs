@@ -69,6 +69,8 @@ struct Sheet {
     paid: bool,
     facts: Vec<(&'static str, String)>,
     bill_to: Vec<String>,
+    /// Where the goods go, when not to the bill-to address.
+    ship_to: Vec<String>,
     lines: Vec<PrintLine>,
     totals: Vec<TotalLine>,
     memo: String,
@@ -289,7 +291,21 @@ fn gather(c: &Company, t: &Transaction, sale: &Sale<'_>, currency: &str) -> Resu
         });
     }
 
+    let ship_to = match &t.body {
+        TxnBody::Invoice(inv) => inv
+            .ship_to
+            .as_ref()
+            .filter(|a| !a.is_empty())
+            .map(|a| {
+                let mut lines = bill_to.first().cloned().into_iter().collect::<Vec<_>>();
+                lines.extend(a.lines());
+                lines
+            })
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
     Ok(Sheet {
+        ship_to,
         look: Look::of(c.info.print.template),
         logo: crate::look::logo(c),
         heading,
@@ -460,21 +476,34 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
         ry += 14.0;
     }
 
-    let mut y = left_bottom.max(ry) + 18.0;
-    if !s.bill_to.is_empty() {
-        p.text(LEFT, y, s.to_label, Font::bold(8.5), s.look.accent, Align::Left);
-        y += 15.0;
+    let top = left_bottom.max(ry) + 18.0;
+    let bill_bottom = address_block(p, s, LEFT, top, s.to_label, &s.bill_to);
+    // Ship to, beside it, when the goods go somewhere else.
+    let ship_bottom = address_block(p, s, SHIP_TO_X, top, "SHIP TO", &s.ship_to);
+    column_headings(p, s, bill_bottom.max(ship_bottom) + 14.0)
+}
+
+/// Where the Ship To block starts.
+const SHIP_TO_X: f32 = 300.0;
+
+/// A labelled address block (the first line, the name, in bold) with its
+/// top at `y`; returns the y below it. Nothing for no lines.
+fn address_block(p: &mut Page, s: &Sheet, x: f32, y: f32, label: &str, lines: &[String]) -> f32 {
+    if lines.is_empty() {
+        return y;
     }
-    for (i, l) in s.bill_to.iter().enumerate() {
+    p.text(x, y, label, Font::bold(8.5), s.look.accent, Align::Left);
+    let mut y = y + 15.0;
+    for (i, l) in lines.iter().enumerate() {
         let (font, color) = if i == 0 {
             (Font::bold(10.5), INK)
         } else {
             (Font::regular(9.5), MUTED)
         };
-        p.text(LEFT, y, l, font, color, Align::Left);
+        p.text(x, y, l, font, color, Align::Left);
         y += 13.5;
     }
-    column_headings(p, s, y + 14.0)
+    y
 }
 
 /// A later page's heading; returns where the lines continue.
@@ -574,6 +603,7 @@ mod tests {
             customer,
             due_date: Date::parse("2026-02-14").unwrap(),
             ar_account: account(&c, "Accounts Receivable"),
+            ship_to: None,
             tax: None,
             lines: vec![
                 SalesLine {
@@ -796,5 +826,25 @@ mod tests {
         let text = text_of(&invoice_pdf(&c, inv, "$").unwrap());
         assert!(!text.contains("/Im1 Do"));
         assert!(text.contains("(INVOICE) Tj"));
+    }
+
+    #[test]
+    fn ship_to_prints_beside_bill_to() {
+        let (mut c, inv, _) = books();
+        let text = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        assert!(!text.contains("(SHIP TO) Tj"));
+        if let Some(t) = c.transactions.iter_mut().find(|t| t.id == inv) {
+            if let TxnBody::Invoice(i) = &mut t.body {
+                i.ship_to = Some(Address {
+                    line1: "40 Warehouse Row".into(),
+                    city: "Orem".into(),
+                    region: "UT".into(),
+                    ..Address::default()
+                });
+            }
+        }
+        let text = text_of(&invoice_pdf(&c, inv, "$").unwrap());
+        assert!(text.contains("(SHIP TO) Tj"));
+        assert!(text.contains("(40 Warehouse Row) Tj"));
     }
 }
