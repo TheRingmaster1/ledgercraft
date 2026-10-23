@@ -582,6 +582,16 @@ mod tests {
     /// Closing the books through March locks the sample's January
     /// transactions until the closing date password is entered.
     #[test]
+    fn reopening_the_books_has_to_be_asked_for() {
+        let mut s = Session::new(crate::sample_company().unwrap());
+        assert!(s.execute_json(r#"{"command":"company.setClosing"}"#).is_err());
+        assert!(s.company().closing.is_some());
+        s.execute_json(r#"{"command":"company.setClosing","date":null}"#)
+            .unwrap();
+        assert!(s.company().closing.is_none());
+    }
+
+    #[test]
     fn closed_books_are_locked() {
         use ledgercraft_core::Date;
         let mut s = Session::new(crate::sample_company().unwrap());
