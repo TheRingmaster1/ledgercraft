@@ -47,7 +47,10 @@ pub fn audit_trail(company: &Company, from: Date, to: Date) -> Report {
 /// The state (or region) a sale counts in: where it was shipped, else the
 /// customer's address, else (a walk-in sale) the company's own.
 fn sale_state(company: &Company, body: &TxnBody) -> String {
-    let customer = body.sale().and_then(|s| s.customer).and_then(|id| company.customer(id));
+    let customer = body
+        .sale()
+        .and_then(|s| s.customer)
+        .and_then(|id| company.customer(id));
     let shipped = match body {
         TxnBody::Invoice(i) => i.ship_to.as_ref().map(|a| a.region.clone()),
         _ => None,
@@ -138,7 +141,12 @@ mod tests {
     }
 
     fn money_in(r: &Report, label: &str, column: usize) -> Money {
-        match r.rows.iter().find(|row| row.label == label).and_then(|row| row.cells.get(column)) {
+        match r
+            .rows
+            .iter()
+            .find(|row| row.label == label)
+            .and_then(|row| row.cells.get(column))
+        {
             Some(Cell::Money(m)) => *m,
             _ => Money::from_cents(i64::MIN),
         }

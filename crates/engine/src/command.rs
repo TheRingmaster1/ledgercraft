@@ -280,7 +280,9 @@ impl Command {
                 "Company Settings".into()
             }
             Self::CompanySetInfo { .. } => "Company Information".into(),
-            Self::CompanySetClosing { date: Some(date), .. } => format!("Closing Date {date}"),
+            Self::CompanySetClosing {
+                date: Some(date), ..
+            } => format!("Closing Date {date}"),
             Self::CompanySetClosing { date: None, .. } => "Remove Closing Date".into(),
             Self::AccountCreate { name, .. } => format!("New Account {name}"),
             Self::AccountUpdate { name, .. } => format!("Edit Account {name}"),
@@ -384,9 +386,8 @@ impl Command {
                 let password = match (keep_password, password) {
                     (true, _) => kept,
                     (false, Some(p)) => Some(
-                        ledgercraft_file::password_check(&p).map_err(|e| {
-                            ledgercraft_ledger::LedgerError::Invalid(e.to_string())
-                        })?,
+                        ledgercraft_file::password_check(&p)
+                            .map_err(|e| ledgercraft_ledger::LedgerError::Invalid(e.to_string()))?,
                     ),
                     (false, None) => None,
                 };

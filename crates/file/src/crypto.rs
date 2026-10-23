@@ -229,11 +229,7 @@ pub fn password_matches(password: &str, check: &str) -> bool {
         // close a guess was.
         Ok(key) => {
             key.len() == hash.len()
-                && key
-                    .iter()
-                    .zip(&hash)
-                    .fold(0u8, |acc, (a, b)| acc | (a ^ b))
-                    == 0
+                && key.iter().zip(&hash).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
         }
         Err(_) => false,
     }

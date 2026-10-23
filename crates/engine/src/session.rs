@@ -608,7 +608,10 @@ mod tests {
             memo: "Changed".into(),
             body: january.body.clone(),
         };
-        assert!(matches!(s.execute(edit.clone()), Err(EngineError::Closed(_))));
+        assert!(matches!(
+            s.execute(edit.clone()),
+            Err(EngineError::Closed(_))
+        ));
         assert!(matches!(
             s.execute(crate::Command::TxnVoid { id: january.id }),
             Err(EngineError::Closed(_))
@@ -625,7 +628,10 @@ mod tests {
             password: None,
             keep_password: false,
         };
-        assert!(matches!(s.execute(reopen.clone()), Err(EngineError::Closed(_))));
+        assert!(matches!(
+            s.execute(reopen.clone()),
+            Err(EngineError::Closed(_))
+        ));
         assert!(s.unlock_closing("wrong").is_err());
         s.unlock_closing("year end").unwrap();
         s.execute(edit).unwrap();
@@ -648,14 +654,23 @@ mod tests {
         s.execute(crate::Command::TxnVoid { id: t.id }).unwrap();
         s.undo();
         s.redo();
-        let log: Vec<&str> = s.company().audit.iter().map(|e| e.action.as_str()).collect();
+        let log: Vec<&str> = s
+            .company()
+            .audit
+            .iter()
+            .map(|e| e.action.as_str())
+            .collect();
         let void = format!("Void {}", t.id);
         let undo = format!("Undo {void}");
         let redo = format!("Redo {void}");
         assert_eq!(log, vec![void.as_str(), undo.as_str(), redo.as_str()]);
         let first = &s.company().audit[0];
         assert!(first.at.ends_with(" UTC") && first.date().is_some());
-        assert!(first.detail.contains(&t.date.to_string()), "{}", first.detail);
+        assert!(
+            first.detail.contains(&t.date.to_string()),
+            "{}",
+            first.detail
+        );
     }
 
     #[test]

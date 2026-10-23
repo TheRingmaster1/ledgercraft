@@ -8,8 +8,8 @@ use eframe::egui::{self, RichText, Ui};
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
-    AccountId, Address, AccountLine, AccountType, Applied, Bill, Check, Company, CreditMemo, CustomerId,
-    Deposit, Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill,
+    AccountId, AccountLine, AccountType, Address, Applied, Bill, Check, Company, CreditMemo,
+    CustomerId, Deposit, Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill,
     ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, Transaction, TxnBody, TxnId,
     VendorId,
 };

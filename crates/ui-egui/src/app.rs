@@ -1401,7 +1401,10 @@ impl LedgerApp {
 
         // File > Closing Date…
         let locked = self.session.as_ref().is_some_and(|s| {
-            s.company().closing.as_ref().is_some_and(|c| c.password.is_some())
+            s.company()
+                .closing
+                .as_ref()
+                .is_some_and(|c| c.password.is_some())
                 && !s.closing_unlocked()
         });
         let chosen = self

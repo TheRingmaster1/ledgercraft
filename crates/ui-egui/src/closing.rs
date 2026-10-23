@@ -163,7 +163,8 @@ pub(crate) fn window(
             }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                let save = ui.add_enabled(!locked, egui::Button::new(RichText::new("Save").strong()));
+                let save =
+                    ui.add_enabled(!locked, egui::Button::new(RichText::new("Save").strong()));
                 if save.clicked() {
                     match form.command() {
                         Ok(cmd) => outcome = Some(ClosingOutcome::Save(Box::new(cmd))),
