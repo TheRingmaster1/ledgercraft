@@ -26,6 +26,9 @@ rust_xlsxwriter = "0.100"
 # Zlib for logos in PDFs: decodes PNG files and compresses their pixels.
 # MIT OR Zlib OR Apache-2.0; already in the dependency tree through eframe.
 miniz_oxide = "0.8"
+# Decodes a chosen logo to show it in Company Information. Already in the
+# build through eframe; JPEG support is added. MIT OR Apache-2.0.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 ledgercraft-core = { path = "crates/core" }
 ledgercraft-ledger = { path = "crates/ledger" }

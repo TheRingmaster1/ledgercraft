@@ -27,6 +27,50 @@ pub(crate) struct CompanyInfoForm {
     error: Option<String>,
 }
 
+/// The most room the logo preview takes, in points.
+const PREVIEW_SIZE: egui::Vec2 = egui::vec2(240.0, 80.0);
+
+/// The logo as a texture to show, decoded once and kept while the window is
+/// open (keyed by the file's contents); `None` if it cannot be shown.
+fn logo_texture(ctx: &egui::Context, bytes: &[u8]) -> Option<egui::TextureHandle> {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::hash::DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    let id = egui::Id::NULL.with(("company_logo_preview", hasher.finish()));
+    if let Some(cached) = ctx.data(|d| d.get_temp::<Option<egui::TextureHandle>>(id)) {
+        return cached;
+    }
+    let texture = image::load_from_memory(bytes).ok().map(|decoded| {
+        let rgba = decoded.to_rgba8();
+        let size = [rgba.width() as usize, rgba.height() as usize];
+        let pixels = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+        ctx.load_texture("company_logo", pixels, egui::TextureOptions::LINEAR)
+    });
+    ctx.data_mut(|d| d.insert_temp(id, texture.clone()));
+    texture
+}
+
+/// The logo on a white card, as it sits on paper: scaled to fit, never
+/// enlarged.
+fn logo_preview(ui: &mut egui::Ui, bytes: &[u8]) {
+    let Some(texture) = logo_texture(ui.ctx(), bytes) else {
+        ui.label(RichText::new("The logo cannot be shown here.").color(theme::MUTED));
+        return;
+    };
+    let natural = texture.size_vec2();
+    let scale = (PREVIEW_SIZE.x / natural.x)
+        .min(PREVIEW_SIZE.y / natural.y)
+        .min(1.0);
+    egui::Frame::NONE
+        .fill(egui::Color32::WHITE)
+        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+        .corner_radius(4.0)
+        .inner_margin(10.0)
+        .show(ui, |ui| {
+            ui.image((texture.id(), natural * scale));
+        });
+}
+
 /// What the user chose.
 pub(crate) enum CompanyInfoOutcome {
     /// Boxed: a command is large, and Cancel carries nothing.
@@ -214,6 +258,11 @@ pub(crate) fn window(
                         }
                     });
                     ui.end_row();
+                    if let Some(logo) = &form.logo {
+                        ui.label("");
+                        logo_preview(ui, &logo.0);
+                        ui.end_row();
+                    }
                 });
             if let Some(e) = &form.error {
                 ui.add_space(4.0);
