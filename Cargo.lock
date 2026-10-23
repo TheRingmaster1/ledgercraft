@@ -1854,6 +1854,8 @@ dependencies = [
  "num-traits",
  "png",
  "tiff",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -2092,6 +2094,7 @@ name = "ledgercraft-ui-egui"
 version = "0.2.0"
 dependencies = [
  "eframe",
+ "image",
  "ledgercraft-core",
  "ledgercraft-engine",
  "ledgercraft-file",
