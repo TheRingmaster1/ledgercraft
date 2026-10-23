@@ -487,6 +487,7 @@ mod tests {
         assert!(c.items.iter().any(|x| !x.active));
         assert!(!c.bank_rules.is_empty());
         assert!(!c.info.legal_name.is_empty() && !c.info.phone.is_empty());
+        assert!(c.info.print.logo.is_some());
 
         // A loan, partly repaid, and depreciation.
         let loan = c.account_balance(account("Loan Payable"), None);

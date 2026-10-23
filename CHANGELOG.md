@@ -8,6 +8,16 @@ fixes to a release. See docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- PDF templates and a logo (finishing M2.5). File > Company Information…
+  has a Printed documents section: choose Classic (coloured headings and
+  column bands, as before), Modern (lighter: coloured headings over thin
+  rules) or Simple (black and white, for printing), and a PNG or JPEG logo
+  printed at the top left. Both apply to invoices, sales receipts, credit
+  memos and statements, and are kept in the company file (the logo as
+  base64; see docs/file-format.md). The PDF writer now places images: JPEGs
+  go in as they are, PNGs (any colour type, transparency kept) are decoded
+  with `miniz_oxide`, already part of the build. The sample company has a
+  logo. The `company.setInfo` command takes an optional `print` object.
 - Sales receipts, credit memos and refunds (M2.6). Customers > Enter Sales
   Receipt records a sale paid on the spot (customer optional, deposited to a
   bank or Undeposited Funds). Create Credit Memo credits a customer for a

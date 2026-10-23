@@ -1769,6 +1769,8 @@ mod tests {
         for t in invoices {
             let pdf = ledgercraft_reports::invoice_pdf(&c, t.id, "$").unwrap();
             assert!(pdf.starts_with(b"%PDF-1.4"));
+            // The sample's logo decodes and prints.
+            assert!(String::from_utf8_lossy(&pdf).contains("/Im1 Do"));
         }
     }
 

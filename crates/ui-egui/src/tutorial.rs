@@ -303,6 +303,10 @@ const LESSONS: &[Lesson] = &[
             Bullets(&[
                 "For an invoice already recorded, click PDF on its row in Transactions, or \
                  open it and click Save as PDF…; changes you made are saved first.",
+                "Choose the look in File > Company Information…, under Printed documents: \
+                 Classic (coloured bands), Modern (lighter, thin rules) or Simple (black and \
+                 white, for printing). Choose… adds your logo (PNG or JPEG) at the top left. \
+                 Both apply to invoices, sales receipts, credit memos and statements.",
                 "A new empty line appears as soon as you type in the last one, so there is \
                  always room for the next; the x button removes a line.",
                 "Dates can be typed as 2026-03-31 or 3/31/2026.",

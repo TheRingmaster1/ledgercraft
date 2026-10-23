@@ -11,10 +11,11 @@ use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{AccountType, Company, CustomerId, Party, TxnBody, TxnId};
 
 use crate::invoice_pdf::{
-    bill_to, company_lines, page_mut, row_count, ACCENT, BOTTOM, INK, LEFT, LINE_HEIGHT, MUTED,
-    RIGHT, RULE, WHITE,
+    bill_to, company_lines, page_mut, row_count, BOTTOM, INK, LEFT, LINE_HEIGHT, MUTED, RIGHT,
+    RULE,
 };
-use crate::pdf::{finish, wrap, Align, Font, Page};
+use crate::look::{letterhead, Look};
+use crate::pdf::{finish_with, wrap, Align, Font, Image, Page};
 
 const DATE_X: f32 = 58.0;
 const TXN_X: f32 = 140.0;
@@ -45,6 +46,9 @@ struct Activity {
 
 /// Everything the page shows, gathered from the books first.
 struct Sheet {
+    look: Look,
+    /// The company's logo, drawn as image 0.
+    logo: Option<Image>,
     company: String,
     company_lines: Vec<String>,
     customer: String,
@@ -86,7 +90,7 @@ pub fn statement_pdf(
 ) -> Result<Vec<u8>, String> {
     let sheet = gather(company, customer, from, to, currency)?;
     let title = format!("Statement for {}", sheet.customer);
-    Ok(finish(&layout(&sheet), &title))
+    Ok(finish_with(&layout(&sheet), &title, sheet.logo.as_slice()))
 }
 
 /// What a transaction is called on the statement, and its quieter detail.
@@ -211,6 +215,8 @@ fn gather(
 
     let name = who.contact.name.trim().to_string();
     Ok(Sheet {
+        look: Look::of(c.info.print.template),
+        logo: crate::look::logo(c),
         company: c.info.name.trim().to_string(),
         company_lines: company_lines(c),
         customer: if name.is_empty() {
@@ -327,10 +333,14 @@ fn simple_row(p: &mut Page, y: f32, date: &str, what: &str, balance: &str) -> f3
 /// The aging band: six columns, headings over amounts.
 fn aging_table(p: &mut Page, s: &Sheet, y: f32) {
     let width = (RIGHT - LEFT) / 6.0;
-    p.rect(LEFT, y, RIGHT - LEFT, 20.0, ACCENT);
+    let headings: Vec<(f32, &str, Align)> = AGING
+        .iter()
+        .enumerate()
+        .map(|(i, label)| (LEFT + width * row_count(i + 1) - 8.0, *label, Align::Right))
+        .collect();
+    s.look.headings(p, y, 8.5, &headings);
     let mut right = LEFT + width - 8.0;
-    for (i, (label, value)) in AGING.iter().zip(&s.aging).enumerate() {
-        p.text(right, y + 13.5, label, Font::bold(8.5), WHITE, Align::Right);
+    for (i, value) in s.aging.iter().enumerate() {
         let font = if i == 5 {
             Font::bold(10.5)
         } else {
@@ -345,20 +355,14 @@ fn aging_table(p: &mut Page, s: &Sheet, y: f32) {
 /// The first page's heading, the customer and the column headings; returns
 /// where the activity starts.
 fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
-    p.text(LEFT, 64.0, &s.company, Font::bold(18.0), INK, Align::Left);
-    let mut y = 82.0;
-    for l in &s.company_lines {
-        p.text(LEFT, y, l, Font::regular(9.5), MUTED, Align::Left);
-        y += LINE_HEIGHT;
-    }
-    let left_bottom = y;
+    let left_bottom = letterhead(p, s.logo.as_ref(), &s.company, &s.company_lines);
 
     p.text(
         RIGHT,
         66.0,
         "STATEMENT",
         Font::bold(24.0),
-        ACCENT,
+        s.look.accent,
         Align::Right,
     );
     let mut ry = 90.0;
@@ -376,7 +380,7 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
     }
 
     let mut y = left_bottom.max(ry) + 18.0;
-    p.text(LEFT, y, "TO", Font::bold(8.5), ACCENT, Align::Left);
+    p.text(LEFT, y, "TO", Font::bold(8.5), s.look.accent, Align::Left);
     y += 15.0;
     for (i, l) in s.to.iter().enumerate() {
         let (font, color) = if i == 0 {
@@ -387,7 +391,7 @@ fn first_page_top(p: &mut Page, s: &Sheet) -> f32 {
         p.text(LEFT, y, l, font, color, Align::Left);
         y += 13.5;
     }
-    column_headings(p, y + 14.0)
+    column_headings(p, s, y + 14.0)
 }
 
 /// A later page's heading; returns where the activity continues.
@@ -395,18 +399,21 @@ fn continued_top(p: &mut Page, s: &Sheet) -> f32 {
     p.text(LEFT, 60.0, &s.company, Font::bold(11.0), INK, Align::Left);
     let label = format!("Statement for {} (continued)", s.customer);
     p.text(RIGHT, 60.0, &label, Font::regular(9.5), MUTED, Align::Right);
-    column_headings(p, 76.0)
+    column_headings(p, s, 76.0)
 }
 
-fn column_headings(p: &mut Page, y: f32) -> f32 {
-    p.rect(LEFT, y, RIGHT - LEFT, 20.0, ACCENT);
-    let baseline = y + 13.5;
-    let font = Font::bold(9.0);
-    p.text(DATE_X, baseline, "Date", font, WHITE, Align::Left);
-    p.text(TXN_X, baseline, "Transaction", font, WHITE, Align::Left);
-    p.text(AMOUNT_RIGHT, baseline, "Amount", font, WHITE, Align::Right);
-    p.text(BALANCE_RIGHT, baseline, "Balance", font, WHITE, Align::Right);
-    y + 20.0
+fn column_headings(p: &mut Page, s: &Sheet, y: f32) -> f32 {
+    s.look.headings(
+        p,
+        y,
+        9.0,
+        &[
+            (DATE_X, "Date", Align::Left),
+            (TXN_X, "Transaction", Align::Left),
+            (AMOUNT_RIGHT, "Amount", Align::Right),
+            (BALANCE_RIGHT, "Balance", Align::Right),
+        ],
+    )
 }
 
 #[cfg(test)]

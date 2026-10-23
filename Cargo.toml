@@ -23,6 +23,9 @@ eframe = "0.37"
 rfd = "0.17"
 # Writes formatted .xlsx report exports. MIT OR Apache-2.0, like LedgerCraft.
 rust_xlsxwriter = "0.100"
+# Zlib for logos in PDFs: decodes PNG files and compresses their pixels.
+# MIT OR Zlib OR Apache-2.0; already in the dependency tree through eframe.
+miniz_oxide = "0.8"
 
 ledgercraft-core = { path = "crates/core" }
 ledgercraft-ledger = { path = "crates/ledger" }

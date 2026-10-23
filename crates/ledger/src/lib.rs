@@ -12,6 +12,7 @@ mod error;
 mod ids;
 mod item;
 mod party;
+mod print;
 mod reconcile;
 mod salestax;
 mod template;
@@ -24,6 +25,7 @@ pub use error::{LedgerError, LedgerResult};
 pub use ids::{AccountId, CustomerId, ItemId, TaxComponentId, TaxGroupId, TxnId, VendorId};
 pub use item::{Item, ItemKind, ItemSpec};
 pub use party::{Address, Contact, Customer, Party, Vendor};
+pub use print::{base64_decode, base64_encode, Logo, PdfTemplate, PrintStyle, LOGO_MAX_BYTES};
 pub use reconcile::{ReconcileItem, Reconciliation};
 pub use salestax::{
     rate_publication_date, tax_payment_memo, AgencyOwed, CustomerTax, DatedRate, ImportedTax,
