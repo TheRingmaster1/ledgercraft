@@ -39,13 +39,15 @@
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
       <Component Id="App" Guid="*">
         <File Id="LedgerCraftExe" Source="$(var.BinDir)/ledgercraft.exe" KeyPath="yes">
+          <!-- A plain shortcut to the exe, so the Start menu shows the icon
+               built into it (Windows 11 often shows a blank page for an
+               advertised shortcut's icon). -->
           <Shortcut Id="StartMenuShortcut"
                     Directory="ProgramMenuFolder"
                     Name="LedgerCraft"
                     Description="Open-source small-business accounting"
                     WorkingDirectory="INSTALLFOLDER"
-                    Icon="LedgerCraftIcon"
-                    Advertise="yes" />
+                    Advertise="no" />
         </File>
         <!-- Double-clicking a company file opens it in LedgerCraft. -->
         <!-- The file icon comes from ledgercraft.exe (its first icon). -->
