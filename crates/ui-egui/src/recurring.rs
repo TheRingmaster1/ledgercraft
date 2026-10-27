@@ -508,8 +508,10 @@ mod tests {
     #[test]
     fn the_page_and_window_draw_without_actions() {
         let c = ledgercraft_engine::sample_company().unwrap();
-        let mut s = RecurringState::default();
-        s.show_inactive = true;
+        let mut s = RecurringState {
+            show_inactive: true,
+            ..RecurringState::default()
+        };
         let first = c.recurring.first().unwrap();
         s.editing = Some((first.id, SpecInput::from_recurring(first)));
         let post = Command::TxnPost {
