@@ -78,6 +78,10 @@ impl Page {
                 "Check a bank or credit card account against its statement, item by item, \
                  so you know the books match the bank."
             }
+            Self::Classes => {
+                "Departments, locations or lines of business to tag transactions with, for \
+                 Profit & Loss by Class."
+            }
             Self::Form(kind) => kind.hint(),
         }
     }
