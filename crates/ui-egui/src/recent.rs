@@ -1,5 +1,6 @@
 //! What LedgerCraft remembers between launches that is not a preference:
-//! the recently opened company files, the window size and the side bar.
+//! the recently opened company files, the window size, the side bar and the
+//! folder each kind of file dialog last used.
 //! Kept as `state.json` next to the preferences. A missing or damaged file
 //! just means a fresh start.
 
@@ -26,6 +27,8 @@ pub(crate) struct AppState {
     /// abbreviation (`UT`): (rate file, boundary file). Used to find a
     /// customer's tax group from their ZIP+4.
     pub(crate) sst_files: std::collections::BTreeMap<String, (PathBuf, PathBuf)>,
+    /// The folder each kind of file dialog last used.
+    pub(crate) folders: std::collections::BTreeMap<crate::dialogs::Folder, PathBuf>,
 }
 
 impl Default for AppState {
@@ -35,6 +38,7 @@ impl Default for AppState {
             window: None,
             side_bar: true,
             sst_files: std::collections::BTreeMap::new(),
+            folders: std::collections::BTreeMap::new(),
         }
     }
 }

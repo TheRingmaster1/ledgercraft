@@ -108,10 +108,11 @@ impl CompanyInfoForm {
 
     /// Asks for a PNG or JPEG file and takes it as the logo, or says why not.
     fn choose_logo(&mut self) {
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("Image (PNG or JPEG)", &["png", "jpg", "jpeg"])
-            .pick_file()
-        else {
+        let Some(path) = crate::dialogs::pick_file(
+            crate::dialogs::Folder::Logo,
+            None,
+            &[("Image (PNG or JPEG)", &["png", "jpg", "jpeg"])],
+        ) else {
             return;
         };
         let name = path

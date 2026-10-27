@@ -148,6 +148,9 @@ const LESSONS: &[Lesson] = &[
                 "File > Open Company opens a .lcbooks file you saved earlier. A \
                  password-protected file asks for its password first. File > Open \
                  Previous Company lists the recent ones.",
+                "Every file window (opening and saving companies, exports, PDFs, bank \
+                 downloads, logos) starts in the folder you last used for that kind of \
+                 file.",
                 "Double-clicking a .lcbooks file opens it in LedgerCraft once it is set \
                  up: on Windows, Help > Preferences > Files; on Linux, the install.sh \
                  script in the release package does it.",
@@ -193,10 +196,23 @@ const LESSONS: &[Lesson] = &[
             ),
             Heading("Backups"),
             Text(
-                "Back up by copying the .lcbooks file somewhere safe, such as a USB drive or \
-                 cloud storage. Saving is crash-safe: LedgerCraft writes a new copy and swaps \
-                 it in, so a power cut never leaves half a file.",
+                "Before the first save of each day, LedgerCraft copies the company file as \
+                 it was into a \"LedgerCraft Backups\" folder beside it, so each backup is \
+                 the books at the start of a day's work. The last 10 days are kept; change \
+                 that, or turn backups off, in Help > Preferences > Files. A protected \
+                 company's backups stay encrypted with its password.",
             ),
+            Bullets(&[
+                "To go back to a backup, open the company and choose File > Open a \
+                 Backup…. The backup opens as an unsaved copy: look through it, then Save \
+                 As over the company file to restore it, or close it to leave things as \
+                 they are. The backup itself is never changed.",
+                "Backups sit beside the company file, so a lost laptop takes them too. \
+                 Also copy the .lcbooks file somewhere else now and then, such as a USB \
+                 drive or cloud storage.",
+                "Saving is crash-safe: LedgerCraft writes a new copy and swaps it in, so a \
+                 power cut never leaves half a file.",
+            ]),
             Tip(
                 "The file format is open and documented (see docs/file-format.md): with \
                  your password, your books are never locked inside LedgerCraft.",

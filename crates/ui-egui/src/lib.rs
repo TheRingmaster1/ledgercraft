@@ -10,6 +10,7 @@ mod closing;
 mod bankimport;
 mod company_info;
 mod currency;
+mod dialogs;
 mod forms;
 mod hints;
 mod licenses;

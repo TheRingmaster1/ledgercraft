@@ -806,10 +806,11 @@ fn file_name(path: Option<&PathBuf>) -> String {
 }
 
 fn pick_csv(title: &str) -> Option<PathBuf> {
-    rfd::FileDialog::new()
-        .set_title(title)
-        .add_filter("Rate or boundary file", &["csv", "txt"])
-        .pick_file()
+    crate::dialogs::pick_file(
+        crate::dialogs::Folder::TaxFiles,
+        Some(title),
+        &[("Rate or boundary file", &["csv", "txt"])],
+    )
 }
 
 fn preview_of(plan: &sst::Plan, state: &str) -> Preview {

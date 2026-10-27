@@ -9,6 +9,20 @@ docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Daily backups (M2.9). Before the first save of each day, the company file
+  as it was is copied into a `LedgerCraft Backups` folder beside it (still
+  encrypted if protected); the last 10 are kept, set in Preferences > Files
+  (1 to 60 days, or off). File > Open a Backup… opens one as an unsaved copy,
+  to look through or Save As over the company file; the backup itself is
+  never changed. A backup that cannot be made is reported and never stops
+  the save.
+- File dialogs remember their folders (M2.9): opening and saving company
+  files, exports, PDFs, bank downloads, list imports, tax files, logos and
+  backups each start where that kind of file was last chosen (kept in
+  state.json). Save As starts in the open company's folder.
+- On Linux, when no file dialog can be shown (no xdg-desktop-portal with a
+  file chooser), the status bar says what to install instead of nothing
+  happening.
 - Installers (M1.5.5): releases now include a Windows installer
   (`LedgerCraft-<version>-x64.msi`: Program Files, Start menu, `.lcbooks`
   file type, `ledgercraft-cli` on the PATH, upgrades in place, uninstalls

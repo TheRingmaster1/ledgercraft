@@ -47,7 +47,13 @@ pub(crate) struct Prefs {
     pub(crate) text_grey: u8,
     /// Snap letters to the pixel grid (sharper); off is smoother.
     pub(crate) hinting: bool,
+    /// How many daily backups of each company file to keep (0: none).
+    pub(crate) backups: u8,
 }
+
+/// The daily backups kept when nothing is chosen, and the most offered.
+pub(crate) const DEFAULT_BACKUPS: u8 = 10;
+pub(crate) const MAX_BACKUPS: u8 = 60;
 
 impl Default for Prefs {
     fn default() -> Self {
@@ -61,6 +67,7 @@ impl Default for Prefs {
             text_size: TextSize::Standard,
             text_grey: 0,
             hinting: true,
+            backups: DEFAULT_BACKUPS,
         }
     }
 }
@@ -197,7 +204,7 @@ impl PrefsPage {
             Self::General => "Row shading, menus and what happens at startup.",
             Self::Currency => "How amounts are shown.",
             Self::Text => "The font and size of all text.",
-            Self::Files => "Opening company files by double-clicking them.",
+            Self::Files => "Daily backups, and opening company files by double-clicking them.",
         }
     }
 }
@@ -243,7 +250,7 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
                             PrefsPage::General => general_section(ui, prefs),
                             PrefsPage::Currency => currency_section(ui, prefs),
                             PrefsPage::Text => text_section(ui, prefs),
-                            PrefsPage::Files => crate::assoc::section(ui),
+                            PrefsPage::Files => files_section(ui, prefs),
                         });
                 });
             });
@@ -279,6 +286,44 @@ fn page_list(ui: &mut egui::Ui, page: &mut PrefsPage) {
                 },
             );
         });
+}
+
+/// Daily backups, then double-click opening.
+fn files_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
+    ui.label(RichText::new("Backups").strong());
+    let mut on = prefs.backups > 0;
+    if ui
+        .checkbox(&mut on, "Back up company files every day")
+        .changed()
+    {
+        prefs.backups = if on { DEFAULT_BACKUPS } else { 0 };
+    }
+    ui.add_enabled_ui(on, |ui| {
+        ui.horizontal(|ui| {
+            ui.label("Keep the last");
+            let mut keep = prefs.backups.max(1);
+            if ui
+                .add(egui::DragValue::new(&mut keep).range(1..=MAX_BACKUPS))
+                .changed()
+                && on
+            {
+                prefs.backups = keep;
+            }
+            ui.label("days' backups");
+        });
+    });
+    ui.label(
+        RichText::new(
+            "Before the first save of each day, the company file as it was is copied into a \
+             \"LedgerCraft Backups\" folder beside it (still encrypted if it has a password). \
+             To go back to one, use File > Open a Backup…",
+        )
+        .small()
+        .color(theme::MUTED),
+    );
+    ui.add_space(10.0);
+    ui.label(RichText::new("Opening company files").strong());
+    crate::assoc::section(ui);
 }
 
 /// The text font and size, applied to the whole app straight away.
@@ -528,6 +573,7 @@ mod tests {
             text_size: TextSize::Larger,
             text_grey: 60,
             hinting: false,
+            backups: 3,
         };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
@@ -608,6 +654,7 @@ mod tests {
             text_size: TextSize::Largest,
             text_grey: 90,
             hinting: false,
+            backups: 0,
         };
         prefs.reset_global();
         // The currency is not a General setting, so Reset leaves it.

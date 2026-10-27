@@ -6,6 +6,7 @@
 //! `{"format":"ledgercraft","version":2,"encryption":{…},"ciphertext":"…"}`.
 //! Both are documented in `docs/file-format.md`.
 
+pub mod backup;
 pub mod bankfeed;
 pub mod crypto;
 pub mod import;
