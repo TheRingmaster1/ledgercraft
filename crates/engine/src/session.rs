@@ -665,16 +665,35 @@ mod tests {
         let mut s = Session::new(crate::sample_company().unwrap());
         // Two vendors with January (closed) transactions.
         let c = s.company();
-        let landlord = c.vendors.iter().find(|v| v.contact.name == "Riverside Properties").unwrap().id;
-        let lumber = c.vendors.iter().find(|v| v.contact.name == "Canyon Lumber Supply").unwrap().id;
+        let landlord = c
+            .vendors
+            .iter()
+            .find(|v| v.contact.name == "Riverside Properties")
+            .unwrap()
+            .id;
+        let lumber = c
+            .vendors
+            .iter()
+            .find(|v| v.contact.name == "Canyon Lumber Supply")
+            .unwrap()
+            .id;
         let merge = crate::Command::VendorMerge {
             from: landlord,
             into: lumber,
         };
-        assert!(matches!(s.execute(merge.clone()), Err(EngineError::Closed(_))));
+        assert!(matches!(
+            s.execute(merge.clone()),
+            Err(EngineError::Closed(_))
+        ));
         assert!(s.company().vendor(landlord).is_some(), "nothing changed");
         // Inactive Old Mill Finishes has no transactions: it merges fine.
-        let old_mill = s.company().vendors.iter().find(|v| v.contact.name == "Old Mill Finishes").unwrap().id;
+        let old_mill = s
+            .company()
+            .vendors
+            .iter()
+            .find(|v| v.contact.name == "Old Mill Finishes")
+            .unwrap()
+            .id;
         s.execute(crate::Command::VendorMerge {
             from: old_mill,
             into: lumber,
@@ -904,7 +923,10 @@ mod tests {
         assert!(c.closing.is_some());
         // A sub-account, and a duplicate customer to merge.
         assert!(c.accounts.iter().any(|a| a.parent.is_some()));
-        assert!(c.customers.iter().any(|x| x.contact.name == "Maple St. Cafe"));
+        assert!(c
+            .customers
+            .iter()
+            .any(|x| x.contact.name == "Maple St. Cafe"));
 
         // A loan, partly repaid, and depreciation.
         let loan = c.account_balance(account("Loan Payable"), None);

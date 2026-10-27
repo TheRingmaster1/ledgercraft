@@ -129,7 +129,9 @@ impl Company {
     /// removes `from`. `into` keeps its own details.
     pub fn merge_customers(&mut self, from: CustomerId, into: CustomerId) -> LedgerResult<()> {
         if from == into {
-            return Err(LedgerError::Invalid("Choose a different customer to merge into".into()));
+            return Err(LedgerError::Invalid(
+                "Choose a different customer to merge into".into(),
+            ));
         }
         for id in [from, into] {
             self.customer(id)
@@ -149,7 +151,9 @@ impl Company {
     /// Moves everything of vendor `from` onto vendor `into`, then removes `from`.
     pub fn merge_vendors(&mut self, from: VendorId, into: VendorId) -> LedgerResult<()> {
         if from == into {
-            return Err(LedgerError::Invalid("Choose a different vendor to merge into".into()));
+            return Err(LedgerError::Invalid(
+                "Choose a different vendor to merge into".into(),
+            ));
         }
         for id in [from, into] {
             self.vendor(id)
@@ -170,7 +174,9 @@ impl Company {
     /// `from`. The lines keep their own descriptions, prices and accounts.
     pub fn merge_items(&mut self, from: ItemId, into: ItemId) -> LedgerResult<()> {
         if from == into {
-            return Err(LedgerError::Invalid("Choose a different item to merge into".into()));
+            return Err(LedgerError::Invalid(
+                "Choose a different item to merge into".into(),
+            ));
         }
         for id in [from, into] {
             self.item(id)
@@ -193,7 +199,9 @@ impl Company {
     /// merged away: its reconciliation reports would no longer add up.
     pub fn merge_accounts(&mut self, from: AccountId, into: AccountId) -> LedgerResult<()> {
         if from == into {
-            return Err(LedgerError::Invalid("Choose a different account to merge into".into()));
+            return Err(LedgerError::Invalid(
+                "Choose a different account to merge into".into(),
+            ));
         }
         let kind_of = |c: &Company, id: AccountId| {
             c.account(id)
@@ -315,7 +323,12 @@ impl Company {
         out
     }
 
-    fn push_subtree<'a>(&'a self, a: &'a Account, depth: usize, out: &mut Vec<(&'a Account, usize)>) {
+    fn push_subtree<'a>(
+        &'a self,
+        a: &'a Account,
+        depth: usize,
+        out: &mut Vec<(&'a Account, usize)>,
+    ) {
         // A damaged file with a loop is shown once, not forever.
         if out.iter().any(|(seen, _)| seen.id == a.id) {
             return;
@@ -424,9 +437,16 @@ mod tests {
         let checking = acct(&c, "Checking");
         let savings = acct(&c, "Savings");
         let items = c.unreconciled(checking, d("2026-12-31"));
-        let ending = items.iter().fold(Money::ZERO, |t, i| t.saturating_add(i.amount));
-        c.reconcile(checking, d("2026-01-31"), ending, items.iter().map(|i| i.txn).collect())
-            .unwrap();
+        let ending = items
+            .iter()
+            .fold(Money::ZERO, |t, i| t.saturating_add(i.amount));
+        c.reconcile(
+            checking,
+            d("2026-01-31"),
+            ending,
+            items.iter().map(|i| i.txn).collect(),
+        )
+        .unwrap();
         assert!(c.merge_accounts(checking, savings).is_err());
         assert!(c.merge_accounts(savings, checking).is_ok());
     }
@@ -443,11 +463,16 @@ mod tests {
             .unwrap();
         c.set_account_parent(electric, Some(utilities)).unwrap();
         c.set_account_parent(meter, Some(electric)).unwrap();
-        assert_eq!(c.account_full_name(meter), "6511 · Utilities:Electric:Shop meter");
+        assert_eq!(
+            c.account_full_name(meter),
+            "6511 · Utilities:Electric:Shop meter"
+        );
         // No loops, and no mixing of types.
         assert!(c.set_account_parent(utilities, Some(meter)).is_err());
         assert!(c.set_account_parent(electric, Some(electric)).is_err());
-        assert!(c.set_account_parent(electric, Some(acct(&c, "Checking"))).is_err());
+        assert!(c
+            .set_account_parent(electric, Some(acct(&c, "Checking")))
+            .is_err());
         let order: Vec<(String, usize)> = c
             .accounts_in_tree_order()
             .into_iter()

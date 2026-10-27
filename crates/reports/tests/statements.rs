@@ -175,7 +175,10 @@ fn sub_accounts_are_totalled_under_their_parent() {
     assert_eq!(labels[at + 1], "6300 · Rent");
     assert_eq!(labels[at + 2], "6310 · Storage unit");
     assert_eq!(labels[at + 3], "Total 6300 · Rent");
-    assert_eq!(last_money(&r, "Total 6300 · Rent"), Money::from_dollars(350));
+    assert_eq!(
+        last_money(&r, "Total 6300 · Rent"),
+        Money::from_dollars(350)
+    );
     assert!(r.rows[at + 2].indent > r.rows[at].indent);
     // The Trial Balance lists it with its parent's name.
     let tb = trial_balance(&c, d("2026-12-31"));

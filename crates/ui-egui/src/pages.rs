@@ -62,9 +62,10 @@ fn parent_combo(
     if parent.is_some_and(|p| c.account(p).is_none_or(|a| a.kind != kind)) {
         *parent = None;
     }
-    let shown = parent.map_or_else(|| "(none: a top-level account)".to_string(), |p| {
-        c.account_full_name(p)
-    });
+    let shown = parent.map_or_else(
+        || "(none: a top-level account)".to_string(),
+        |p| c.account_full_name(p),
+    );
     egui::ComboBox::from_id_salt(("parent_account", salt))
         .selected_text(shown)
         .width(240.0)
@@ -81,7 +82,13 @@ fn parent_combo(
 
 /// "Merge into": a picker of the other entries and a Merge button. Returns
 /// the one chosen when Merge is clicked.
-fn merge_row<T>(ui: &mut Ui, salt: &str, noun: &str, name: &str, others: &[(T, String)]) -> Option<T>
+fn merge_row<T>(
+    ui: &mut Ui,
+    salt: &str,
+    noun: &str,
+    name: &str,
+    others: &[(T, String)],
+) -> Option<T>
 where
     T: Copy + PartialEq + Send + Sync + 'static,
 {
@@ -784,7 +791,11 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
                             }
                         });
                         ui.label(a.kind.label());
-                        money_label(ui, balances.get(&a.id).copied().unwrap_or(Money::ZERO), false);
+                        money_label(
+                            ui,
+                            balances.get(&a.id).copied().unwrap_or(Money::ZERO),
+                            false,
+                        );
                         if ui
                             .small_button("Edit")
                             .on_hover_text(
@@ -795,7 +806,11 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
                         {
                             s.editing_account = Some((a.id, NewAccount::from_account(a)));
                         }
-                        let toggle = if a.active { "Make inactive" } else { "Make active" };
+                        let toggle = if a.active {
+                            "Make inactive"
+                        } else {
+                            "Make active"
+                        };
                         let toggle_hint = "Inactive accounts are hidden from lists but keep \
                                            their history. Only an account with a zero balance \
                                            can be made inactive.";
