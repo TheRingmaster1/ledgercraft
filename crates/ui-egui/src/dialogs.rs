@@ -211,7 +211,10 @@ mod tests {
         assert_eq!(remembered(Folder::Pdf), Some(dir.clone()));
         assert_eq!(remembered(Folder::Export), None);
         // A folder that no longer exists is not offered.
-        set_folders(BTreeMap::from([(Folder::Logo, dir.join("gone-away-folder"))]));
+        set_folders(BTreeMap::from([(
+            Folder::Logo,
+            dir.join("gone-away-folder"),
+        )]));
         assert_eq!(remembered(Folder::Logo), None);
         set_folders(BTreeMap::new());
     }
@@ -228,7 +231,10 @@ mod tests {
             "",
         )
         .unwrap();
-        assert!(!linux_file_chooser_found(&dirs), "a service but no back end");
+        assert!(
+            !linux_file_chooser_found(&dirs),
+            "a service but no back end"
+        );
         std::fs::create_dir_all(root.join("xdg-desktop-portal/portals")).unwrap();
         std::fs::write(
             root.join("xdg-desktop-portal/portals/gtk.portal"),

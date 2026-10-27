@@ -61,7 +61,11 @@ pub fn backups_of(path: &Path) -> Vec<PathBuf> {
 /// Copies `path` as it is now into today's backup, unless today's backup is
 /// already made or there is no file yet, then deletes the oldest backups
 /// beyond `keep`. Returns the backup made, if one was.
-pub fn backup_before_save(path: &Path, today: Date, keep: usize) -> Result<Option<PathBuf>, FileError> {
+pub fn backup_before_save(
+    path: &Path,
+    today: Date,
+    keep: usize,
+) -> Result<Option<PathBuf>, FileError> {
     if keep == 0 || !path.is_file() {
         return Ok(None);
     }
@@ -105,12 +109,18 @@ mod tests {
         let made = backup_before_save(&file, d("2026-10-01"), 3).unwrap();
         assert_eq!(
             made,
-            Some(dir.join(BACKUP_FOLDER).join("Pine Ridge 2026-10-01.lcbooks"))
+            Some(
+                dir.join(BACKUP_FOLDER)
+                    .join("Pine Ridge 2026-10-01.lcbooks")
+            )
         );
         // Saving again the same day keeps the morning's copy.
         fs::write(&file, "monday afternoon").unwrap();
         assert_eq!(backup_before_save(&file, d("2026-10-01"), 3).unwrap(), None);
-        let first = fs::read_to_string(dir.join(BACKUP_FOLDER).join("Pine Ridge 2026-10-01.lcbooks"));
+        let first = fs::read_to_string(
+            dir.join(BACKUP_FOLDER)
+                .join("Pine Ridge 2026-10-01.lcbooks"),
+        );
         assert_eq!(first.unwrap(), "monday");
 
         for day in ["2026-10-02", "2026-10-03", "2026-10-04"] {
@@ -118,7 +128,12 @@ mod tests {
         }
         // Other files in the folder are left alone.
         fs::write(dir.join(BACKUP_FOLDER).join("notes.txt"), "x").unwrap();
-        fs::write(dir.join(BACKUP_FOLDER).join("Pine Ridge Two 2026-01-01.lcbooks"), "x").unwrap();
+        fs::write(
+            dir.join(BACKUP_FOLDER)
+                .join("Pine Ridge Two 2026-01-01.lcbooks"),
+            "x",
+        )
+        .unwrap();
         let names: Vec<String> = backups_of(&file)
             .iter()
             .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
