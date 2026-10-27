@@ -250,6 +250,34 @@ impl Session {
         Ok(())
     }
 
+    /// Why a change that rewrote transactions is refused: it changed one
+    /// dated on or before the closing date (compared with `before`), and the
+    /// closing date password has not been entered.
+    fn closed_changes(&self, before: &Company) -> Option<EngineError> {
+        let closing = self.company.closing.as_ref()?;
+        let has_password = closing.password.is_some();
+        if has_password && self.closing_unlocked {
+            return None;
+        }
+        let changed = before
+            .transactions
+            .iter()
+            .filter(|t| t.date <= closing.date)
+            .any(|t| self.company.txn(t.id).is_none_or(|now| now.body != t.body));
+        changed.then(|| {
+            let how = if has_password {
+                "enter the closing date password (File > Closing Date…) first"
+            } else {
+                "move the closing date (File > Closing Date…) first"
+            };
+            EngineError::Closed(format!(
+                "This merge would change transactions dated on or before the closing date \
+                 ({}): {how}.",
+                closing.date
+            ))
+        })
+    }
+
     /// What an audit trail entry says a command was done to.
     fn audit_detail(&self, cmd: &Command) -> String {
         let describe = |date: Date, number: &str, body: &ledgercraft_ledger::TxnBody| {
@@ -309,8 +337,23 @@ impl Session {
         let id = cmd.id();
         let label = cmd.undo_label();
         let detail = self.audit_detail(&cmd);
+        let merge = matches!(
+            cmd,
+            Command::AccountMerge { .. }
+                | Command::CustomerMerge { .. }
+                | Command::VendorMerge { .. }
+                | Command::ItemMerge { .. }
+        );
         let before = self.company.clone();
         let result = catch_unwind(AssertUnwindSafe(|| cmd.apply(&mut self.company)));
+        // A merge rewrites the transactions that named what was merged away:
+        // closed ones are as locked as for any other change.
+        if merge && matches!(result, Ok(Ok(_))) {
+            if let Some(e) = self.closed_changes(&before) {
+                self.company = before;
+                return Err(e);
+            }
+        }
         match result {
             Ok(Ok(created)) => {
                 self.audit(label.clone(), detail);
@@ -616,6 +659,32 @@ mod tests {
         assert!(s.company().reconciliations_for(checking).is_empty());
     }
 
+    /// Merging names on closed transactions is refused like editing them.
+    #[test]
+    fn merges_respect_the_closing_date() {
+        let mut s = Session::new(crate::sample_company().unwrap());
+        // Two vendors with January (closed) transactions.
+        let c = s.company();
+        let landlord = c.vendors.iter().find(|v| v.contact.name == "Riverside Properties").unwrap().id;
+        let lumber = c.vendors.iter().find(|v| v.contact.name == "Canyon Lumber Supply").unwrap().id;
+        let merge = crate::Command::VendorMerge {
+            from: landlord,
+            into: lumber,
+        };
+        assert!(matches!(s.execute(merge.clone()), Err(EngineError::Closed(_))));
+        assert!(s.company().vendor(landlord).is_some(), "nothing changed");
+        // Inactive Old Mill Finishes has no transactions: it merges fine.
+        let old_mill = s.company().vendors.iter().find(|v| v.contact.name == "Old Mill Finishes").unwrap().id;
+        s.execute(crate::Command::VendorMerge {
+            from: old_mill,
+            into: lumber,
+        })
+        .unwrap();
+        assert!(s.company().vendor(old_mill).is_none());
+        assert_eq!(s.undo().as_deref(), Some("Merge Vendors"));
+        assert!(s.company().vendor(old_mill).is_some());
+    }
+
     /// Closing the books through March locks the sample's January
     /// transactions until the closing date password is entered.
     #[test]
@@ -794,6 +863,9 @@ mod tests {
         assert!(!c.info.legal_name.is_empty() && !c.info.phone.is_empty());
         assert!(c.info.print.logo.is_some());
         assert!(c.closing.is_some());
+        // A sub-account, and a duplicate customer to merge.
+        assert!(c.accounts.iter().any(|a| a.parent.is_some()));
+        assert!(c.customers.iter().any(|x| x.contact.name == "Maple St. Cafe"));
 
         // A loan, partly repaid, and depreciation.
         let loan = c.account_balance(account("Loan Payable"), None);

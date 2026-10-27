@@ -96,6 +96,7 @@ pub(crate) enum Reset {
     EditedCustomer,
     EditedVendor,
     EditedItem,
+    EditedAccount,
 }
 
 // `Run` carries a whole `Command` (contacts are large); a handful per frame is fine.

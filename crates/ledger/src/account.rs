@@ -127,6 +127,9 @@ pub struct Account {
     pub description: String,
     #[serde(default = "yes")]
     pub active: bool,
+    /// The account this is a sub-account of, if it is one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<AccountId>,
 }
 
 fn yes() -> bool {

@@ -250,6 +250,7 @@ impl Company {
             kind,
             description: description.to_string(),
             active: true,
+            parent: None,
         });
         Ok(id)
     }

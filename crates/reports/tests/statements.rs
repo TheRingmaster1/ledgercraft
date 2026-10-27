@@ -142,3 +142,45 @@ fn register_and_transaction_list_rows_point_at_their_transactions() {
     assert_eq!(ids.len(), c.transactions.len());
     assert!(ids.iter().all(|id| c.txn(*id).is_some()));
 }
+
+/// Sub-accounts sit under their parent, which gets a total line.
+#[test]
+fn sub_accounts_are_totalled_under_their_parent() {
+    let mut c = books();
+    let rent = c.account_by_name("Rent").unwrap().id;
+    let storage = c
+        .add_account(
+            "6310",
+            "Storage unit",
+            ledgercraft_ledger::AccountType::Expense,
+            "",
+        )
+        .unwrap();
+    c.set_account_parent(storage, Some(rent)).unwrap();
+    let check = TxnBody::Check(Check {
+        payee: None,
+        pay_from: c.account_by_name("Checking").unwrap().id,
+        lines: vec![AccountLine {
+            account: storage,
+            description: String::new(),
+            amount: Money::from_dollars(50),
+        }],
+    });
+    c.post(d("2026-02-02"), "102", "", check).unwrap();
+    let r = profit_and_loss(&c, d("2026-01-01"), d("2026-12-31"));
+    let labels: Vec<&str> = r.rows.iter().map(|row| row.label.as_str()).collect();
+    let at = labels.iter().position(|l| *l == "6300 · Rent").unwrap();
+    // The heading, Rent's own 300, the 50 under it, then the total of 350.
+    assert_eq!(r.rows[at].kind, RowKind::Section);
+    assert_eq!(labels[at + 1], "6300 · Rent");
+    assert_eq!(labels[at + 2], "6310 · Storage unit");
+    assert_eq!(labels[at + 3], "Total 6300 · Rent");
+    assert_eq!(last_money(&r, "Total 6300 · Rent"), Money::from_dollars(350));
+    assert!(r.rows[at + 2].indent > r.rows[at].indent);
+    // The Trial Balance lists it with its parent's name.
+    let tb = trial_balance(&c, d("2026-12-31"));
+    assert!(tb
+        .rows
+        .iter()
+        .any(|row| row.label == "6310 · Rent:Storage unit"));
+}

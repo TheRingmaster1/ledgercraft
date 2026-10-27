@@ -31,8 +31,9 @@ fn sum(values: impl IntoIterator<Item = Money>) -> Money {
     values.into_iter().fold(Money::ZERO, Money::saturating_add)
 }
 
-/// Adds one detail row per account of the given types with activity, and
-/// returns their natural-sign total.
+/// Adds a row per account of the given types with activity, sub-accounts
+/// indented under their parents with a total for each parent, and returns
+/// their natural-sign total.
 fn account_rows(
     report: &mut Report,
     company: &Company,
@@ -41,25 +42,95 @@ fn account_rows(
     indent: u8,
 ) -> Money {
     let mut total = Money::ZERO;
-    for a in company.sorted_accounts() {
-        if !kinds.contains(&a.kind) {
-            continue;
-        }
-        let raw = amounts.get(&a.id).copied().unwrap_or(Money::ZERO);
-        if raw.is_zero() {
-            continue;
-        }
-        let value = natural(a.kind, raw);
+    // Top level here: no parent, or a parent of another type (which a
+    // damaged file could have).
+    let top = company.sorted_accounts().into_iter().filter(|a| {
+        kinds.contains(&a.kind)
+            && a.parent
+                .and_then(|p| company.account(p))
+                .is_none_or(|p| !kinds.contains(&p.kind))
+    });
+    for a in top {
+        let value = tree_rows(report, company, amounts, a, indent, 0);
         total = total.saturating_add(value);
+    }
+    total
+}
+
+/// The raw activity of an account and everything under it.
+fn subtree_raw(
+    company: &Company,
+    amounts: &BTreeMap<AccountId, Money>,
+    a: &Account,
+    depth: usize,
+) -> Money {
+    let own = amounts.get(&a.id).copied().unwrap_or(Money::ZERO);
+    // Deeper than the chart is long means a loop in a damaged file.
+    if depth > company.accounts.len() {
+        return own;
+    }
+    company
+        .sub_accounts(a.id)
+        .into_iter()
+        .fold(own, |sum, child| {
+            sum.saturating_add(subtree_raw(company, amounts, child, depth + 1))
+        })
+}
+
+/// One account's rows: a plain line, or, when its sub-accounts have
+/// activity, a heading, its own line, its sub-accounts and "Total …".
+/// Returns the natural-sign total of the account and its sub-accounts.
+fn tree_rows(
+    report: &mut Report,
+    company: &Company,
+    amounts: &BTreeMap<AccountId, Money>,
+    a: &Account,
+    indent: u8,
+    depth: usize,
+) -> Money {
+    let subtree = subtree_raw(company, amounts, a, depth);
+    if subtree.is_zero() {
+        return Money::ZERO;
+    }
+    let own = amounts.get(&a.id).copied().unwrap_or(Money::ZERO);
+    let children: Vec<&Account> = if depth > company.accounts.len() {
+        Vec::new()
+    } else {
+        company
+            .sub_accounts(a.id)
+            .into_iter()
+            .filter(|c| !subtree_raw(company, amounts, c, depth + 1).is_zero())
+            .collect()
+    };
+    let name = a.display_name();
+    if children.is_empty() {
+        let value = natural(a.kind, own);
+        report.money(RowKind::Detail, &name, indent, &[value], Some(a.id));
+        return value;
+    }
+    report.section(&name, indent);
+    let inner = indent.saturating_add(1);
+    if !own.is_zero() {
         report.money(
             RowKind::Detail,
-            &a.display_name(),
-            indent,
-            &[value],
+            &name,
+            inner,
+            &[natural(a.kind, own)],
             Some(a.id),
         );
     }
-    total
+    for child in children {
+        tree_rows(report, company, amounts, child, inner, depth + 1);
+    }
+    let value = natural(a.kind, subtree);
+    report.money(
+        RowKind::Subtotal,
+        &format!("Total {name}"),
+        indent,
+        &[value],
+        None,
+    );
+    value
 }
 
 pub fn trial_balance(company: &Company, as_of: Date) -> Report {
@@ -88,7 +159,7 @@ pub fn trial_balance(company: &Company, as_of: Date) -> Report {
         };
         r.line(
             RowKind::Detail,
-            &a.display_name(),
+            &company.account_full_name(a.id),
             0,
             vec![dr, cr],
             Some(a.id),

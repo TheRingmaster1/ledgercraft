@@ -35,6 +35,8 @@ A company file is UTF-8 JSON:
 * Dates are `YYYY-MM-DD`.
 * Daily backups are byte-for-byte copies of the file, in a `LedgerCraft
   Backups` folder beside it, named `<company file name> YYYY-MM-DD.lcbooks`.
+* An account's `parent` is the account it is a sub-account of (same type);
+  left out for a top-level account.
 * `closing`, when the books are closed: `date` (transactions dated then or
   before are locked) and, if set, `password`: a one-way Argon2id check value
   (`argon2id$memory$passes$lanes$salt$hash`), never the password itself.
