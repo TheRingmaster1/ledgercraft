@@ -332,6 +332,8 @@ impl ListState {
             Reset::NewClass => self.new_class.clear(),
             Reset::EditedClass => self.editing_class = None,
             Reset::Nothing
+            | Reset::NewRecurring
+            | Reset::EditedRecurring
             | Reset::Form(_)
             | Reset::NewTax
             | Reset::NewTaxGroup
@@ -674,6 +676,7 @@ fn glance_row(ui: &mut Ui, stripe: Option<Color32>, label: &str, hint: bool, amo
 /// `stripe` shades every other At A Glance row (Help > Preferences).
 pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Action>) {
     title(ui, &c.info.name);
+    crate::recurring::due_banner(ui, c, out);
     let balances = widgets::balances(c);
     let total_of = |kind: AccountType| {
         c.accounts

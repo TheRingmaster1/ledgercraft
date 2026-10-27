@@ -970,6 +970,22 @@ mod tests {
         assert!(c.accounts.iter().any(|a| a.parent.is_some()));
         assert!(c.customers.iter().any(|x| x.contact.name == "Maple St. Cafe"));
 
+        // Recurring: an automatic one not yet due, and a reminder due.
+        assert!(c
+            .recurring
+            .iter()
+            .any(|r| r.mode == ledgercraft_ledger::RecurringMode::Automatic));
+        assert!(!c.automatic_due(today));
+        let due: Vec<&str> = c
+            .recurring_due(today)
+            .iter()
+            .map(|r| r.name.as_str())
+            .collect();
+        assert_eq!(due, ["Loan payment"]);
+        for r in &c.recurring {
+            c.recurring_body(r.id, r.next().unwrap()).unwrap();
+        }
+
         // Classes: two in use (each on income), one inactive.
         assert!(c.classes.iter().any(|k| !k.active));
         for k in c.classes.iter().filter(|k| k.active) {

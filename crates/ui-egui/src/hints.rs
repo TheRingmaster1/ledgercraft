@@ -80,6 +80,10 @@ impl Page {
                 "Check a bank or credit card account against its statement, item by item, \
                  so you know the books match the bank."
             }
+            Self::Recurring => {
+                "Memorized transactions: entered for you on a schedule, or listed here when \
+                 due."
+            }
             Self::Classes => {
                 "Departments, locations or lines of business to tag transactions with, for \
                  Profit & Loss by Class."

@@ -264,6 +264,32 @@ impl Forms {
         }
     }
 
+    /// Makes the form `kind` a new transaction rather than an edit (after
+    /// loading a recurring transaction's next occurrence into it).
+    pub(crate) fn make_new(&mut self, kind: FormKind) {
+        match kind {
+            FormKind::Invoice => {
+                self.invoice.editing = None;
+                self.invoice.recorded_tax = None;
+            }
+            FormKind::SalesReceipt => {
+                self.sales_receipt.editing = None;
+                self.sales_receipt.recorded_tax = None;
+            }
+            FormKind::CreditMemo => {
+                self.credit_memo.editing = None;
+                self.credit_memo.recorded_tax = None;
+            }
+            FormKind::Refund => self.refund.editing = None,
+            FormKind::ReceivePayment => self.receive.editing = None,
+            FormKind::PayBills => self.pay_bills.editing = None,
+            FormKind::Bill => self.bill.editing = None,
+            FormKind::Check => self.check.editing = None,
+            FormKind::Deposit => self.deposit.editing = None,
+            FormKind::Journal => self.journal.editing = None,
+        }
+    }
+
     /// Fills the matching form with a recorded transaction so it can be
     /// edited, and says which form that is.
     pub(crate) fn load(&mut self, t: &Transaction) -> Result<FormKind, String> {
@@ -516,10 +542,33 @@ fn footer_with(
     editing: Option<TxnId>,
     extra: Option<(&str, &str)>,
 ) -> (bool, bool, bool) {
+    let (save, clear, more, _) = footer_full(ui, editing, extra, false);
+    (save, clear, more)
+}
+
+/// The footer with Memorize…: (save, clear or cancel, memorize).
+fn footer_memorize(ui: &mut Ui, editing: Option<TxnId>) -> (bool, bool, bool) {
+    let (save, clear, _, memorize) = footer_full(ui, editing, None, true);
+    (save, clear, memorize)
+}
+
+const MEMORIZE_HOVER: &str = "Save it as a recurring transaction (Lists > Recurring \
+                              Transactions): entered for you on a schedule, or a reminder \
+                              when it is due";
+
+/// Every footer: Save, an optional extra button, Memorize… when
+/// `memorize`, then Clear or Cancel.
+fn footer_full(
+    ui: &mut Ui,
+    editing: Option<TxnId>,
+    extra: Option<(&str, &str)>,
+    memorize: bool,
+) -> (bool, bool, bool, bool) {
     ui.add_space(10.0);
     let mut save = false;
     let mut clear = false;
     let mut more = false;
+    let mut memo = false;
     let (save_label, clear_label) = if editing.is_some() {
         ("Save Changes", "Cancel")
     } else {
@@ -530,9 +579,20 @@ fn footer_with(
         if let Some((label, hover)) = extra {
             more = ui.button(label).on_hover_text(hover).clicked();
         }
+        if memorize {
+            memo = ui.button("Memorize…").on_hover_text(MEMORIZE_HOVER).clicked();
+        }
         clear = ui.button(clear_label).clicked();
     });
-    (save, clear, more)
+    (save, clear, more, memo)
+}
+
+/// Memorize…: what the form would record, for the recurring window.
+fn memorize(out: &mut Vec<Action>, kind: FormKind, built: Result<Command, String>) {
+    match built {
+        Ok(cmd) => out.push(Action::Memorize(kind, Box::new(cmd))),
+        Err(e) => out.push(Action::Error(e)),
+    }
 }
 
 /// Runs what the form built: a new transaction, or, while editing, the
@@ -915,9 +975,14 @@ fn sales_form(
     } else {
         "Record it, then save it as a PDF to email or print"
     };
-    let (save, clear, pdf) = footer_with(ui, f.editing, Some(("Save as PDF…", hover)));
+    let can_memorize = matches!(kind, FormKind::Invoice | FormKind::SalesReceipt);
+    let (save, clear, pdf, memo) =
+        footer_full(ui, f.editing, Some(("Save as PDF…", hover)), can_memorize);
     if save {
         finish(out, kind, f.editing, build_sale(c, f, kind));
+    }
+    if memo {
+        memorize(out, kind, build_sale(c, f, kind));
     }
     if pdf {
         match command_for(f.editing, build_sale(c, f, kind)) {
@@ -1663,9 +1728,12 @@ pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Ac
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Amount due", total);
-    let (save, clear) = footer(ui, f.editing);
+    let (save, clear, memo) = footer_memorize(ui, f.editing);
     if save {
         finish(out, FormKind::Bill, f.editing, build_bill(c, f));
+    }
+    if memo {
+        memorize(out, FormKind::Bill, build_bill(c, f));
     }
     if clear {
         let editing = f.editing;
@@ -1731,9 +1799,12 @@ pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<A
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Amount", total);
-    let (save, clear) = footer(ui, f.editing);
+    let (save, clear, memo) = footer_memorize(ui, f.editing);
     if save {
         finish(out, FormKind::Check, f.editing, build_check(c, f));
+    }
+    if memo {
+        memorize(out, FormKind::Check, build_check(c, f));
     }
     if clear {
         let editing = f.editing;
@@ -1809,9 +1880,12 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Deposit total", total);
-    let (save, clear) = footer(ui, f.editing);
+    let (save, clear, memo) = footer_memorize(ui, f.editing);
     if save {
         finish(out, FormKind::Deposit, f.editing, build_deposit(f));
+    }
+    if memo {
+        memorize(out, FormKind::Deposit, build_deposit(f));
     }
     if clear {
         let editing = f.editing;
@@ -1908,9 +1982,12 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
             ui.label(RichText::new(off).color(theme::NEGATIVE));
         }
     });
-    let (save, clear) = footer(ui, f.editing);
+    let (save, clear, memo) = footer_memorize(ui, f.editing);
     if save {
         finish(out, FormKind::Journal, f.editing, build_journal(f));
+    }
+    if memo {
+        memorize(out, FormKind::Journal, build_journal(f));
     }
     if clear {
         let editing = f.editing;

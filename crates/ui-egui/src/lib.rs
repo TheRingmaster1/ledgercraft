@@ -18,6 +18,7 @@ mod pages;
 mod prefs;
 mod recent;
 mod reconcile;
+mod recurring;
 mod salestax;
 mod security;
 mod start;
@@ -46,6 +47,7 @@ pub(crate) enum Page {
     BankImport,
     SalesTax,
     Classes,
+    Recurring,
     Form(FormKind),
 }
 
@@ -100,6 +102,8 @@ pub(crate) enum Reset {
     EditedAccount,
     NewClass,
     EditedClass,
+    NewRecurring,
+    EditedRecurring,
 }
 
 // `Run` carries a whole `Command` (contacts are large); a handful per frame is fine.
@@ -129,6 +133,11 @@ pub(crate) enum Action {
     ClearStatus,
     /// Open a recorded transaction in its form, to change it.
     Open(TxnId),
+    /// Memorize… on a form: what it would record (a `txn.post`).
+    Memorize(FormKind, Box<Command>),
+    /// Open a recurring transaction's next occurrence in its form, to check
+    /// and enter it.
+    EnterRecurring(ledgercraft_ledger::RecurringId),
     /// Cancel on a form that was editing a recorded transaction.
     EditCancelled,
     ExportCsv {
