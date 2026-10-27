@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText};
 use ledgercraft_engine::{sample_company, Command, EngineError, Outcome, Session};
 use ledgercraft_file::FileError;
-use ledgercraft_ledger::{CustomerId, TxnId};
+use ledgercraft_ledger::{CustomerId, RecurringId, TxnId};
 
 use crate::bankimport::{self, ImportState};
 use crate::closing::{self, ClosingForm, ClosingOutcome};
@@ -15,6 +15,7 @@ use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
 use crate::recent::{AppState, WindowState};
 use crate::reconcile::{self, ReconcileState};
+use crate::recurring::{self, MemorizeOutcome, RecurringState};
 use crate::salestax::{self, SalesTaxState};
 use crate::security::{
     self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice,
@@ -58,6 +59,13 @@ pub struct LedgerApp {
     /// The quarterly "check your sales tax rates" reminder was put off until
     /// the company is next opened.
     tax_reminder_later: bool,
+    /// Lists > Recurring Transactions, and the Memorize window.
+    recurring: RecurringState,
+    /// The form holding a recurring transaction's next occurrence: saving
+    /// it enters that occurrence.
+    entering: Option<(FormKind, RecurringId)>,
+    /// The day automatic recurring transactions were last entered.
+    recurring_checked: Option<ledgercraft_ledger::Date>,
     /// Offer to protect the unprotected file just opened.
     offer_protection: bool,
     /// What the last import brought in, shown until closed.
@@ -184,6 +192,9 @@ impl LedgerApp {
             statement: None,
             sales_tax: SalesTaxState::default(),
             tax_reminder_later: false,
+            recurring: RecurringState::default(),
+            entering: None,
+            recurring_checked: None,
             offer_protection: false,
             start: StartPage::default(),
             page: Page::Home,
@@ -498,6 +509,9 @@ impl LedgerApp {
         self.statement = None;
         self.sales_tax = SalesTaxState::default();
         self.tax_reminder_later = false;
+        self.recurring = RecurringState::default();
+        self.entering = None;
+        self.recurring_checked = None;
         self.page = Page::Home;
     }
 
@@ -515,6 +529,9 @@ impl LedgerApp {
         self.statement = None;
         self.sales_tax = SalesTaxState::default();
         self.tax_reminder_later = false;
+        self.recurring = RecurringState::default();
+        self.entering = None;
+        self.recurring_checked = None;
         self.page = Page::Home;
     }
 
@@ -619,8 +636,18 @@ impl LedgerApp {
     fn apply(&mut self, action: Action) {
         match action {
             Action::Run { cmd, reset } => {
-                self.run(cmd, reset);
+                let cmd = self.for_recurring(cmd, reset);
+                let entered = matches!(cmd, Command::RecurringEnter { .. });
+                if self.run(cmd, reset).is_some() && entered {
+                    self.entering = None;
+                }
             }
+            Action::Memorize(kind, cmd) => {
+                if let Some(s) = self.session.as_ref() {
+                    self.recurring.memorize(s.company(), kind, *cmd);
+                }
+            }
+            Action::EnterRecurring(id) => self.enter_recurring(id),
             Action::Go(page) => self.page = page,
             Action::Reconcile(account) => {
                 self.reconcile.start(account);
@@ -672,7 +699,13 @@ impl LedgerApp {
                 self.page = Page::Form(FormKind::PayBills);
             }
             Action::Error(e) => self.error(e),
-            Action::ClearStatus => self.info("Ready"),
+            Action::ClearStatus => {
+                // Clear on the form holding a recurring transaction's next one.
+                if matches!((self.page, self.entering), (Page::Form(k), Some((e, _))) if k == e) {
+                    self.entering = None;
+                }
+                self.info("Ready");
+            }
             Action::Open(id) => self.open_txn(id),
             Action::EditCancelled => {
                 self.info("Edit cancelled; nothing was changed.");
@@ -697,6 +730,7 @@ impl LedgerApp {
                 self.save_state();
             }
             Action::SaveInvoicePdf(kind, cmd) => {
+                let cmd = self.for_recurring(cmd, Reset::Form(kind));
                 let editing = match &cmd {
                     Command::TxnUpdate { id, .. } => Some(*id),
                     _ => None,
@@ -712,6 +746,9 @@ impl LedgerApp {
                         Some(id)
                     }
                     _ => self.run(cmd, reset).and_then(|outcome| {
+                        if matches!(self.entering, Some((k, _)) if k == kind) {
+                            self.entering = None;
+                        }
                         editing.or_else(|| outcome.created.as_deref().and_then(parse_txn_id))
                     }),
                 };
@@ -737,6 +774,7 @@ impl LedgerApp {
                 }
                 self.lists.reset(reset);
                 self.sales_tax.reset(reset);
+                self.recurring.reset(reset);
                 if was_edit {
                     self.info(format!(
                         "{label}: changes saved. Edit > Undo puts the original back."
@@ -874,6 +912,74 @@ impl LedgerApp {
     }
 
     /// Opens a recorded transaction in its form, ready to change.
+    /// Saving the form that holds a recurring transaction's next one enters
+    /// it as that occurrence (moving its schedule on), not as a one-off.
+    fn for_recurring(&self, cmd: Command, reset: Reset) -> Command {
+        let (Reset::Form(kind), Some((holding, id))) = (reset, self.entering) else {
+            return cmd;
+        };
+        match cmd {
+            Command::TxnPost {
+                date,
+                number,
+                memo,
+                body,
+                class,
+            } if kind == holding => Command::RecurringEnter {
+                id,
+                date,
+                number,
+                memo,
+                body,
+                class,
+            },
+            cmd => cmd,
+        }
+    }
+
+    /// Opens a recurring transaction's next occurrence in its form.
+    fn enter_recurring(&mut self, id: RecurringId) {
+        let Some(c) = self.session.as_ref().map(Session::company) else {
+            return;
+        };
+        let loaded = next_occurrence(c, id);
+        match loaded.and_then(|(t, name)| Ok((self.forms.load(&t)?, name))) {
+            Ok((kind, name)) => {
+                self.forms.make_new(kind);
+                self.entering = Some((kind, id));
+                self.edit_return = None;
+                self.page = Page::Form(kind);
+                self.info(format!("Entering {name}: check it, then Save."));
+            }
+            Err(e) => self.error(e),
+        }
+    }
+
+    /// Enters the automatic recurring transactions due, once a day while a
+    /// company is open.
+    fn enter_automatic(&mut self) {
+        let today = ledgercraft_ledger::Date::today();
+        if self.recurring_checked == Some(today) || self.unlock.is_some() {
+            return;
+        }
+        let Some(session) = self.session.as_ref() else {
+            return;
+        };
+        self.recurring_checked = Some(today);
+        if !session.company().automatic_due(today) {
+            return;
+        }
+        if let Some(outcome) = self.run(Command::RecurringEnterDue { through: today }, Reset::Nothing) {
+            let n = outcome.created.as_deref().map_or(0, |ids| ids.split(", ").count());
+            self.info(format!(
+                "Entered {n} recurring transaction{} due (Lists > Recurring Transactions). \
+                 Edit > Undo takes {} back.",
+                if n == 1 { "" } else { "s" },
+                if n == 1 { "it" } else { "them" },
+            ));
+        }
+    }
+
     fn open_txn(&mut self, id: TxnId) {
         let Some(t) = self
             .session
@@ -1129,6 +1235,7 @@ impl LedgerApp {
                             ("Vendors", Page::Vendors),
                             ("Products and Services", Page::Items),
                             ("Classes", Page::Classes),
+                            ("Recurring Transactions", Page::Recurring),
                             ("Sales Tax", Page::SalesTax),
                         ] {
                             if ui.button(label).clicked() {
@@ -1558,6 +1665,34 @@ impl LedgerApp {
             }
         }
 
+        // Automatic recurring transactions, and the Memorize window.
+        if self.create.is_none() {
+            self.enter_automatic();
+        }
+        let chosen = match (self.recurring.memorize.as_mut(), self.session.as_ref()) {
+            (Some(m), Some(session)) => recurring::memorize_window(ctx, m, session.company()),
+            (Some(_), None) => Some(MemorizeOutcome::Cancel),
+            (None, _) => None,
+        };
+        match chosen {
+            Some(MemorizeOutcome::Save(cmd)) => {
+                let label = cmd.undo_label();
+                let result = self.session.as_mut().map(|s| s.execute(*cmd));
+                match result {
+                    Some(Ok(_)) => {
+                        self.recurring.memorize = None;
+                        self.info(format!(
+                            "{label}: done. It is on Lists > Recurring Transactions."
+                        ));
+                    }
+                    Some(Err(e)) => self.recurring.set_error(e.to_string()),
+                    None => self.recurring.memorize = None,
+                }
+            }
+            Some(MemorizeOutcome::Cancel) => self.recurring.memorize = None,
+            None => {}
+        }
+
         let changed = match (self.password.as_mut(), self.session.as_ref()) {
             (Some(form), Some(session)) => security::password_window(ctx, form, session),
             (Some(_), None) => Some(PasswordOutcome::Cancel),
@@ -1778,6 +1913,7 @@ impl eframe::App for LedgerApp {
         let mut actions: Vec<Action> = Vec::new();
         let page = self.page;
         let mut start_choice = None;
+        let mut stop_entering = false;
         egui::CentralPanel::default().show(ui, |ui| {
             let Some(session) = self.session.as_ref() else {
                 start_choice = self.start.ui(ui, &self.state.recent);
@@ -1797,6 +1933,11 @@ impl eframe::App for LedgerApp {
                     bankimport::page(ui, company, &mut self.bank_import, &mut actions)
                 }
                 _ => {
+                    if let (Page::Form(kind), Some((holding, id))) = (page, self.entering) {
+                        if kind == holding && recurring::entering_banner(ui, company, id) {
+                            stop_entering = true;
+                        }
+                    }
                     let stripe = self.prefs.stripe();
                     let salt = ("page", format!("{page:?}"));
                     egui::ScrollArea::both()
@@ -1806,6 +1947,9 @@ impl eframe::App for LedgerApp {
                             Page::Items => pages::items(ui, company, &mut self.lists, &mut actions),
                             Page::Classes => {
                                 pages::classes(ui, company, &mut self.lists, &mut actions)
+                            }
+                            Page::Recurring => {
+                                recurring::page(ui, company, &mut self.recurring, &mut actions)
                             }
                             Page::SalesTax => {
                                 salestax::page(ui, company, &mut self.sales_tax, &mut actions)
@@ -1857,6 +2001,10 @@ impl eframe::App for LedgerApp {
                 }
             }
         });
+        if stop_entering {
+            self.entering = None;
+            self.info("The form is now an ordinary new transaction.");
+        }
         for action in actions {
             self.apply(action);
         }
@@ -1880,6 +2028,29 @@ impl eframe::App for LedgerApp {
 /// The transaction id in an outcome's `created`, such as `T42`.
 fn parse_txn_id(created: &str) -> Option<TxnId> {
     created.strip_prefix('T')?.parse().ok().map(TxnId)
+}
+
+/// A recurring transaction's next occurrence as a transaction to load into
+/// its form, with the recurring transaction's name.
+fn next_occurrence(
+    c: &ledgercraft_ledger::Company,
+    id: RecurringId,
+) -> Result<(ledgercraft_ledger::Transaction, String), String> {
+    let r = c
+        .recurring(id)
+        .ok_or_else(|| format!("Recurring transaction {id} was not found."))?;
+    let date = r.next().ok_or_else(|| format!("{} has ended.", r.name))?;
+    let body = c.recurring_body(id, date).map_err(|e| e.to_string())?;
+    let t = ledgercraft_ledger::Transaction {
+        id: TxnId(0),
+        date,
+        number: String::new(),
+        memo: r.template.memo.clone(),
+        body,
+        voided: false,
+        class: r.template.class,
+    };
+    Ok((t, r.name.clone()))
 }
 
 #[cfg(test)]

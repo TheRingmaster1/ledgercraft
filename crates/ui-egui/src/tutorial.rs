@@ -609,6 +609,46 @@ const LESSONS: &[Lesson] = &[
         try_it: &[("Open Journal Entry", form(FormKind::Journal))],
     },
     Lesson {
+        title: "Recurring transactions",
+        blocks: &[
+            Text(
+                "Rent, a loan payment, a monthly retainer invoice: anything entered the same \
+                 way again and again can be memorized with a schedule. Invoices, sales \
+                 receipts, bills, checks, deposits and journal entries can recur.",
+            ),
+            Steps(&[
+                "Fill in the form as it should be each time (the date does not matter).",
+                "Click Memorize… beside Save. Name it, choose how often (every 2 weeks, \
+                 monthly, quarterly…), the next date and, if it stops, an end date.",
+                "Choose Remind me to check each one before it is entered, or Enter it \
+                 automatically for amounts that never change.",
+                "Click Memorize. The form itself is not saved by this: Save it too if this \
+                 one should be recorded now.",
+            ]),
+            Heading("When one is due"),
+            Bullets(&[
+                "Automatic ones are entered on their date when the company is opened on or \
+                 after it (several at once if you have been away). Edit > Undo takes them \
+                 back.",
+                "Reminders show on Home and in Lists > Recurring Transactions. Enter… opens \
+                 the next one in its form with its date filled in; change anything (this \
+                 month's power bill amount, say), then Save. Skip moves to the next date \
+                 without entering it.",
+                "Due dates keep their terms, and sales tax is worked out at the rates in \
+                 force on the new date.",
+                "Edit changes the name and schedule; Pause stops it until you resume it; \
+                 Delete forgets it (what it entered stays).",
+                "Nothing is entered into closed books: skip those, or move the closing date.",
+            ]),
+            Tip(
+                "The sample company enters its shop rent automatically on the first, and \
+                 reminds you of the loan payment (October's is due) and the quarterly \
+                 depreciation entry.",
+            ),
+        ],
+        try_it: &[("Open Recurring Transactions", Target::Page(Page::Recurring))],
+    },
+    Lesson {
         title: "Fixing mistakes",
         blocks: &[
             Heading("Undo and redo"),

@@ -15,10 +15,11 @@
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_ledger::{
     tax_payment_memo, AccountId, AccountLine, AccountType, Address, Applied, BankRule, Bill, Check,
-    Company, Contact, CreditMemo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
-    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Logo, Party, PayBill,
-    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, TaxRate, TxnBody, TxnClassId,
-    TxnId, VendorId,
+    Company, Contact, CreditMemo, Logo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
+    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Party, PayBill,
+    ReceivePayment, RecurringMode, RecurringSpec, Refund, SalesLine, SalesReceipt, TaxGroupId,
+    TaxRate, TxnBody, TxnClassId, TxnId, TxnTemplate, Frequency,
+    VendorId,
 };
 
 fn d(y: i32, m: u32, day: u32) -> LedgerResult<Date> {
@@ -784,7 +785,66 @@ pub fn sample_company() -> LedgerResult<Company> {
         [table, chair, design],
     )?;
     classes(&mut c)?;
+    memorized(&mut c)?;
     Ok(c)
+}
+
+/// Recurring transactions: the rent check entered automatically on the
+/// first, the loan payment as a reminder (October's is due), and the
+/// quarterly depreciation entry.
+fn memorized(c: &mut Company) -> LedgerResult<()> {
+    let latest = |c: &Company, memo: &str| {
+        c.transactions
+            .iter()
+            .filter(|t| t.memo == memo && !t.voided)
+            .max_by_key(|t| t.date)
+            .map(|t| TxnTemplate {
+                date: t.date,
+                memo: t.memo.clone(),
+                body: t.body.clone(),
+                class: t.class,
+            })
+            .ok_or_else(|| LedgerError::NotFound(format!("The {memo} transaction")))
+    };
+    let mut rent = latest(c, "October rent")?;
+    rent.memo = "Shop rent".into();
+    let loan = latest(c, "Loan payment")?;
+    let mut depreciation = latest(c, "Third-quarter depreciation")?;
+    depreciation.memo = "Quarterly depreciation".into();
+    for (name, frequency, next, mode, template) in [
+        (
+            "Shop rent",
+            Frequency::Monthly,
+            d(2026, 11, 1)?,
+            RecurringMode::Automatic,
+            rent,
+        ),
+        (
+            "Loan payment",
+            Frequency::Monthly,
+            d(2026, 10, 4)?,
+            RecurringMode::Remind,
+            loan,
+        ),
+        (
+            "Quarterly depreciation",
+            Frequency::Quarterly,
+            d(2026, 12, 31)?,
+            RecurringMode::Remind,
+            depreciation,
+        ),
+    ] {
+        let spec = RecurringSpec {
+            name: name.into(),
+            frequency,
+            every: 1,
+            next,
+            end: None,
+            mode,
+        };
+        c.add_recurring(spec, template)?;
+    }
+    Ok(())
 }
 
 /// Classes split the shop's own sales from the craft fairs for Profit &

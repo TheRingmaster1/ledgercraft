@@ -89,6 +89,9 @@ pub struct Company {
     /// Classes transactions can be put in (departments, locations…).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub classes: Vec<crate::TxnClass>,
+    /// Memorized transactions with their schedules.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recurring: Vec<crate::Recurring>,
     #[serde(default)]
     next_id: u64,
 }
@@ -121,6 +124,7 @@ impl Company {
             closing: None,
             audit: Vec::new(),
             classes: Vec::new(),
+            recurring: Vec::new(),
             next_id: 0,
         }
     }
@@ -153,6 +157,8 @@ impl Company {
             .chain(self.transactions.iter().map(|t| t.id.0))
             .chain(self.tax_components.iter().map(|t| t.id.0))
             .chain(self.tax_groups.iter().map(|g| g.id.0))
+            .chain(self.classes.iter().map(|k| k.id.0))
+            .chain(self.recurring.iter().map(|r| r.id.0))
             .max()
             .unwrap_or(0);
         self.next_id = self.next_id.max(max);

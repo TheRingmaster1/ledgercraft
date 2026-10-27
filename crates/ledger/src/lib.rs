@@ -17,6 +17,7 @@ mod merge;
 mod party;
 mod print;
 mod reconcile;
+mod recurring;
 mod salestax;
 mod template;
 mod txn;
@@ -28,12 +29,16 @@ pub use closing::{AuditEntry, Closing};
 pub use company::{Company, CompanyInfo, LedgerEntry};
 pub use error::{LedgerError, LedgerResult};
 pub use ids::{
-    AccountId, CustomerId, ItemId, TaxComponentId, TaxGroupId, TxnClassId, TxnId, VendorId,
+    AccountId, CustomerId, ItemId, RecurringId, TaxComponentId, TaxGroupId, TxnClassId, TxnId,
+    VendorId,
 };
 pub use item::{Item, ItemKind, ItemSpec};
 pub use party::{Address, Contact, Customer, Party, Vendor};
 pub use print::{base64_decode, base64_encode, Logo, PdfTemplate, PrintStyle, LOGO_MAX_BYTES};
 pub use reconcile::{ReconcileItem, Reconciliation};
+pub use recurring::{
+    can_recur, Frequency, Recurring, RecurringMode, RecurringSpec, TxnTemplate, MAX_CATCH_UP,
+};
 pub use salestax::{
     rate_publication_date, tax_payment_memo, AgencyOwed, CustomerTax, DatedRate, ImportedTax,
     InvoiceTax, TaxComponent, TaxGroup, TaxLine, TaxRate, TaxReview, SALES_TAX_ACCOUNT,

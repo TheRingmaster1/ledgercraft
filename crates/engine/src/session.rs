@@ -218,7 +218,7 @@ impl Session {
         }
         let txn_date = |id: &TxnId| self.company.txn(*id).map(|t| t.date);
         let dates: Vec<Date> = match cmd {
-            Command::TxnPost { date, .. } => vec![*date],
+            Command::TxnPost { date, .. } | Command::RecurringEnter { date, .. } => vec![*date],
             Command::TxnUpdate { id, date, .. } => {
                 txn_date(id).into_iter().chain([*date]).collect()
             }
@@ -253,7 +253,8 @@ impl Session {
     /// Why a change that rewrote transactions is refused: it changed one
     /// dated on or before the closing date (compared with `before`), and the
     /// closing date password has not been entered.
-    fn closed_changes(&self, before: &Company) -> Option<EngineError> {
+    /// `what` starts the message; `also` is added at its end.
+    fn closed_changes(&self, before: &Company, what: &str, also: &str) -> Option<EngineError> {
         let closing = self.company.closing.as_ref()?;
         let has_password = closing.password.is_some();
         if has_password && self.closing_unlocked {
@@ -264,15 +265,20 @@ impl Session {
             .iter()
             .filter(|t| t.date <= closing.date)
             .any(|t| self.company.txn(t.id).is_none_or(|now| now.body != t.body));
-        changed.then(|| {
+        // Or added one dated then or before.
+        let added = self
+            .company
+            .transactions
+            .iter()
+            .any(|t| t.date <= closing.date && before.txn(t.id).is_none());
+        (changed || added).then(|| {
             let how = if has_password {
                 "enter the closing date password (File > Closing Date…) first"
             } else {
                 "move the closing date (File > Closing Date…) first"
             };
             EngineError::Closed(format!(
-                "This merge would change transactions dated on or before the closing date \
-                 ({}): {how}.",
+                "{what} dated on or before the closing date ({}): {how}.{also}",
                 closing.date
             ))
         })
@@ -317,6 +323,28 @@ impl Session {
                 .map(|t| describe(t.date, &t.number, &t.body))
                 .unwrap_or_default(),
             Command::CompanySetClosing { date: Some(d), .. } => format!("Closed through {d}"),
+            Command::RecurringEnter {
+                id,
+                date,
+                number,
+                body,
+                ..
+            } => {
+                let name = self
+                    .company
+                    .recurring(*id)
+                    .map(|r| r.name.clone())
+                    .unwrap_or_default();
+                format!("{} (recurring {name})", describe(*date, number, body))
+            }
+            Command::RecurringEnterDue { through } => self
+                .company
+                .recurring_due(*through)
+                .iter()
+                .filter(|r| r.mode == ledgercraft_ledger::RecurringMode::Automatic)
+                .map(|r| r.name.clone())
+                .collect::<Vec<_>>()
+                .join(", "),
             _ => String::new(),
         }
     }
@@ -344,12 +372,22 @@ impl Session {
                 | Command::VendorMerge { .. }
                 | Command::ItemMerge { .. }
         );
+        // Automatic recurring transactions are only known once entered.
+        let entering = matches!(cmd, Command::RecurringEnterDue { .. });
         let before = self.company.clone();
         let result = catch_unwind(AssertUnwindSafe(|| cmd.apply(&mut self.company)));
         // A merge rewrites the transactions that named what was merged away:
         // closed ones are as locked as for any other change.
-        if merge && matches!(result, Ok(Ok(_))) {
-            if let Some(e) = self.closed_changes(&before) {
+        if (merge || entering) && matches!(result, Ok(Ok(_))) {
+            let (what, also) = if merge {
+                ("This merge would change transactions", "")
+            } else {
+                (
+                    "Recurring transactions due would be entered",
+                    " Or skip them on Lists > Recurring Transactions.",
+                )
+            };
+            if let Some(e) = self.closed_changes(&before, what, also) {
                 self.company = before;
                 return Err(e);
             }
@@ -720,6 +758,69 @@ mod tests {
     }
 
     #[test]
+    fn recurring_transactions_respect_the_closing_date_and_undo() {
+        use ledgercraft_core::{Date, Money};
+        use ledgercraft_ledger::{
+            AccountLine, Check, Company, Frequency, RecurringMode, RecurringSpec, TxnBody,
+            TxnTemplate,
+        };
+        let d = |t: &str| Date::parse(t).unwrap();
+        let mut s = Session::new(Company::with_default_accounts("Recurring Co"));
+        let id = |s: &Session, n: &str| s.company().account_by_name(n).unwrap().id;
+        let create = crate::Command::RecurringCreate {
+            spec: RecurringSpec {
+                name: "Rent".into(),
+                frequency: Frequency::Monthly,
+                every: 1,
+                next: d("2026-01-31"),
+                end: None,
+                mode: RecurringMode::Automatic,
+            },
+            template: TxnTemplate {
+                date: d("2026-01-31"),
+                memo: "Rent".into(),
+                body: TxnBody::Check(Check {
+                    payee: None,
+                    pay_from: id(&s, "Checking"),
+                    lines: vec![AccountLine {
+                        account: id(&s, "Rent"),
+                        description: String::new(),
+                        amount: Money::from_dollars(1200),
+                    }],
+                }),
+                class: None,
+            },
+        };
+        // Through JSON, as the CLI sends it.
+        let json = serde_json::to_string(&create).unwrap();
+        let made = s.execute_json(&json).unwrap().created.unwrap();
+        let rent = s.company().recurring[0].id;
+        assert_eq!(made, rent.to_string());
+
+        s.execute(crate::Command::CompanySetClosing {
+            date: Some(d("2026-02-15")),
+            password: None,
+            keep_password: false,
+        })
+        .unwrap();
+        let due = crate::Command::RecurringEnterDue {
+            through: d("2026-03-31"),
+        };
+        // January's is in the closed books: nothing is entered.
+        assert!(matches!(s.execute(due.clone()), Err(EngineError::Closed(_))));
+        assert!(s.company().transactions.is_empty());
+        s.execute(crate::Command::RecurringSkip { id: rent }).unwrap();
+        s.execute(due).unwrap();
+        let dates: Vec<Date> = s.company().transactions.iter().map(|t| t.date).collect();
+        assert_eq!(dates, [d("2026-02-28"), d("2026-03-31")]);
+        assert_eq!(s.company().recurring[0].next(), Some(d("2026-04-30")));
+        // One undo takes them both back, schedule included.
+        s.undo();
+        assert!(s.company().transactions.is_empty());
+        assert_eq!(s.company().recurring[0].next(), Some(d("2026-02-28")));
+    }
+
+    #[test]
     fn closed_books_are_locked() {
         use ledgercraft_core::Date;
         let mut s = Session::new(crate::sample_company().unwrap());
@@ -929,6 +1030,22 @@ mod tests {
             .customers
             .iter()
             .any(|x| x.contact.name == "Maple St. Cafe"));
+
+        // Recurring: an automatic one not yet due, and a reminder due.
+        assert!(c
+            .recurring
+            .iter()
+            .any(|r| r.mode == ledgercraft_ledger::RecurringMode::Automatic));
+        assert!(!c.automatic_due(today));
+        let due: Vec<&str> = c
+            .recurring_due(today)
+            .iter()
+            .map(|r| r.name.as_str())
+            .collect();
+        assert_eq!(due, ["Loan payment"]);
+        for r in &c.recurring {
+            c.recurring_body(r.id, r.next().unwrap()).unwrap();
+        }
 
         // Classes: two in use (each on income), one inactive.
         assert!(c.classes.iter().any(|k| !k.active));

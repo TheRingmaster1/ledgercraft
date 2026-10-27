@@ -23,6 +23,21 @@ docs/releasing.md.
   Sheet show each parent with its sub-accounts and a total, and the Trial
   Balance uses full names. `account.create` and `account.update` take
   `parent`.
+- Recurring transactions: Memorize… on an invoice, sales receipt, bill,
+  check, deposit or journal entry saves it with a schedule (every N days,
+  weeks, months, quarters or years, from a next date to an optional end
+  date). Reminders are listed on Home and Lists > Recurring Transactions,
+  where Enter… opens the next one in its form to check and save, and Skip
+  moves past it; automatic ones are entered when the company is opened on or
+  after their date, catching up any missed (one Undo takes them back).
+  Due dates keep their terms and sales tax is worked out at the new date's
+  rates; monthly ones on the 31st land on the last day of shorter months.
+  Nothing is entered into closed books. Merges move recurring transactions
+  too. Commands `recurring.create`, `recurring.update`, `recurring.delete`,
+  `recurring.setActive`, `recurring.skip`, `recurring.enter`,
+  `recurring.enterDue`.
+- The sample company has recurring transactions: shop rent (automatic), the
+  loan payment (a reminder, October's due) and quarterly depreciation.
 - Classes (M2.8): Lists > Classes adds departments, locations or lines of
   business (rename, make inactive). Every transaction form shows a Class box
   once a class exists, and Reports > Profit & Loss by Class (CLI
