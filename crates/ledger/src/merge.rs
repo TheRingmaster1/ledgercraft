@@ -407,7 +407,7 @@ mod tests {
         };
         let first = check(a);
         let second = check(b);
-        let memorized = check(a);
+        let scheduled = check(a);
         c.post(d("2026-01-02"), "1", "", first).unwrap();
         c.post(d("2026-01-03"), "2", "", second).unwrap();
         let recurring = c
@@ -423,7 +423,7 @@ mod tests {
                 crate::TxnTemplate {
                     date: d("2026-01-02"),
                     memo: String::new(),
-                    body: memorized,
+                    body: scheduled,
                     class: None,
                 },
             )

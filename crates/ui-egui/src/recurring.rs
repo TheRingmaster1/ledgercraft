@@ -1,5 +1,5 @@
-//! Recurring (memorized) transactions: Lists > Recurring Transactions, and
-//! the Memorize window a form's Memorize… button opens.
+//! Recurring transactions: Lists > Recurring Transactions, and the Make
+//! Recurring window a form's Make Recurring… button opens.
 
 use eframe::egui::{self, RichText, Ui};
 use ledgercraft_core::{Date, Money};
@@ -71,16 +71,16 @@ impl SpecInput {
     }
 }
 
-/// The Memorize window: the transaction from the form, and its schedule.
-pub(crate) struct Memorize {
+/// The Make Recurring window: the transaction from the form, and its schedule.
+pub(crate) struct NewRecurring {
     kind: FormKind,
     template: TxnTemplate,
     input: SpecInput,
     error: Option<String>,
 }
 
-/// What the Memorize window asks for.
-pub(crate) enum MemorizeOutcome {
+/// What the Make Recurring window asks for.
+pub(crate) enum RecurringOutcome {
     /// Boxed: a command is large.
     Save(Box<Command>),
     Cancel,
@@ -88,7 +88,7 @@ pub(crate) enum MemorizeOutcome {
 
 #[derive(Default)]
 pub(crate) struct RecurringState {
-    pub memorize: Option<Memorize>,
+    pub new_recurring: Option<NewRecurring>,
     /// The one whose settings are being changed.
     pub editing: Option<(RecurringId, SpecInput)>,
     pub show_inactive: bool,
@@ -101,8 +101,8 @@ impl RecurringState {
         }
     }
 
-    /// Opens the Memorize window for what a form would record.
-    pub(crate) fn memorize(&mut self, c: &Company, kind: FormKind, cmd: Command) {
+    /// Opens the Make Recurring window for what a form would record.
+    pub(crate) fn make_recurring(&mut self, c: &Company, kind: FormKind, cmd: Command) {
         let Command::TxnPost {
             date,
             memo,
@@ -118,7 +118,7 @@ impl RecurringState {
             None if !memo.trim().is_empty() => memo.trim().to_string(),
             None => body.label().to_string(),
         };
-        self.memorize = Some(Memorize {
+        self.new_recurring = Some(NewRecurring {
             kind,
             input: SpecInput::new(name, date.add_months(1)),
             template: TxnTemplate {
@@ -132,7 +132,7 @@ impl RecurringState {
     }
 
     pub(crate) fn set_error(&mut self, e: String) {
-        if let Some(m) = self.memorize.as_mut() {
+        if let Some(m) = self.new_recurring.as_mut() {
             m.error = Some(e);
         }
     }
@@ -205,14 +205,14 @@ fn describe(c: &Company, template: &TxnTemplate) -> String {
     parts.join(" · ")
 }
 
-pub(crate) fn memorize_window(
+pub(crate) fn make_recurring_window(
     ctx: &egui::Context,
-    m: &mut Memorize,
+    m: &mut NewRecurring,
     c: &Company,
-) -> Option<MemorizeOutcome> {
+) -> Option<RecurringOutcome> {
     let mut outcome = None;
     let mut open = true;
-    egui::Window::new("Memorize Transaction")
+    egui::Window::new("Make Recurring")
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
@@ -230,18 +230,18 @@ pub(crate) fn memorize_window(
                 .color(theme::MUTED),
             );
             ui.add_space(8.0);
-            spec_fields(ui, "memorize", &mut m.input);
+            spec_fields(ui, "new", &mut m.input);
             if let Some(e) = &m.error {
                 ui.add_space(4.0);
                 ui.label(RichText::new(e.as_str()).color(theme::NEGATIVE));
             }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if ui.button(RichText::new("Memorize").strong()).clicked() {
+                if ui.button(RichText::new("Save Schedule").strong()).clicked() {
                     match m.input.build() {
                         Ok(spec) => {
-                            outcome =
-                                Some(MemorizeOutcome::Save(Box::new(Command::RecurringCreate {
+                            outcome = Some(RecurringOutcome::Save(Box::new(
+                                Command::RecurringCreate {
                                     spec,
                                     template: m.template.clone(),
                                 })));
@@ -250,12 +250,12 @@ pub(crate) fn memorize_window(
                     }
                 }
                 if ui.button("Cancel").clicked() {
-                    outcome = Some(MemorizeOutcome::Cancel);
+                    outcome = Some(RecurringOutcome::Cancel);
                 }
             });
         });
     if !open {
-        outcome = Some(MemorizeOutcome::Cancel);
+        outcome = Some(RecurringOutcome::Cancel);
     }
     outcome
 }
@@ -277,7 +277,7 @@ fn edit_panel(ui: &mut Ui, c: &Company, s: &mut RecurringState, out: &mut Vec<Ac
         ui.label(
             RichText::new(
                 "To change what it enters, enter it once, change it in its form, then \
-                 Memorize… it again and delete this one.",
+                 Make Recurring… again and delete this one.",
             )
             .color(theme::MUTED),
         );
@@ -328,7 +328,7 @@ pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut RecurringState, out: &mut V
     ui.label(
         RichText::new(
             "Fill in an invoice, sales receipt, bill, check, deposit or journal entry, then \
-             click Memorize… on its form to save it with a schedule. Reminders are listed \
+             click Make Recurring… on its form to save it with a schedule. Reminders are listed \
              here and on Home when due; automatic ones are entered when the company is \
              opened on or after their date.",
         )
@@ -336,7 +336,7 @@ pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut RecurringState, out: &mut V
     );
     ui.add_space(6.0);
     if c.recurring.is_empty() {
-        ui.label(RichText::new("Nothing memorized yet.").color(theme::MUTED));
+        ui.label(RichText::new("No recurring transactions yet.").color(theme::MUTED));
         return;
     }
     ui.checkbox(&mut s.show_inactive, "Show paused and ended");
@@ -533,16 +533,16 @@ mod tests {
             body: first.template.body.clone(),
             class: None,
         };
-        s.memorize(&c, FormKind::Check, post);
-        assert!(s.memorize.is_some());
+        s.make_recurring(&c, FormKind::Check, post);
+        assert!(s.new_recurring.is_some());
         let ctx = egui::Context::default();
         crate::theme::apply(&ctx);
         let mut out = Vec::new();
         crate::theme::test_frame(&ctx, |ui| page(ui, &c, &mut s, &mut out));
         assert!(out.is_empty());
         let mut outcome = None;
-        let mut m = s.memorize.take().unwrap();
-        crate::theme::test_frame(&ctx, |ui| outcome = memorize_window(ui.ctx(), &mut m, &c));
+        let mut m = s.new_recurring.take().unwrap();
+        crate::theme::test_frame(&ctx, |ui| outcome = make_recurring_window(ui.ctx(), &mut m, &c));
         assert!(outcome.is_none());
     }
 }

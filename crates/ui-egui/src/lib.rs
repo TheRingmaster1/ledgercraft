@@ -132,8 +132,8 @@ pub(crate) enum Action {
     ClearStatus,
     /// Open a recorded transaction in its form, to change it.
     Open(TxnId),
-    /// Memorize… on a form: what it would record (a `txn.post`).
-    Memorize(FormKind, Box<Command>),
+    /// Make Recurring… on a form: what it would record (a `txn.post`).
+    MakeRecurring(FormKind, Box<Command>),
     /// Open a recurring transaction's next occurrence in its form, to check
     /// and enter it.
     EnterRecurring(ledgercraft_ledger::RecurringId),

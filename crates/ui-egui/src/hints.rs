@@ -79,7 +79,7 @@ impl Page {
                  so you know the books match the bank."
             }
             Self::Recurring => {
-                "Memorized transactions: entered for you on a schedule, or listed here when \
+                "Transactions entered for you on a schedule, or listed here when they are \
                  due."
             }
             Self::Classes => {

@@ -15,7 +15,7 @@ use crate::pages::{self, ListState, ReportState};
 use crate::prefs::{self, Prefs};
 use crate::recent::{AppState, WindowState};
 use crate::reconcile::{self, ReconcileState};
-use crate::recurring::{self, MemorizeOutcome, RecurringState};
+use crate::recurring::{self, RecurringOutcome, RecurringState};
 use crate::salestax::{self, SalesTaxState};
 use crate::security::{
     self, PasswordForm, PasswordOutcome, UnlockForm, UnlockOutcome, UpgradeChoice,
@@ -59,7 +59,7 @@ pub struct LedgerApp {
     /// The quarterly "check your sales tax rates" reminder was put off until
     /// the company is next opened.
     tax_reminder_later: bool,
-    /// Lists > Recurring Transactions, and the Memorize window.
+    /// Lists > Recurring Transactions, and the Make Recurring window.
     recurring: RecurringState,
     /// The form holding a recurring transaction's next occurrence: saving
     /// it enters that occurrence.
@@ -642,9 +642,9 @@ impl LedgerApp {
                     self.entering = None;
                 }
             }
-            Action::Memorize(kind, cmd) => {
+            Action::MakeRecurring(kind, cmd) => {
                 if let Some(s) = self.session.as_ref() {
-                    self.recurring.memorize(s.company(), kind, *cmd);
+                    self.recurring.make_recurring(s.company(), kind, *cmd);
                 }
             }
             Action::EnterRecurring(id) => self.enter_recurring(id),
@@ -1671,31 +1671,31 @@ impl LedgerApp {
             }
         }
 
-        // Automatic recurring transactions, and the Memorize window.
+        // Automatic recurring transactions, and the Make Recurring window.
         if self.create.is_none() {
             self.enter_automatic();
         }
-        let chosen = match (self.recurring.memorize.as_mut(), self.session.as_ref()) {
-            (Some(m), Some(session)) => recurring::memorize_window(ctx, m, session.company()),
-            (Some(_), None) => Some(MemorizeOutcome::Cancel),
+        let chosen = match (self.recurring.new_recurring.as_mut(), self.session.as_ref()) {
+            (Some(m), Some(session)) => recurring::make_recurring_window(ctx, m, session.company()),
+            (Some(_), None) => Some(RecurringOutcome::Cancel),
             (None, _) => None,
         };
         match chosen {
-            Some(MemorizeOutcome::Save(cmd)) => {
+            Some(RecurringOutcome::Save(cmd)) => {
                 let label = cmd.undo_label();
                 let result = self.session.as_mut().map(|s| s.execute(*cmd));
                 match result {
                     Some(Ok(_)) => {
-                        self.recurring.memorize = None;
+                        self.recurring.new_recurring = None;
                         self.info(format!(
                             "{label}: done. It is on Lists > Recurring Transactions."
                         ));
                     }
                     Some(Err(e)) => self.recurring.set_error(e.to_string()),
-                    None => self.recurring.memorize = None,
+                    None => self.recurring.new_recurring = None,
                 }
             }
-            Some(MemorizeOutcome::Cancel) => self.recurring.memorize = None,
+            Some(RecurringOutcome::Cancel) => self.recurring.new_recurring = None,
             None => {}
         }
 

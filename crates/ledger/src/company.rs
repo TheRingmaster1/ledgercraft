@@ -89,7 +89,7 @@ pub struct Company {
     /// Classes transactions can be put in (departments, locations…).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub classes: Vec<crate::TxnClass>,
-    /// Memorized transactions with their schedules.
+    /// Recurring transactions with their schedules.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recurring: Vec<crate::Recurring>,
     #[serde(default)]

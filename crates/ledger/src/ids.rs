@@ -52,6 +52,6 @@ define_id!(
     TxnClassId, "K"
 );
 define_id!(
-    /// Identifies a recurring (memorized) transaction.
+    /// Identifies a recurring transaction.
     RecurringId, "M"
 );
