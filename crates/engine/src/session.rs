@@ -68,6 +68,10 @@ pub struct Session {
     /// The closing date password was entered: closed books can be changed
     /// until the company is closed.
     closing_unlocked: bool,
+    /// How many daily backups to keep beside the file (0: none).
+    backups: usize,
+    /// Why the last save could not make its backup, if it could not.
+    backup_problem: Option<String>,
 }
 
 impl Session {
@@ -80,7 +84,38 @@ impl Session {
             dirty: false,
             protection: None,
             closing_unlocked: false,
+            backups: 0,
+            backup_problem: None,
         }
+    }
+
+    /// Keep `keep` daily backups of the file, made before the first save of
+    /// each day (0 turns backups off).
+    pub fn set_backups(&mut self, keep: usize) {
+        self.backups = keep;
+    }
+
+    /// Why the last save could not make its backup, once. The save itself
+    /// went ahead.
+    pub fn take_backup_problem(&mut self) -> Option<String> {
+        self.backup_problem.take()
+    }
+
+    /// Makes today's backup of `path` if it is due. A backup that fails is
+    /// reported, but never stops the save.
+    fn backup(&mut self, path: &Path) {
+        let result =
+            ledgercraft_file::backup::backup_before_save(path, Date::today(), self.backups);
+        if let Err(e) = result {
+            self.backup_problem = Some(format!("The daily backup could not be made: {e}"));
+        }
+    }
+
+    /// Forgets where the books came from: the next save asks where to save.
+    /// Used when a backup is opened, so saving never overwrites the backup.
+    pub fn detach(&mut self) {
+        self.path = None;
+        self.dirty = true;
     }
 
     /// Opens a plain company file. A protected one fails with
@@ -343,6 +378,7 @@ impl Session {
 
     pub fn save(&mut self) -> Result<(), EngineError> {
         let path = self.path.clone().ok_or(EngineError::NoPath)?;
+        self.backup(&path);
         ledgercraft_file::save(&path, &self.company, self.protection.as_ref())?;
         self.dirty = false;
         Ok(())
@@ -350,6 +386,7 @@ impl Session {
 
     pub fn save_as(&mut self, path: &Path) -> Result<(), EngineError> {
         let path = ledgercraft_file::with_extension(path);
+        self.backup(&path);
         ledgercraft_file::save(&path, &self.company, self.protection.as_ref())?;
         self.path = Some(path);
         self.dirty = false;
@@ -683,6 +720,29 @@ mod tests {
             "{}",
             first.detail
         );
+    }
+
+    #[test]
+    fn saving_makes_the_daily_backup() {
+        let dir = std::env::temp_dir().join(format!("lc-session-backup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("Books.lcbooks");
+        let mut s = Session::new(crate::sample_company().unwrap());
+        s.set_backups(5);
+        s.save_as(&path).unwrap();
+        // The first save had no earlier file to copy.
+        assert!(ledgercraft_file::backup::backups_of(&path).is_empty());
+        s.save().unwrap();
+        assert_eq!(ledgercraft_file::backup::backups_of(&path).len(), 1);
+        assert!(s.take_backup_problem().is_none());
+        // A backup opened and saved goes somewhere new, never over itself.
+        let backup = ledgercraft_file::backup::backups_of(&path).remove(0);
+        let mut restored = Session::open(&backup).unwrap();
+        restored.detach();
+        assert!(restored.path().is_none() && restored.is_dirty());
+        assert!(matches!(restored.save(), Err(EngineError::NoPath)));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

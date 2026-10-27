@@ -65,6 +65,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 * PDF templates (Classic, Modern, Simple) and a company logo (M2.5)
 * Closing date with an optional password, and an audit trail report (M2.7)
 * Ship-to addresses on customers and invoices; Sales by State report
+* File dialogs that remember their folders; daily backups with Open a Backup (M2.9)
 * Sales receipts, credit memos (applied to invoices or kept as credit) and
   refunds, with sales tax and PDFs (M2.6)
 
@@ -84,8 +85,8 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
    - ~~File association for `.lcbooks`~~ (done: Windows from Preferences, Linux from install.sh)
    - ~~Remembered window size, side bar and last company~~ (done)
    - ~~Recent companies on the start page~~ (done, also File > Open Previous Company)
-   - A clear message when the system file dialog cannot open (Linux without an
-     xdg-desktop-portal backend)
+   - ~~A clear message when the system file dialog cannot open (Linux without an
+     xdg-desktop-portal backend)~~ (done)
 5. M1.5.5 Packaging: ~~Windows installer (MSI) and portable zip; Linux AppImage~~
    (done: built by the Release workflow, which can also be run by hand to try
    them); next: an AUR PKGBUILD (deb/rpm later); code signing later
@@ -140,7 +141,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 6. ~~M2.6 Credit memos, refunds, customer credits; sales receipts~~ (done)
 7. ~~M2.7 Closing date and password; audit trail report~~ (done)
 8. M2.8 Edit and merge list entries; sub-accounts; classes
-9. M2.9 Native file dialogs that remember locations, recent files, auto-backup
+9. ~~M2.9 Native file dialogs that remember locations, recent files, auto-backup~~ (done)
 
 ## Later (M3: small business)
 

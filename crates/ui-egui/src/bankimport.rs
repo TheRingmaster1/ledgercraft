@@ -177,10 +177,11 @@ fn body(ui: &mut Ui, c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
 }
 
 fn choose_file(c: &Company, s: &mut ImportState, out: &mut Vec<Action>) {
-    let Some(path) = rfd::FileDialog::new()
-        .add_filter("Bank download", &["ofx", "qfx", "qbo", "csv", "txt"])
-        .pick_file()
-    else {
+    let Some(path) = crate::dialogs::pick_file(
+        crate::dialogs::Folder::BankDownload,
+        None,
+        &[("Bank download", &["ofx", "qfx", "qbo", "csv", "txt"])],
+    ) else {
         return;
     };
     let name = path

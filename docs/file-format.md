@@ -33,6 +33,8 @@ A company file is UTF-8 JSON:
 * Amounts (`rate`, `amount`, `debit`, `credit`) are integers in **cents**.
 * Quantities (`qty`) are integers in **thousandths** (`1000` = 1).
 * Dates are `YYYY-MM-DD`.
+* Daily backups are byte-for-byte copies of the file, in a `LedgerCraft
+  Backups` folder beside it, named `<company file name> YYYY-MM-DD.lcbooks`.
 * `closing`, when the books are closed: `date` (transactions dated then or
   before are locked) and, if set, `password`: a one-way Argon2id check value
   (`argon2id$memory$passes$lanes$salt$hash`), never the password itself.

@@ -585,10 +585,11 @@ fn import_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
              Export > Lists to IIF Files. Brings in accounts, customers, vendors and items.",
         );
         if iif.clicked() {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("IIF file", &["iif", "txt"])
-                .pick_file()
-            {
+            if let Some(path) = crate::dialogs::pick_file(
+                crate::dialogs::Folder::ListImport,
+                None,
+                &[("IIF file", &["iif", "txt"])],
+            ) {
                 form.imports.push(ImportFile { path, csv: None });
             }
         }
@@ -608,10 +609,11 @@ fn import_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
             form.csv_kind.columns()
         ));
         if csv.clicked() {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("CSV file", &["csv", "txt"])
-                .pick_file()
-            {
+            if let Some(path) = crate::dialogs::pick_file(
+                crate::dialogs::Folder::ListImport,
+                None,
+                &[("CSV file", &["csv", "txt"])],
+            ) {
                 form.imports.push(ImportFile {
                     path,
                     csv: Some(form.csv_kind),

@@ -11,6 +11,8 @@ use crate::company_info::{self, CompanyInfoForm, CompanyInfoOutcome};
 use crate::forms::Forms;
 use crate::licenses::{LicenseTab, LicenseWindow};
 use crate::pages::{self, ListState, ReportState};
+use crate::dialogs::{self, Folder};
+use crate::widgets;
 use crate::prefs::{self, Prefs};
 use crate::recent::{AppState, WindowState};
 use crate::reconcile::{self, ReconcileState};
@@ -30,6 +32,8 @@ enum Pending {
     Open,
     /// Open `LedgerApp::open_target` (a recent company).
     OpenPath,
+    /// Choose one of the open company's backups and open it as a copy.
+    OpenBackup,
     Sample,
     Close,
     Quit,
@@ -89,6 +93,9 @@ pub struct LedgerApp {
     state_path: Option<PathBuf>,
     /// The recent company waiting on `Pending::OpenPath`.
     open_target: Option<PathBuf>,
+    /// File > Open a Backup… is opening a backup: it opens as an unsaved
+    /// copy, so saving never overwrites the backup.
+    restoring: bool,
     /// Where to go back to when a transaction edit is saved or cancelled.
     edit_return: Option<Page>,
     show_nav: bool,
@@ -132,6 +139,7 @@ impl LedgerApp {
             .as_deref()
             .map(AppState::load_from)
             .unwrap_or_default();
+        dialogs::set_folders(state.folders.clone());
         let mut app = Self {
             show_tutorial: prefs.show_tutorial,
             prefs,
@@ -201,6 +209,7 @@ impl LedgerApp {
             saved_state: AppState::default(),
             state_path: None,
             open_target: None,
+            restoring: false,
             edit_return: None,
             show_nav: true,
             title: String::new(),
@@ -312,6 +321,7 @@ impl LedgerApp {
     /// Writes the recent list, window size and side bar when they change.
     fn save_state(&mut self) {
         self.state.side_bar = self.show_nav;
+        self.state.folders = dialogs::folders();
         if self.state == self.saved_state {
             return;
         }
@@ -407,10 +417,25 @@ impl LedgerApp {
                     self.open_recent(path);
                 }
             }
+            Pending::OpenBackup => {
+                let start = self.open_target.take();
+                let picked = dialogs::pick_file_in(
+                    Folder::Backup,
+                    Some("Open a Backup"),
+                    &[("LedgerCraft company", &[ledgercraft_file::EXTENSION])],
+                    start.as_deref(),
+                );
+                if let Some(path) = picked {
+                    self.restoring = true;
+                    self.open_path(path);
+                }
+            }
             Pending::Open => {
-                let picked = rfd::FileDialog::new()
-                    .add_filter("LedgerCraft company", &[ledgercraft_file::EXTENSION])
-                    .pick_file();
+                let picked = dialogs::pick_file(
+                    Folder::Company,
+                    None,
+                    &[("LedgerCraft company", &[ledgercraft_file::EXTENSION])],
+                );
                 if let Some(path) = picked {
                     self.open_path(path);
                 }
@@ -427,16 +452,36 @@ impl LedgerApp {
             Ok(s) => {
                 let protected = s.is_protected();
                 self.replace_session(s);
-                self.remember(&path);
-                self.info(format!("Opened {}", file_name(&path)));
                 // A file from before encryption (or with its password removed):
                 // offer to upgrade it.
-                self.offer_protection = !protected;
+                self.offer_protection = !protected && !self.restoring;
+                self.opened(&path);
             }
             Err(EngineError::File(FileError::PasswordRequired)) => {
                 self.unlock = Some(UnlockForm::new(path))
             }
-            Err(e) => self.error(format!("Could not open {}: {e}", path.display())),
+            Err(e) => {
+                self.restoring = false;
+                self.error(format!("Could not open {}: {e}", path.display()));
+            }
+        }
+    }
+
+    /// After a company file opened: remembered as a recent company, or, for
+    /// a backup, made an unsaved copy.
+    fn opened(&mut self, path: &Path) {
+        if std::mem::take(&mut self.restoring) {
+            if let Some(s) = self.session.as_mut() {
+                s.detach();
+            }
+            self.info(format!(
+                "Opened the backup {} as a copy. Save asks where to keep it (choose the \
+                 company file to replace it), so the backup itself stays as it was.",
+                file_name(path)
+            ));
+        } else {
+            self.remember(path);
+            self.info(format!("Opened {}", file_name(path)));
         }
     }
 
@@ -504,11 +549,14 @@ impl LedgerApp {
             session.company().info.name,
             ledgercraft_file::EXTENSION
         );
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("LedgerCraft company", &[ledgercraft_file::EXTENSION])
-            .set_file_name(name)
-            .save_file()
-        else {
+        // A copy starts in the folder the company is already in.
+        let here = session.path().and_then(Path::parent).map(Path::to_path_buf);
+        let Some(path) = dialogs::save_file(
+            Folder::Company,
+            ("LedgerCraft company", &[ledgercraft_file::EXTENSION]),
+            &name,
+            here.as_deref(),
+        ) else {
             return false;
         };
         let Some(session) = self.session.as_mut() else {
@@ -529,11 +577,7 @@ impl LedgerApp {
     }
 
     fn export_csv(&mut self, name: &str, csv: &str) {
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("CSV", &["csv"])
-            .set_file_name(name)
-            .save_file()
-        else {
+        let Some(path) = dialogs::save_file(Folder::Export, ("CSV", &["csv"]), name, None) else {
             return;
         };
         // Excel on Windows reads a CSV without a byte-order mark as the local
@@ -546,10 +590,8 @@ impl LedgerApp {
     }
 
     fn export_xlsx(&mut self, name: &str, bytes: &[u8]) {
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("Excel workbook", &["xlsx"])
-            .set_file_name(name)
-            .save_file()
+        let Some(path) =
+            dialogs::save_file(Folder::Export, ("Excel workbook", &["xlsx"]), name, None)
         else {
             return;
         };
@@ -779,10 +821,7 @@ impl LedgerApp {
                 return;
             }
         };
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("PDF document", &["pdf"])
-            .set_file_name(name)
-            .save_file()
+        let Some(path) = dialogs::save_file(Folder::Pdf, ("PDF document", &["pdf"]), &name, None)
         else {
             return;
         };
@@ -817,10 +856,7 @@ impl LedgerApp {
                 return false;
             }
         };
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("PDF document", &["pdf"])
-            .set_file_name(name)
-            .save_file()
+        let Some(path) = dialogs::save_file(Folder::Pdf, ("PDF document", &["pdf"]), &name, None)
         else {
             return false;
         };
@@ -956,6 +992,32 @@ impl LedgerApp {
                         {
                             ui.close();
                             self.save_as();
+                        }
+                        let saved_at = self
+                            .session
+                            .as_ref()
+                            .and_then(|s| s.path())
+                            .map(Path::to_path_buf);
+                        let backup = ui
+                            .add_enabled(saved_at.is_some(), egui::Button::new("Open a Backup…"))
+                            .on_hover_text(
+                                "Open one of this company's daily backups, as a copy to look \
+                                 at or save over the company file.",
+                            );
+                        if backup.clicked() {
+                            ui.close();
+                            if let Some(path) = saved_at {
+                                if ledgercraft_file::backup::backups_of(&path).is_empty() {
+                                    self.info(
+                                        "No backups of this company yet: one is made before \
+                                         the first save of each day (Preferences > Files).",
+                                    );
+                                } else {
+                                    self.open_target =
+                                        Some(ledgercraft_file::backup::backup_dir(&path));
+                                    self.request(Pending::OpenBackup, ctx);
+                                }
+                            }
                         }
                         let info = ui
                             .add_enabled(has_company, egui::Button::new("Company Information…"))
@@ -1352,15 +1414,18 @@ impl LedgerApp {
                 let path = self.unlock.take().map(|f| f.path.clone());
                 self.replace_session(*session);
                 if let Some(path) = path {
-                    self.remember(&path);
-                    self.info(format!("Opened {}", file_name(&path)));
+                    self.opened(&path);
                 }
             }
             Some(UnlockOutcome::Failed(e)) => {
                 self.unlock = None;
+                self.restoring = false;
                 self.error(format!("Could not open the company: {e}"));
             }
-            Some(UnlockOutcome::Cancel) => self.unlock = None,
+            Some(UnlockOutcome::Cancel) => {
+                self.unlock = None;
+                self.restoring = false;
+            }
             None => {}
         }
 
@@ -1675,6 +1740,16 @@ impl eframe::App for LedgerApp {
             // Really closing: remember the window for next time.
             self.note_window(ctx);
             self.save_state();
+        }
+        // Keep as many daily backups as Preferences says, and report a
+        // backup or file dialog that could not be made or shown.
+        let keep = usize::from(self.prefs.backups);
+        let backup_problem = self.session.as_mut().and_then(|s| {
+            s.set_backups(keep);
+            s.take_backup_problem()
+        });
+        if let Some(problem) = backup_problem.or_else(dialogs::take_problem) {
+            self.error(problem);
         }
         let title = match &self.session {
             Some(session) => format!("LedgerCraft — {}", session.title()),
