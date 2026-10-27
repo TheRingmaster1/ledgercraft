@@ -22,7 +22,6 @@ use crate::security::{
 use crate::start::{self, NewCompanyForm, StartChoice, StartPage};
 use crate::statement::{self, StatementForm, StatementOutcome};
 use crate::widgets;
-use crate::widgets;
 use crate::{forms, theme, tutorial, Action, FormKind, Page, Reset};
 
 /// Something waiting for the user to decide what to do with unsaved changes.
