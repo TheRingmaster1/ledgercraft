@@ -580,7 +580,10 @@ fn footer_full(
             more = ui.button(label).on_hover_text(hover).clicked();
         }
         if recur {
-            memo = ui.button("Make Recurring…").on_hover_text(MAKE_RECURRING_HOVER).clicked();
+            memo = ui
+                .button("Make Recurring…")
+                .on_hover_text(MAKE_RECURRING_HOVER)
+                .clicked();
         }
         clear = ui.button(clear_label).clicked();
     });

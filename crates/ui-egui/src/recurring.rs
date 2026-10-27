@@ -240,8 +240,8 @@ pub(crate) fn make_recurring_window(
                 if ui.button(RichText::new("Save Schedule").strong()).clicked() {
                     match m.input.build() {
                         Ok(spec) => {
-                            outcome = Some(RecurringOutcome::Save(Box::new(
-                                Command::RecurringCreate {
+                            outcome =
+                                Some(RecurringOutcome::Save(Box::new(Command::RecurringCreate {
                                     spec,
                                     template: m.template.clone(),
                                 })));
@@ -542,7 +542,9 @@ mod tests {
         assert!(out.is_empty());
         let mut outcome = None;
         let mut m = s.new_recurring.take().unwrap();
-        crate::theme::test_frame(&ctx, |ui| outcome = make_recurring_window(ui.ctx(), &mut m, &c));
+        crate::theme::test_frame(&ctx, |ui| {
+            outcome = make_recurring_window(ui.ctx(), &mut m, &c)
+        });
         assert!(outcome.is_none());
     }
 }
