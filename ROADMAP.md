@@ -160,6 +160,9 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 * Choose the flowcards on Home: show or hide each one (Customers, Vendors,
   Banking, At A Glance, and any added later) in Preferences, remembered with
   the other preferences, so Home shows only the work you do
+* Live counts on flowcards: small badges on the boxes showing what is
+  waiting there (3 bills to pay, 2 invoices overdue, 5 bank lines to match,
+  1 recurring transaction due), so Home works as a to-do list as well as a map
 
 ## Out of scope for now
 
