@@ -48,7 +48,9 @@
                     Advertise="yes" />
         </File>
         <!-- Double-clicking a company file opens it in LedgerCraft. -->
-        <ProgId Id="LedgerCraft.Company" Description="LedgerCraft company file" Icon="LedgerCraftIcon">
+        <!-- The file icon comes from ledgercraft.exe (its first icon). -->
+        <ProgId Id="LedgerCraft.Company" Description="LedgerCraft company file"
+                Icon="LedgerCraftExe" IconIndex="0">
           <Extension Id="lcbooks" ContentType="application/x-ledgercraft">
             <Verb Id="open" Command="Open" TargetFile="LedgerCraftExe" Argument="&quot;%1&quot;" />
           </Extension>
