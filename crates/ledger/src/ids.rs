@@ -51,3 +51,7 @@ define_id!(
     /// Identifies a class (a department, location or line of business).
     TxnClassId, "K"
 );
+define_id!(
+    /// Identifies a recurring (memorized) transaction.
+    RecurringId, "M"
+);

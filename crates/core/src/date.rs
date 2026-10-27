@@ -88,6 +88,22 @@ impl Date {
         Self::from_ymd(year, start_month, 1).unwrap_or(self)
     }
 
+    /// Adds (or subtracts) whole months, keeping the day of the month where
+    /// it exists and otherwise using the month's last day (Jan 31 + 1 month
+    /// is Feb 28 or 29). Clamped to years 1–9999.
+    pub fn add_months(self, n: i64) -> Self {
+        let (y, m, d) = self.ymd();
+        let index = i64::from(y)
+            .saturating_mul(12)
+            .saturating_add(i64::from(m) - 1)
+            .saturating_add(n)
+            .clamp(MIN_YEAR * 12, MAX_YEAR * 12 + 11);
+        let year = i32::try_from(index.div_euclid(12)).unwrap_or(1970);
+        let month = u32::try_from(index.rem_euclid(12) + 1).unwrap_or(1);
+        let day = d.min(days_in_month(year, month));
+        Self::from_ymd(year, month, day).unwrap_or(self)
+    }
+
     pub fn first_of_month(self) -> Self {
         let (y, m, _) = self.ymd();
         Self::from_ymd(y, m, 1).unwrap_or(self)
@@ -186,6 +202,17 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn adding_months_keeps_the_day_where_it_can() {
+        let d = |s: &str| Date::parse(s).unwrap();
+        assert_eq!(d("2026-01-31").add_months(1), d("2026-02-28"));
+        assert_eq!(d("2028-01-31").add_months(1), d("2028-02-29"));
+        assert_eq!(d("2026-01-31").add_months(2), d("2026-03-31"));
+        assert_eq!(d("2026-11-15").add_months(3), d("2027-02-15"));
+        assert_eq!(d("2026-03-15").add_months(-3), d("2025-12-15"));
+        assert_eq!(d("2026-02-28").add_months(12), d("2027-02-28"));
+    }
 
     #[test]
     fn epoch_and_round_trip() {

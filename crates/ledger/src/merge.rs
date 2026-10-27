@@ -125,6 +125,15 @@ impl TxnBody {
 }
 
 impl Company {
+    /// Every transaction body on file: the transactions, and the ones
+    /// recurring transactions enter.
+    fn bodies_mut(&mut self) -> impl Iterator<Item = &mut TxnBody> {
+        self.transactions
+            .iter_mut()
+            .map(|t| &mut t.body)
+            .chain(self.recurring.iter_mut().map(|r| &mut r.template.body))
+    }
+
     /// Moves everything of customer `from` onto customer `into`, then
     /// removes `from`. `into` keeps its own details.
     pub fn merge_customers(&mut self, from: CustomerId, into: CustomerId) -> LedgerResult<()> {
@@ -135,8 +144,8 @@ impl Company {
             self.customer(id)
                 .ok_or_else(|| LedgerError::NotFound(format!("Customer {id}")))?;
         }
-        for t in &mut self.transactions {
-            for id in t.body.parties_mut().0 {
+        for body in self.bodies_mut() {
+            for id in body.parties_mut().0 {
                 if *id == from {
                     *id = into;
                 }
@@ -155,8 +164,8 @@ impl Company {
             self.vendor(id)
                 .ok_or_else(|| LedgerError::NotFound(format!("Vendor {id}")))?;
         }
-        for t in &mut self.transactions {
-            for id in t.body.parties_mut().1 {
+        for body in self.bodies_mut() {
+            for id in body.parties_mut().1 {
                 if *id == from {
                     *id = into;
                 }
@@ -176,8 +185,8 @@ impl Company {
             self.item(id)
                 .ok_or_else(|| LedgerError::NotFound(format!("Item {id}")))?;
         }
-        for t in &mut self.transactions {
-            for id in t.body.items_mut() {
+        for body in self.bodies_mut() {
+            for id in body.items_mut() {
                 if *id == from {
                     *id = into;
                 }
@@ -222,8 +231,8 @@ impl Company {
                 *id = into;
             }
         };
-        for t in &mut self.transactions {
-            t.body.accounts_mut().into_iter().for_each(swap);
+        for body in self.bodies_mut() {
+            body.accounts_mut().into_iter().for_each(swap);
         }
         for item in &mut self.items {
             swap(&mut item.spec.income_account);
@@ -385,10 +394,34 @@ mod tests {
         };
         let first = check(a);
         let second = check(b);
+        let memorized = check(a);
         c.post(d("2026-01-02"), "1", "", first).unwrap();
         c.post(d("2026-01-03"), "2", "", second).unwrap();
+        let recurring = c
+            .add_recurring(
+                crate::RecurringSpec {
+                    name: "Lumber".into(),
+                    frequency: crate::Frequency::Monthly,
+                    every: 1,
+                    next: d("2026-02-02"),
+                    end: None,
+                    mode: crate::RecurringMode::Remind,
+                },
+                crate::TxnTemplate {
+                    date: d("2026-01-02"),
+                    memo: String::new(),
+                    body: memorized,
+                    class: None,
+                },
+            )
+            .unwrap();
         c.merge_vendors(a, b).unwrap();
         assert!(c.vendor(a).is_none());
+        // Recurring transactions move too.
+        assert_eq!(
+            c.recurring(recurring).unwrap().template.body.party(),
+            Some(Party::Vendor(b))
+        );
         assert!(c
             .transactions
             .iter()
