@@ -137,7 +137,10 @@ pub enum Command {
         template: TxnTemplate,
     },
     #[serde(rename = "recurring.update")]
-    RecurringUpdate { id: RecurringId, spec: RecurringSpec },
+    RecurringUpdate {
+        id: RecurringId,
+        spec: RecurringSpec,
+    },
     #[serde(rename = "recurring.delete")]
     RecurringDelete { id: RecurringId },
     #[serde(rename = "recurring.setActive")]

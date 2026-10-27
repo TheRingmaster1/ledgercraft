@@ -807,9 +807,13 @@ mod tests {
             through: d("2026-03-31"),
         };
         // January's is in the closed books: nothing is entered.
-        assert!(matches!(s.execute(due.clone()), Err(EngineError::Closed(_))));
+        assert!(matches!(
+            s.execute(due.clone()),
+            Err(EngineError::Closed(_))
+        ));
         assert!(s.company().transactions.is_empty());
-        s.execute(crate::Command::RecurringSkip { id: rent }).unwrap();
+        s.execute(crate::Command::RecurringSkip { id: rent })
+            .unwrap();
         s.execute(due).unwrap();
         let dates: Vec<Date> = s.company().transactions.iter().map(|t| t.date).collect();
         assert_eq!(dates, [d("2026-02-28"), d("2026-03-31")]);

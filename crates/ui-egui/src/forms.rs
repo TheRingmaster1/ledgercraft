@@ -580,7 +580,10 @@ fn footer_full(
             more = ui.button(label).on_hover_text(hover).clicked();
         }
         if memorize {
-            memo = ui.button("Memorize…").on_hover_text(MEMORIZE_HOVER).clicked();
+            memo = ui
+                .button("Memorize…")
+                .on_hover_text(MEMORIZE_HOVER)
+                .clicked();
         }
         clear = ui.button(clear_label).clicked();
     });

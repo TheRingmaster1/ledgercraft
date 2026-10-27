@@ -969,8 +969,14 @@ impl LedgerApp {
         if !session.company().automatic_due(today) {
             return;
         }
-        if let Some(outcome) = self.run(Command::RecurringEnterDue { through: today }, Reset::Nothing) {
-            let n = outcome.created.as_deref().map_or(0, |ids| ids.split(", ").count());
+        if let Some(outcome) = self.run(
+            Command::RecurringEnterDue { through: today },
+            Reset::Nothing,
+        ) {
+            let n = outcome
+                .created
+                .as_deref()
+                .map_or(0, |ids| ids.split(", ").count());
             self.info(format!(
                 "Entered {n} recurring transaction{} due (Lists > Recurring Transactions). \
                  Edit > Undo takes {} back.",

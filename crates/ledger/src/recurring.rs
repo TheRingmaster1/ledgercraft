@@ -202,7 +202,9 @@ impl Company {
     fn check_spec(&self, spec: &RecurringSpec, me: Option<RecurringId>) -> LedgerResult<String> {
         let name = spec.name.trim();
         if name.is_empty() {
-            return Err(LedgerError::Required("A name for the recurring transaction"));
+            return Err(LedgerError::Required(
+                "A name for the recurring transaction",
+            ));
         }
         if self
             .recurring
@@ -470,7 +472,12 @@ mod tests {
         let dates: Vec<Date> = (0..4).map(|n| r.occurrence(n)).collect();
         assert_eq!(
             dates,
-            [d("2026-01-31"), d("2026-02-28"), d("2026-03-31"), d("2026-04-30")]
+            [
+                d("2026-01-31"),
+                d("2026-02-28"),
+                d("2026-03-31"),
+                d("2026-04-30")
+            ]
         );
     }
 
@@ -479,10 +486,16 @@ mod tests {
         let mut c = Company::with_default_accounts("R");
         let t = rent(&c);
         let auto = c
-            .add_recurring(monthly("Rent", "2026-01-31", RecurringMode::Automatic), t.clone())
+            .add_recurring(
+                monthly("Rent", "2026-01-31", RecurringMode::Automatic),
+                t.clone(),
+            )
             .unwrap();
         let remind = c
-            .add_recurring(monthly("Rent reminder", "2026-01-31", RecurringMode::Remind), t)
+            .add_recurring(
+                monthly("Rent reminder", "2026-01-31", RecurringMode::Remind),
+                t,
+            )
             .unwrap();
         assert!(c.automatic_due(d("2026-03-31")));
         let made = c.enter_due_recurring(d("2026-03-31")).unwrap();
@@ -547,7 +560,10 @@ mod tests {
             class: None,
         };
         let r = c
-            .add_recurring(monthly("Lease", "2026-03-01", RecurringMode::Remind), template)
+            .add_recurring(
+                monthly("Lease", "2026-03-01", RecurringMode::Remind),
+                template,
+            )
             .unwrap();
         let body = c.recurring_body(r, d("2026-03-01")).unwrap();
         assert!(
@@ -557,7 +573,10 @@ mod tests {
         // A duplicate name, a zero interval and an end before the start are refused.
         let t = rent(&c);
         assert!(c
-            .add_recurring(monthly("lease", "2026-03-01", RecurringMode::Remind), t.clone())
+            .add_recurring(
+                monthly("lease", "2026-03-01", RecurringMode::Remind),
+                t.clone()
+            )
             .is_err());
         let mut zero = monthly("Zero", "2026-03-01", RecurringMode::Remind);
         zero.every = 0;

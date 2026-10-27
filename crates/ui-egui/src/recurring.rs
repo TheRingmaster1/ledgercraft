@@ -242,12 +242,11 @@ pub(crate) fn memorize_window(
                 if ui.button(RichText::new("Memorize").strong()).clicked() {
                     match m.input.build() {
                         Ok(spec) => {
-                            outcome = Some(MemorizeOutcome::Save(Box::new(
-                                Command::RecurringCreate {
+                            outcome =
+                                Some(MemorizeOutcome::Save(Box::new(Command::RecurringCreate {
                                     spec,
                                     template: m.template.clone(),
-                                },
-                            )));
+                                })));
                         }
                         Err(e) => m.error = Some(e),
                     }
@@ -302,7 +301,9 @@ fn edit_panel(ui: &mut Ui, c: &Company, s: &mut RecurringState, out: &mut Vec<Ac
             }
             if ui
                 .button("Delete")
-                .on_hover_text("Forget it. Transactions it already entered stay. Edit > Undo puts it back.")
+                .on_hover_text(
+                    "Forget it. Transactions it already entered stay. Edit > Undo puts it back.",
+                )
                 .clicked()
             {
                 out.push(Action::Run {
@@ -354,7 +355,16 @@ pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut RecurringState, out: &mut V
         .striped(true)
         .spacing([18.0, 4.0])
         .show(ui, |ui| {
-            for h in ["Name", "Type", "Name on it", "Amount", "How often", "Next", "", ""] {
+            for h in [
+                "Name",
+                "Type",
+                "Name on it",
+                "Amount",
+                "How often",
+                "Next",
+                "",
+                "",
+            ] {
                 widgets::column_header(ui, h);
             }
             ui.end_row();
@@ -409,7 +419,11 @@ pub(crate) fn page(ui: &mut Ui, c: &Company, s: &mut RecurringState, out: &mut V
                             reset: Reset::Nothing,
                         });
                     }
-                    if ui.small_button("Edit").on_hover_text("Name and schedule").clicked() {
+                    if ui
+                        .small_button("Edit")
+                        .on_hover_text("Name and schedule")
+                        .clicked()
+                    {
                         edit = Some((r.id, SpecInput::from_recurring(r)));
                     }
                     let (label, hover) = if r.active {
