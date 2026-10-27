@@ -1116,7 +1116,9 @@ fn edit_customer(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Acti
             .filter(|o| o.id != id)
             .map(|o| (o.id, o.contact.name.clone()))
             .collect();
-        if let Some(into) = merge_row(ui, "customer", "customer", &x.contact.name, &others, |_| None) {
+        if let Some(into) = merge_row(ui, "customer", "customer", &x.contact.name, &others, |_| {
+            None
+        }) {
             out.push(Action::Run {
                 cmd: Command::CustomerMerge { from: id, into },
                 reset: Reset::EditedCustomer,
@@ -1622,7 +1624,11 @@ pub(crate) fn classes(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
             ui.end_row();
             let show_inactive = s.show_inactive;
             for k in c.classes.iter().filter(|k| k.active || show_inactive) {
-                let used = c.transactions.iter().filter(|t| t.class == Some(k.id)).count();
+                let used = c
+                    .transactions
+                    .iter()
+                    .filter(|t| t.class == Some(k.id))
+                    .count();
                 let renaming = s.editing_class.as_mut().filter(|(id, _)| *id == k.id);
                 match renaming {
                     Some((_, name)) => {

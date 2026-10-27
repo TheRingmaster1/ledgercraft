@@ -15,11 +15,10 @@
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_ledger::{
     tax_payment_memo, AccountId, AccountLine, AccountType, Address, Applied, BankRule, Bill, Check,
-    Company, Contact, CreditMemo, Logo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
-    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Party, PayBill,
+    Company, Contact, CreditMemo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
+    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Logo, Party, PayBill,
     ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, TaxRate, TxnBody, TxnClassId,
-    TxnId,
-    VendorId,
+    TxnId, VendorId,
 };
 
 fn d(y: i32, m: u32, day: u32) -> LedgerResult<Date> {
@@ -778,7 +777,12 @@ pub fn sample_company() -> LedgerResult<Company> {
         }),
     )?;
 
-    rest_of_year(&mut c, [maple, harbor, lin], [lumber, power, landlord], [table, chair, design])?;
+    rest_of_year(
+        &mut c,
+        [maple, harbor, lin],
+        [lumber, power, landlord],
+        [table, chair, design],
+    )?;
     classes(&mut c)?;
     Ok(c)
 }

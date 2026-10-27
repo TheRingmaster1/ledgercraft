@@ -25,8 +25,7 @@ pub use salestax::sales_tax_liability;
 pub use statement_pdf::{statement_pdf, statement_pdf_name};
 pub use statements::{
     account_register, balance_sheet, profit_and_loss, profit_and_loss_by_class,
-    reconciliation_report, transaction_list,
-    trial_balance,
+    reconciliation_report, transaction_list, trial_balance,
 };
 
 /// The reports the app offers, for menus and the CLI.

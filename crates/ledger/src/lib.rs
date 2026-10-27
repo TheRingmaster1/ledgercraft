@@ -23,10 +23,10 @@ mod txn;
 
 pub use account::{Account, AccountType, Class};
 pub use bankfeed::{BankRule, FeedAction, FeedEntry, FeedLine, FeedLink, MATCH_DAYS};
+pub use classes::TxnClass;
 pub use closing::{AuditEntry, Closing};
 pub use company::{Company, CompanyInfo, LedgerEntry};
 pub use error::{LedgerError, LedgerResult};
-pub use classes::TxnClass;
 pub use ids::{
     AccountId, CustomerId, ItemId, TaxComponentId, TaxGroupId, TxnClassId, TxnId, VendorId,
 };

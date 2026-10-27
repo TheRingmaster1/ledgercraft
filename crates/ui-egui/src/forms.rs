@@ -8,10 +8,10 @@ use eframe::egui::{self, RichText, Ui};
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
-    AccountId, Address, AccountLine, AccountType, Applied, Bill, Check, Company, CreditMemo, CustomerId,
-    Deposit, Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill,
-    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, Transaction, TxnBody,
-    TxnClassId, TxnId, VendorId,
+    AccountId, AccountLine, AccountType, Address, Applied, Bill, Check, Company, CreditMemo,
+    CustomerId, Deposit, Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill,
+    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, Transaction, TxnBody, TxnClassId,
+    TxnId, VendorId,
 };
 
 use crate::widgets::{self, field, money_label};
@@ -660,7 +660,11 @@ fn class_choice(ui: &mut Ui, c: &Company, class: &mut Option<TxnClassId>) {
                 ui.selectable_value(class, None, "(none)");
                 // The chosen class stays listed even if made inactive since.
                 let chosen = *class;
-                for k in c.classes.iter().filter(|k| k.active || chosen == Some(k.id)) {
+                for k in c
+                    .classes
+                    .iter()
+                    .filter(|k| k.active || chosen == Some(k.id))
+                {
                     ui.selectable_value(class, Some(k.id), k.name.as_str());
                 }
             });

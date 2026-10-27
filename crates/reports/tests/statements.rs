@@ -194,7 +194,12 @@ fn profit_and_loss_by_class_splits_the_columns() {
     let mut c = books();
     let shop = c.add_class("Shop").unwrap();
     c.add_class("Never used").unwrap();
-    let check = c.transactions.iter().find(|t| t.number == "101").unwrap().id;
+    let check = c
+        .transactions
+        .iter()
+        .find(|t| t.number == "101")
+        .unwrap()
+        .id;
     c.set_txn_class(check, Some(shop)).unwrap();
     let r = profit_and_loss_by_class(&c, d("2026-01-01"), d("2026-12-31"));
     // Classes with no activity in the period get no column.

@@ -105,7 +105,10 @@ fn subtree_raw(
         return total;
     }
     for child in company.sub_accounts(a.id) {
-        add_into(&mut total, &subtree_raw(company, amounts, n, child, depth + 1));
+        add_into(
+            &mut total,
+            &subtree_raw(company, amounts, n, child, depth + 1),
+        );
     }
     total
 }
@@ -150,7 +153,13 @@ fn tree_rows(
     report.section(&name, indent);
     let inner = indent.saturating_add(1);
     if !all_zero(&own) {
-        report.money(RowKind::Detail, &name, inner, &natural_all(&own), Some(a.id));
+        report.money(
+            RowKind::Detail,
+            &name,
+            inner,
+            &natural_all(&own),
+            Some(a.id),
+        );
     }
     for child in children {
         tree_rows(report, company, amounts, n, child, inner, depth + 1);
@@ -286,7 +295,13 @@ fn profit_and_loss_rows(r: &mut Report, company: &Company, amounts: &Columns, n:
     let expenses = account_rows_in(r, company, amounts, n, &[AccountType::Expense], 1);
     r.money(RowKind::Subtotal, "Total Expenses", 0, &expenses, None);
     let operating = minus(&gross, &expenses);
-    r.money(RowKind::Subtotal, "Net Operating Income", 0, &operating, None);
+    r.money(
+        RowKind::Subtotal,
+        "Net Operating Income",
+        0,
+        &operating,
+        None,
+    );
 
     r.section("Other Income and Expense", 0);
     let other_income = account_rows_in(r, company, amounts, n, &[AccountType::OtherIncome], 1);
