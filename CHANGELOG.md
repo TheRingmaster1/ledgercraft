@@ -8,6 +8,15 @@ docs/releasing.md.
 
 ## [Unreleased]
 
+### Added
+- Installers (M1.5.5): releases now include a Windows installer
+  (`LedgerCraft-<version>-x64.msi`: Program Files, Start menu, `.lcbooks`
+  file type, `ledgercraft-cli` on the PATH, upgrades in place, uninstalls
+  from Settings > Apps) and a Linux AppImage (one file that runs on most
+  distributions; `cli` runs the command line tool), beside the zip and
+  tarball. The Release workflow can be run by hand (Actions > Release > Run
+  workflow) to build the packages without releasing, to try them first.
+
 ## [0.2.1] - 2026-10-23
 
 ### Added

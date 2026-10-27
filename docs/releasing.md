@@ -28,10 +28,18 @@ automatically from `main`.
    git push origin v0.2.0
    ```
 6. The Release workflow (`.github/workflows/release.yml`) checks that the tag
-   matches the version in `Cargo.toml`, builds the Windows (`.zip`) and Linux
-   (`.tar.gz`, with `install.sh`, a desktop entry and the icon) packages, and
-   creates a **draft** GitHub Release with them and `SHA256SUMS.txt`
+   matches the version in `Cargo.toml` and builds:
+   * Windows: the installer `LedgerCraft-<version>-x64.msi` (WiX Toolset 5,
+     from `packaging/windows/ledgercraft.wxs`) and a portable `.zip`;
+   * Linux: `LedgerCraft-<version>-x86_64.AppImage` (appimagetool, launched by
+     `packaging/linux/AppRun`) and a `.tar.gz` with `install.sh`, a desktop
+     entry and the icon.
+   It creates a **draft** GitHub Release with them and `SHA256SUMS.txt`
    attached. macOS joins once it has been tested.
+
+   To try the packages before tagging, open Actions > Release > **Run
+   workflow**: it builds everything from the chosen branch and stops before
+   releasing; the packages are under the run's Artifacts.
 7. Review the draft on GitHub (Releases), paste the changelog section into the
    notes, and press **Publish release**.
 
@@ -39,5 +47,6 @@ automatically from `main`.
 
 * Code signing (Windows Authenticode, macOS notarization). Until then, Windows
   SmartScreen and macOS Gatekeeper will warn that the app is unsigned.
-* Installers (MSI, DMG, AppImage, AUR PKGBUILD, deb/rpm). Releases ship a
-  zip for Windows and a tarball with a per-user `install.sh` for Linux.
+* More packages: DMG (with macOS), an AUR PKGBUILD, deb/rpm, winget.
+* The MSI's UpgradeCode in `ledgercraft.wxs` must never change: it is how a
+  new installer recognises and replaces an installed older version.

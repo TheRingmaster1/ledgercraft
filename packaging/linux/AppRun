@@ -1,0 +1,10 @@
+#!/bin/sh
+# Starts LedgerCraft from inside its AppImage.
+#   ./LedgerCraft-x86_64.AppImage [FILE.lcbooks]   the desktop app
+#   ./LedgerCraft-x86_64.AppImage cli ...          ledgercraft-cli
+here="$(dirname "$(readlink -f "$0")")"
+if [ "${1:-}" = "cli" ]; then
+    shift
+    exec "$here/usr/bin/ledgercraft-cli" "$@"
+fi
+exec "$here/usr/bin/ledgercraft" "$@"

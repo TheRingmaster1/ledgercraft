@@ -1,9 +1,14 @@
 name: Release
-# Runs only when a version tag such as v0.2.0 is pushed. Creates a DRAFT
+# A version tag such as v0.2.1 builds every package and creates a DRAFT
 # release; a maintainer reviews it and presses Publish.
+#
+# "Run workflow" on the Actions tab (any branch) builds the same packages
+# without releasing anything, to try the installers first: download them from
+# the run's Artifacts.
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,14 +16,19 @@ permissions:
 jobs:
   check-version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - name: Tag must match Cargo.toml version
+      - id: version
+        name: Version (a tag must match Cargo.toml)
         run: |
-          tag="${GITHUB_REF_NAME#v}"
           version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
-          echo "tag=$tag cargo=$version"
-          test "$tag" = "$version"
+          echo "cargo=$version ref=$GITHUB_REF_NAME"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            test "${GITHUB_REF_NAME#v}" = "$version"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
   build:
     needs: check-version
@@ -36,6 +46,9 @@ jobs:
             ext: ""
           # macOS returns after it has been tested on a Mac.
     runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.check-version.outputs.version }}
+      BIN: target/${{ matrix.target }}/release
     steps:
       - uses: actions/checkout@v4
       - name: Linux libraries
@@ -46,31 +59,74 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }} -p ledgercraft -p ledgercraft-cli
-      - name: Package
+
+      - name: Portable package (zip or tar.gz)
         shell: bash
         run: |
-          name="ledgercraft-${GITHUB_REF_NAME#v}-${{ matrix.target }}"
+          name="ledgercraft-$VERSION-${{ matrix.target }}"
           mkdir "$name"
-          cp "target/${{ matrix.target }}/release/ledgercraft${{ matrix.ext }}" "$name/"
-          cp "target/${{ matrix.target }}/release/ledgercraft-cli${{ matrix.ext }}" "$name/"
+          cp "$BIN/ledgercraft${{ matrix.ext }}" "$BIN/ledgercraft-cli${{ matrix.ext }}" "$name/"
           cp README.md CHANGELOG.md LICENSE-MIT LICENSE-APACHE NOTICE "$name/"
           if [ "${{ runner.os }}" = "Linux" ]; then
             cp packaging/linux/ledgercraft.desktop packaging/linux/ledgercraft-mime.xml packaging/linux/install.sh "$name/"
             cp assets/app-icon/ledgercraft-256.png "$name/ledgercraft.png"
             chmod +x "$name/install.sh" "$name/ledgercraft" "$name/ledgercraft-cli"
-          fi
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            7z a "$name.zip" "$name" > /dev/null
-          else
             tar czf "$name.tar.gz" "$name"
+          else
+            7z a "$name.zip" "$name" > /dev/null
           fi
+
+      # Windows installer: WiX Toolset 5 (MS-RL), a build tool only.
+      - name: Install WiX
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          echo "$USERPROFILE/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Windows installer (MSI)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          wix extension add -g WixToolset.UI.wixext/5.0.2
+          wix build packaging/windows/ledgercraft.wxs -arch x64 -ext WixToolset.UI.wixext \
+            -d "Version=$VERSION" -d "BinDir=$BIN" \
+            -o "LedgerCraft-$VERSION-x64.msi"
+
+      # Linux AppImage: one file that runs on most distributions.
+      - name: Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          app=LedgerCraft.AppDir
+          mkdir -p "$app/usr/bin" "$app/usr/share/applications" \
+            "$app/usr/share/icons/hicolor/256x256/apps" "$app/usr/share/mime/packages"
+          install -m 755 "$BIN/ledgercraft" "$BIN/ledgercraft-cli" "$app/usr/bin/"
+          install -m 755 packaging/linux/AppRun "$app/AppRun"
+          cp packaging/linux/ledgercraft.desktop "$app/ledgercraft.desktop"
+          cp packaging/linux/ledgercraft.desktop "$app/usr/share/applications/"
+          cp assets/app-icon/ledgercraft-256.png "$app/ledgercraft.png"
+          cp assets/app-icon/ledgercraft-256.png "$app/usr/share/icons/hicolor/256x256/apps/ledgercraft.png"
+          cp packaging/linux/ledgercraft-mime.xml "$app/usr/share/mime/packages/ledgercraft.xml"
+          ln -s ledgercraft.png "$app/.DirIcon"
+          curl -fsSL -o appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          # The runner has no FUSE: let the tool unpack itself instead.
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool --no-appstream \
+            "$app" "LedgerCraft-$VERSION-x86_64.AppImage"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
-          path: ledgercraft-*.*z*
+          path: |
+            ledgercraft-*.zip
+            ledgercraft-*.tar.gz
+            LedgerCraft-*.msi
+            LedgerCraft-*.AppImage
 
   release:
     needs: build
+    # Only for a version tag; "Run workflow" stops after the packages.
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

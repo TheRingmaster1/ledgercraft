@@ -110,16 +110,26 @@ Keep the source folder outside OneDrive and other synced folders: syncing the
 Download the package for your system from
 [Releases](https://github.com/TheRingmaster1/ledgercraft/releases):
 
-* **Windows:** `ledgercraft-<version>-x86_64-pc-windows-msvc.zip`. Unzip it and
-  run `ledgercraft.exe`. The app is not code-signed yet, so SmartScreen may ask
-  you to confirm (More info → Run anyway). To open company files by
-  double-clicking them, use Help > Preferences > Files.
-* **Linux:** `ledgercraft-<version>-x86_64-unknown-linux-gnu.tar.gz`. Unpack it
-  and run `./install.sh` to add LedgerCraft to your Applications menu for your
-  user, and makes double-clicking a `.lcbooks` file open it (no root
-  needed; `./install.sh --uninstall` removes it), or run
-  `./ledgercraft` directly. It needs the graphics and file dialog packages
-  listed above.
+* **Windows installer:** `LedgerCraft-<version>-x64.msi`. Run it and follow
+  the steps: it installs for all users into Program Files, adds LedgerCraft to
+  the Start menu, opens `.lcbooks` company files on double-click and puts
+  `ledgercraft-cli` on the PATH. Installing a newer version replaces the old
+  one; uninstall from Settings > Apps (your company files are kept). The
+  installer is not code-signed yet, so SmartScreen may ask you to confirm
+  (More info → Run anyway).
+* **Windows portable:** `ledgercraft-<version>-x86_64-pc-windows-msvc.zip`.
+  Unzip it anywhere and run `ledgercraft.exe`; nothing is installed. To open
+  company files by double-clicking them, use Help > Preferences > Files.
+* **Linux AppImage:** `LedgerCraft-<version>-x86_64.AppImage`. One file: make
+  it executable (`chmod +x LedgerCraft-*.AppImage`) and run it. The command
+  line tool is inside it: `./LedgerCraft-*.AppImage cli report books.lcbooks pl`.
+  Some distributions need `libfuse2` to run AppImages.
+* **Linux tarball:** `ledgercraft-<version>-x86_64-unknown-linux-gnu.tar.gz`.
+  Unpack it and run `./install.sh` to add LedgerCraft to your Applications
+  menu for your user, and make double-clicking a `.lcbooks` file open it (no
+  root needed; `./install.sh --uninstall` removes it), or run `./ledgercraft`
+  directly.
+* Linux packages need the graphics and file dialog packages listed above.
 
 Command line:
 
