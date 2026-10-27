@@ -96,10 +96,8 @@ pub(crate) struct RecurringState {
 
 impl RecurringState {
     pub(crate) fn reset(&mut self, what: Reset) {
-        match what {
-            Reset::NewRecurring => self.memorize = None,
-            Reset::EditedRecurring => self.editing = None,
-            _ => {}
+        if what == Reset::EditedRecurring {
+            self.editing = None;
         }
     }
 

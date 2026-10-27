@@ -102,7 +102,6 @@ pub(crate) enum Reset {
     EditedAccount,
     NewClass,
     EditedClass,
-    NewRecurring,
     EditedRecurring,
 }
 
