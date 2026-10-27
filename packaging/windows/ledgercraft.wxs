@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The LedgerCraft Windows installer (MSI), built by the Release workflow with
+  the WiX Toolset 5 (MS-RL licence; a build tool only, nothing of it ships):
+
+    wix extension add -g WixToolset.UI.wixext/5.0.2
+    wix build packaging/windows/ledgercraft.wxs -arch x64 -ext WixToolset.UI.wixext
+      -d Version=0.2.1 -d BinDir=target/x86_64-pc-windows-msvc/release -o LedgerCraft.msi
+
+  It installs for all users into Program Files\LedgerCraft, adds LedgerCraft
+  to the Start menu, opens .lcbooks company files on double-click, and puts
+  ledgercraft-cli on the PATH. A newer version replaces an older one in place;
+  uninstalling (Settings > Apps) leaves company files and preferences alone.
+
+  The UpgradeCode must never change: it is how Windows knows a new MSI is the
+  same product.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="LedgerCraft"
+           Manufacturer="LedgerCraft contributors"
+           Version="$(var.Version)"
+           UpgradeCode="652B80B5-8CF1-4132-97BF-D722FE24A4D6"
+           Scope="perMachine"
+           Compressed="yes">
+    <SummaryInformation Description="LedgerCraft $(var.Version) installer" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of LedgerCraft is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="LedgerCraftIcon" SourceFile="assets/app-icon/ledgercraft.ico" />
+    <Property Id="ARPPRODUCTICON" Value="LedgerCraftIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/TheRingmaster1/ledgercraft" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/TheRingmaster1/ledgercraft" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="LedgerCraft" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Component Id="App" Guid="*">
+        <File Id="LedgerCraftExe" Source="$(var.BinDir)/ledgercraft.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut"
+                    Directory="ProgramMenuFolder"
+                    Name="LedgerCraft"
+                    Description="Open-source small-business accounting"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="LedgerCraftIcon"
+                    Advertise="yes" />
+        </File>
+        <!-- Double-clicking a company file opens it in LedgerCraft. -->
+        <ProgId Id="LedgerCraft.Company" Description="LedgerCraft company file" Icon="LedgerCraftIcon">
+          <Extension Id="lcbooks" ContentType="application/x-ledgercraft">
+            <Verb Id="open" Command="Open" TargetFile="LedgerCraftExe" Argument="&quot;%1&quot;" />
+          </Extension>
+        </ProgId>
+      </Component>
+      <Component Id="Cli" Guid="*">
+        <File Id="LedgerCraftCliExe" Source="$(var.BinDir)/ledgercraft-cli.exe" KeyPath="yes" />
+        <!-- So ledgercraft-cli runs from any command prompt. -->
+        <Environment Id="PathEntry" Name="PATH" Value="[INSTALLFOLDER]"
+                     Permanent="no" Part="last" Action="set" System="yes" />
+      </Component>
+      <Component Id="Docs" Guid="*">
+        <File Id="Readme" Source="README.md" KeyPath="yes" />
+        <File Id="Changelog" Source="CHANGELOG.md" />
+        <File Id="LicenseMit" Source="LICENSE-MIT" />
+        <File Id="LicenseApache" Source="LICENSE-APACHE" />
+        <File Id="Notice" Source="NOTICE" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main" Title="LedgerCraft" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+    </Feature>
+
+    <!-- Welcome, licence, install folder, install, finish. -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="packaging/windows/license.rtf" />
+  </Package>
+</Wix>

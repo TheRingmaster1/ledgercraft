@@ -86,8 +86,9 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
    - ~~Recent companies on the start page~~ (done, also File > Open Previous Company)
    - A clear message when the system file dialog cannot open (Linux without an
      xdg-desktop-portal backend)
-5. M1.5.5 Packaging: Windows installer (MSI) and portable zip; Linux AppImage and
-   an AUR PKGBUILD (deb/rpm later); code signing later
+5. M1.5.5 Packaging: ~~Windows installer (MSI) and portable zip; Linux AppImage~~
+   (done: built by the Release workflow, which can also be run by hand to try
+   them); next: an AUR PKGBUILD (deb/rpm later); code signing later
 6. M1.5.6 macOS: test results from a Mac, then CI, a universal `LedgerCraft.app`
    in a `.dmg`, and Cmd shortcuts; notarization later
 
