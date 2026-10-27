@@ -1956,6 +1956,34 @@ fn rest_of_year(
         "Check #2318",
         &[(inv1016, Some(dollars(1_000)))],
     )?;
+    // The same cafe entered again under a slightly different name, with one
+    // sale: merge it into Maple Street Cafe to practise merging.
+    let duplicate_cafe = c.add_customer(
+        Who {
+            name: "Maple St. Cafe",
+            email: "",
+            phone: "",
+            street: "12 Maple Street",
+            city: "Provo",
+            zip: "84601",
+            terms: 30,
+            notes: "Entered twice by mistake: the same as Maple Street Cafe.",
+        }
+        .contact(),
+    )?;
+    sales_receipt(
+        c,
+        d(2026, 10, 14)?,
+        "1004",
+        Some(duplicate_cafe),
+        checking,
+        "Visa",
+        None,
+        &[(refinish, "Refinish a cafe table", 1, dollars(65))],
+    )?;
+    // Accumulated depreciation as a sub-account of the equipment it wears.
+    c.set_account_parent(accumulated, Some(equipment))?;
+
     // Entered twice by mistake; the copy was voided.
     let duplicate = invoice(
         c,

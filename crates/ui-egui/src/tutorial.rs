@@ -248,7 +248,26 @@ const LESSONS: &[Lesson] = &[
                 "Make inactive hides an account you no longer use. It is only allowed once \
                  the balance is zero, and its history is kept. Tick \"Show inactive \
                  accounts\" to see them again.",
+                "Edit beside an account changes its number, name or description.",
             ]),
+            Heading("Sub-accounts"),
+            Text(
+                "A sub-account splits an account into parts, such as Utilities into \
+                 Electric and Water. Choose \"Subaccount of\" when adding an account, or in \
+                 its Edit panel; it must be of the same type. The chart lists sub-accounts \
+                 indented under their parent, pickers show them as Utilities:Electric, and \
+                 the Profit & Loss and Balance Sheet total each parent with its \
+                 sub-accounts.",
+            ),
+            Heading("Merging accounts"),
+            Text(
+                "Two accounts that are really one (Postage and Postage & Shipping, say)? \
+                 In the Edit panel of the one to remove, choose Merge into and the account \
+                 to keep, then Merge. Everything posted to the first moves to the second, \
+                 and the first is removed. They must be the same type, and a reconciled \
+                 account cannot be merged away (merge the other into it instead). Edit > \
+                 Undo puts it back.",
+            ),
             Tip(
                 "An account's type cannot be changed after it is created, so posted history \
                  always keeps its meaning. Choose carefully.",
@@ -274,6 +293,10 @@ const LESSONS: &[Lesson] = &[
                 "Edit beside a name changes it, its address, terms or notes. Make inactive \
                  there leaves someone you no longer deal with off the forms; their history \
                  and balance stay, and Show inactive lists them again.",
+                "Entered someone twice? In the Edit panel of the duplicate, choose Merge \
+                 into and the one to keep, then Merge: all their transactions move over \
+                 and the duplicate is removed (Edit > Undo puts it back). Items merge the \
+                 same way. The sample company has Maple St. Cafe to try it on.",
                 "A customer whose goods go somewhere else (a warehouse, another office) gets \
                  a Ship to address under the address. Their invoices start with it, it \
                  prints beside Bill To, and Sales by State counts the sale there.",

@@ -20,6 +20,8 @@ pub(crate) struct NewAccount {
     pub name: String,
     pub kind: AccountType,
     pub description: String,
+    /// The account it is a sub-account of.
+    pub parent: Option<AccountId>,
 }
 
 impl Default for NewAccount {
@@ -29,8 +31,97 @@ impl Default for NewAccount {
             name: String::new(),
             kind: AccountType::Expense,
             description: String::new(),
+            parent: None,
         }
     }
+}
+
+impl NewAccount {
+    /// An account's fields, to edit.
+    fn from_account(a: &ledgercraft_ledger::Account) -> Self {
+        Self {
+            number: a.number.clone(),
+            name: a.name.clone(),
+            kind: a.kind,
+            description: a.description.clone(),
+            parent: a.parent,
+        }
+    }
+}
+
+/// "Subaccount of": the accounts of `kind` that `me` (when editing) could
+/// sit under, that is not itself or one of its own sub-accounts.
+fn parent_combo(
+    ui: &mut Ui,
+    salt: &str,
+    c: &Company,
+    kind: AccountType,
+    me: Option<AccountId>,
+    parent: &mut Option<AccountId>,
+) {
+    if parent.is_some_and(|p| c.account(p).is_none_or(|a| a.kind != kind)) {
+        *parent = None;
+    }
+    let shown = parent.map_or_else(|| "(none: a top-level account)".to_string(), |p| {
+        c.account_full_name(p)
+    });
+    egui::ComboBox::from_id_salt(("parent_account", salt))
+        .selected_text(shown)
+        .width(240.0)
+        .show_ui(ui, |ui| {
+            ui.selectable_value(parent, None, "(none: a top-level account)");
+            for (a, _) in c.accounts_in_tree_order() {
+                let mine = me.is_some_and(|m| c.descends_from(a.id, m));
+                if a.kind == kind && a.active && !mine {
+                    ui.selectable_value(parent, Some(a.id), c.account_full_name(a.id));
+                }
+            }
+        });
+}
+
+/// "Merge into": a picker of the other entries and a Merge button. Returns
+/// the one chosen when Merge is clicked.
+fn merge_row<T>(ui: &mut Ui, salt: &str, noun: &str, name: &str, others: &[(T, String)]) -> Option<T>
+where
+    T: Copy + PartialEq + Send + Sync + 'static,
+{
+    if others.is_empty() {
+        return None;
+    }
+    let id = egui::Id::NULL.with(("merge_into", salt));
+    let mut picked: Option<T> = ui.data(|d| d.get_temp::<Option<T>>(id)).flatten();
+    if picked.is_some_and(|p| !others.iter().any(|(o, _)| *o == p)) {
+        picked = None;
+    }
+    let mut merge = None;
+    ui.add_space(4.0);
+    ui.horizontal_wrapped(|ui| {
+        widgets::hint_label(ui, "Merge into");
+        let shown = picked
+            .and_then(|p| others.iter().find(|(o, _)| *o == p))
+            .map_or("Choose…", |(_, label)| label.as_str());
+        egui::ComboBox::from_id_salt(("merge_combo", salt))
+            .selected_text(shown)
+            .width(240.0)
+            .show_ui(ui, |ui| {
+                for (value, label) in others {
+                    ui.selectable_value(&mut picked, Some(*value), label.as_str());
+                }
+            });
+        let hover = format!(
+            "Moves everything of {name} to the {noun} chosen, then removes {name}: for \
+             duplicates. Edit > Undo puts it back."
+        );
+        if ui
+            .add_enabled(picked.is_some(), egui::Button::new("Merge"))
+            .on_hover_text(hover)
+            .clicked()
+        {
+            merge = picked;
+        }
+    });
+    ui.data_mut(|d| d.insert_temp(id, picked));
+    merge
 }
 
 #[derive(Default)]
@@ -172,6 +263,7 @@ pub(crate) struct ListState {
     pub editing_customer: Option<(CustomerId, ContactInput)>,
     pub editing_vendor: Option<(VendorId, ContactInput)>,
     pub editing_item: Option<(ItemId, NewItem)>,
+    pub editing_account: Option<(AccountId, NewAccount)>,
     /// Exemption certificate numbers being typed, by customer.
     pub exemption_notes: std::collections::BTreeMap<CustomerId, String>,
 }
@@ -186,6 +278,7 @@ impl ListState {
             Reset::EditedCustomer => self.editing_customer = None,
             Reset::EditedVendor => self.editing_vendor = None,
             Reset::EditedItem => self.editing_item = None,
+            Reset::EditedAccount => self.editing_account = None,
             Reset::Nothing
             | Reset::Form(_)
             | Reset::NewTax
@@ -624,6 +717,7 @@ pub(crate) fn home(ui: &mut Ui, c: &Company, stripe: Color32, out: &mut Vec<Acti
 
 pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
     title(ui, "Chart of Accounts");
+    edit_account(ui, c, s, out);
     egui::CollapsingHeader::new("New account")
         .default_open(false)
         .show(ui, |ui| {
@@ -639,6 +733,10 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
                         }
                     });
                 field(ui, &mut n.description, 200.0, "Description");
+            });
+            ui.horizontal_wrapped(|ui| {
+                widgets::hint_label(ui, "Subaccount of");
+                parent_combo(ui, "new_account", c, n.kind, None, &mut n.parent);
                 if ui.button("Add").clicked() {
                     out.push(Action::Run {
                         cmd: Command::AccountCreate {
@@ -646,6 +744,7 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
                             name: n.name.clone(),
                             kind: n.kind,
                             description: n.description.clone(),
+                            parent: n.parent,
                         },
                         reset: Reset::NewAccount,
                     });
@@ -655,40 +754,137 @@ pub(crate) fn accounts(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Ve
     ui.checkbox(&mut s.show_inactive, "Show inactive accounts");
     ui.add_space(6.0);
     let balances = widgets::balances(c);
-    egui::ScrollArea::both().id_salt("accounts_scroll")
-        .auto_shrink([false, true]).show(ui, |ui| {
-        egui::Grid::new("accounts").striped(true).spacing([18.0, 4.0]).show(ui, |ui| {
-            for h in ["Number", "Name", "Type", "Balance", ""] {
-                widgets::column_header(ui, h);
-            }
-            ui.end_row();
-            for a in c.sorted_accounts() {
-                if !a.active && !s.show_inactive {
-                    continue;
-                }
-                ui.label(a.number.as_str());
-                let mut name = RichText::new(a.name.as_str());
-                if !a.active {
-                    name = name.color(theme::MUTED).italics();
-                }
-                if ui.link(name).on_hover_text("Open register").clicked() {
-                    out.push(Action::Go(Page::Register(a.id)));
-                }
-                ui.label(a.kind.label());
-                money_label(ui, balances.get(&a.id).copied().unwrap_or(Money::ZERO), false);
-                let toggle = if a.active { "Make inactive" } else { "Make active" };
-                                let toggle_hint = "Inactive accounts are hidden from lists but keep their history. Only an account with a zero balance can be made inactive.";
-                if ui.small_button(toggle).on_hover_text(toggle_hint).clicked() {
+    egui::ScrollArea::both()
+        .id_salt("accounts_scroll")
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            egui::Grid::new("accounts")
+                .striped(true)
+                .spacing([18.0, 4.0])
+                .show(ui, |ui| {
+                    for h in ["Number", "Name", "Type", "Balance", "", ""] {
+                        widgets::column_header(ui, h);
+                    }
+                    ui.end_row();
+                    // Sub-accounts sit under their parents, indented.
+                    for (a, depth) in c.accounts_in_tree_order() {
+                        if !a.active && !s.show_inactive {
+                            continue;
+                        }
+                        ui.label(a.number.as_str());
+                        let mut name = RichText::new(a.name.as_str());
+                        if !a.active {
+                            name = name.color(theme::MUTED).italics();
+                        }
+                        ui.horizontal(|ui| {
+                            let depth = u16::try_from(depth).unwrap_or(u16::MAX);
+                            ui.add_space(18.0 * f32::from(depth));
+                            if ui.link(name).on_hover_text("Open register").clicked() {
+                                out.push(Action::Go(Page::Register(a.id)));
+                            }
+                        });
+                        ui.label(a.kind.label());
+                        money_label(ui, balances.get(&a.id).copied().unwrap_or(Money::ZERO), false);
+                        if ui
+                            .small_button("Edit")
+                            .on_hover_text(
+                                "Rename or renumber it, make it a sub-account, or merge it \
+                                 into another",
+                            )
+                            .clicked()
+                        {
+                            s.editing_account = Some((a.id, NewAccount::from_account(a)));
+                        }
+                        let toggle = if a.active { "Make inactive" } else { "Make active" };
+                        let toggle_hint = "Inactive accounts are hidden from lists but keep \
+                                           their history. Only an account with a zero balance \
+                                           can be made inactive.";
+                        if ui.small_button(toggle).on_hover_text(toggle_hint).clicked() {
+                            out.push(Action::Run {
+                                cmd: Command::AccountSetActive {
+                                    id: a.id,
+                                    active: !a.active,
+                                },
+                                reset: Reset::Nothing,
+                            });
+                        }
+                        ui.end_row();
+                    }
+                });
+        });
+}
 
-                    out.push(Action::Run {
-                        cmd: Command::AccountSetActive { id: a.id, active: !a.active },
-                        reset: Reset::Nothing,
-                    });
-                }
+/// The account being edited: number, name, description and parent, and
+/// merging it into another of the same type.
+fn edit_account(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
+    let Some((id, input)) = s.editing_account.as_mut() else {
+        return;
+    };
+    let id = *id;
+    let Some(a) = c.account(id) else {
+        s.editing_account = None;
+        return;
+    };
+    let mut close = false;
+    egui::Frame::group(ui.style()).show(ui, |ui| {
+        ui.label(RichText::new(format!("Edit account: {}", a.display_name())).strong());
+        egui::Grid::new("edit_account")
+            .num_columns(2)
+            .spacing([10.0, 4.0])
+            .show(ui, |ui| {
+                widgets::hint_label(ui, "Number");
+                field(ui, &mut input.number, 80.0, "");
                 ui.end_row();
+                widgets::hint_label(ui, "Name");
+                field(ui, &mut input.name, 240.0, "");
+                ui.end_row();
+                widgets::hint_label(ui, "Type");
+                ui.label(RichText::new(a.kind.label()).color(theme::MUTED))
+                    .on_hover_text("An account's type cannot change once it is created.");
+                ui.end_row();
+                widgets::hint_label(ui, "Description");
+                field(ui, &mut input.description, 240.0, "");
+                ui.end_row();
+                widgets::hint_label(ui, "Subaccount of");
+                parent_combo(ui, "edit_account", c, a.kind, Some(id), &mut input.parent);
+                ui.end_row();
+            });
+        ui.horizontal_wrapped(|ui| {
+            if ui.button(RichText::new("Save Changes").strong()).clicked() {
+                out.push(Action::Run {
+                    cmd: Command::AccountUpdate {
+                        id,
+                        number: input.number.clone(),
+                        name: input.name.clone(),
+                        description: input.description.clone(),
+                        parent: input.parent,
+                    },
+                    reset: Reset::EditedAccount,
+                });
+            }
+            if ui.button("Cancel").clicked() {
+                close = true;
             }
         });
+        // Only into an account of the same type, and not one of its own
+        // sub-accounts.
+        let others: Vec<(AccountId, String)> = c
+            .accounts_in_tree_order()
+            .into_iter()
+            .filter(|(o, _)| o.kind == a.kind && !c.descends_from(o.id, id))
+            .map(|(o, _)| (o.id, c.account_full_name(o.id)))
+            .collect();
+        if let Some(into) = merge_row(ui, "account", "account", &a.name, &others) {
+            out.push(Action::Run {
+                cmd: Command::AccountMerge { from: id, into },
+                reset: Reset::EditedAccount,
+            });
+        }
     });
+    if close {
+        s.editing_account = None;
+    }
+    ui.add_space(6.0);
 }
 
 pub(crate) fn register(ui: &mut Ui, c: &Company, account: AccountId, out: &mut Vec<Action>) {
@@ -851,6 +1047,18 @@ fn edit_customer(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Acti
             }),
             EditChoice::Nothing => {}
         }
+        let others: Vec<(CustomerId, String)> = c
+            .customers
+            .iter()
+            .filter(|o| o.id != id)
+            .map(|o| (o.id, o.contact.name.clone()))
+            .collect();
+        if let Some(into) = merge_row(ui, "customer", "customer", &x.contact.name, &others) {
+            out.push(Action::Run {
+                cmd: Command::CustomerMerge { from: id, into },
+                reset: Reset::EditedCustomer,
+            });
+        }
     });
     if close {
         s.editing_customer = None;
@@ -886,6 +1094,18 @@ fn edit_vendor(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action
                 reset: Reset::Nothing,
             }),
             EditChoice::Nothing => {}
+        }
+        let others: Vec<(VendorId, String)> = c
+            .vendors
+            .iter()
+            .filter(|o| o.id != id)
+            .map(|o| (o.id, o.contact.name.clone()))
+            .collect();
+        if let Some(into) = merge_row(ui, "vendor", "vendor", &x.contact.name, &others) {
+            out.push(Action::Run {
+                cmd: Command::VendorMerge { from: id, into },
+                reset: Reset::EditedVendor,
+            });
         }
     });
     if close {
@@ -1205,6 +1425,18 @@ fn edit_item(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>)
             }),
             EditChoice::Nothing => {}
         }
+        let others: Vec<(ItemId, String)> = c
+            .items
+            .iter()
+            .filter(|o| o.id != id)
+            .map(|o| (o.id, o.spec.name.clone()))
+            .collect();
+        if let Some(into) = merge_row(ui, "item", "item", &x.spec.name, &others) {
+            out.push(Action::Run {
+                cmd: Command::ItemMerge { from: id, into },
+                reset: Reset::EditedItem,
+            });
+        }
     });
     if close {
         s.editing_item = None;
@@ -1473,6 +1705,7 @@ mod tests {
             editing_customer: Some((customer.id, ContactInput::from_contact(&customer.contact))),
             editing_vendor: Some((vendor.id, ContactInput::from_contact(&vendor.contact))),
             editing_item: Some((item.id, NewItem::from_item(item))),
+            editing_account: Some((c.accounts[0].id, NewAccount::from_account(&c.accounts[0]))),
             ..ListState::default()
         };
         let ctx = egui::Context::default();
@@ -1482,6 +1715,7 @@ mod tests {
             customers(ui, &c, &mut s, &mut out);
             vendors(ui, &c, &mut s, &mut out);
             items(ui, &c, &mut s, &mut out);
+            accounts(ui, &c, &mut s, &mut out);
         });
         assert!(out.is_empty());
         assert!(s.editing_customer.is_some() && s.editing_item.is_some());

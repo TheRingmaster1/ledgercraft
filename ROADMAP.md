@@ -141,6 +141,9 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 6. ~~M2.6 Credit memos, refunds, customer credits; sales receipts~~ (done)
 7. ~~M2.7 Closing date and password; audit trail report~~ (done)
 8. M2.8 Edit and merge list entries; sub-accounts; classes
+   - ~~Edit customers, vendors, items and accounts; merge them; sub-accounts~~
+     (done)
+   - Classes (departments or locations) on transactions, with P&L by Class
 9. ~~M2.9 Native file dialogs that remember locations, recent files, auto-backup~~ (done)
 
 ## Later (M3: small business)

@@ -54,6 +54,9 @@ pub enum Command {
         kind: AccountType,
         #[serde(default)]
         description: String,
+        /// The account this is a sub-account of.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent: Option<AccountId>,
     },
     #[serde(rename = "account.update")]
     AccountUpdate {
@@ -63,7 +66,20 @@ pub enum Command {
         name: String,
         #[serde(default)]
         description: String,
+        /// The account this is a sub-account of; none for a top-level account.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent: Option<AccountId>,
     },
+    /// Moves everything of one account onto another of the same type, then
+    /// removes the first.
+    #[serde(rename = "account.merge")]
+    AccountMerge { from: AccountId, into: AccountId },
+    #[serde(rename = "customer.merge")]
+    CustomerMerge { from: CustomerId, into: CustomerId },
+    #[serde(rename = "vendor.merge")]
+    VendorMerge { from: VendorId, into: VendorId },
+    #[serde(rename = "item.merge")]
+    ItemMerge { from: ItemId, into: ItemId },
     #[serde(rename = "account.setActive")]
     AccountSetActive { id: AccountId, active: bool },
     #[serde(rename = "customer.create")]
@@ -201,8 +217,12 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "company.setFiscalYearStart", summary: "First month of the fiscal year, 1-12. {month}" },
     CommandInfo { id: "company.setClosing", summary: "Close the books through a date; transactions then or before are locked. {date: YYYY-MM-DD, or null to reopen the books, password?, keep_password?}" },
     CommandInfo { id: "company.setInfo", summary: "Name and contact details printed on invoices. {name, legal_name?, email?, phone?, address?:{line1, line2, city, region, postal_code, country}, print?:{template: classic|modern|simple, logo?: base64 PNG or JPEG}}" },
-    CommandInfo { id: "account.create", summary: "Add an account. {number?, name, kind, description?}" },
-    CommandInfo { id: "account.update", summary: "Rename or renumber an account. {id, number?, name, description?}" },
+    CommandInfo { id: "account.create", summary: "Add an account. {number?, name, kind, description?, parent?: account id}" },
+    CommandInfo { id: "account.update", summary: "Rename or renumber an account, or make it a sub-account. {id, number?, name, description?, parent?: account id (omit for top level)}" },
+    CommandInfo { id: "account.merge", summary: "Move everything of one account onto another of the same type, then remove the first. {from, into}" },
+    CommandInfo { id: "customer.merge", summary: "Move a customer's transactions onto another customer, then remove the first. {from, into}" },
+    CommandInfo { id: "vendor.merge", summary: "Move a vendor's transactions onto another vendor, then remove the first. {from, into}" },
+    CommandInfo { id: "item.merge", summary: "Move an item's lines onto another item, then remove the first. {from, into}" },
     CommandInfo { id: "account.setActive", summary: "Make an account active or inactive. {id, active}" },
     CommandInfo { id: "customer.create", summary: "Add a customer. {contact:{name, email?, phone?, terms_days?, …}}" },
     CommandInfo { id: "customer.update", summary: "Edit a customer. {id, contact}" },
@@ -243,6 +263,10 @@ impl Command {
             Self::CompanySetInfo { .. } => "company.setInfo",
             Self::AccountCreate { .. } => "account.create",
             Self::AccountUpdate { .. } => "account.update",
+            Self::AccountMerge { .. } => "account.merge",
+            Self::CustomerMerge { .. } => "customer.merge",
+            Self::VendorMerge { .. } => "vendor.merge",
+            Self::ItemMerge { .. } => "item.merge",
             Self::AccountSetActive { .. } => "account.setActive",
             Self::CustomerCreate { .. } => "customer.create",
             Self::CustomerUpdate { .. } => "customer.update",
@@ -288,6 +312,10 @@ impl Command {
             Self::CompanySetClosing { date: None, .. } => "Remove Closing Date".into(),
             Self::AccountCreate { name, .. } => format!("New Account {name}"),
             Self::AccountUpdate { name, .. } => format!("Edit Account {name}"),
+            Self::AccountMerge { .. } => "Merge Accounts".into(),
+            Self::CustomerMerge { .. } => "Merge Customers".into(),
+            Self::VendorMerge { .. } => "Merge Vendors".into(),
+            Self::ItemMerge { .. } => "Merge Items".into(),
             Self::AccountSetActive { .. } => "Account Status".into(),
             Self::CustomerCreate { contact } => format!("New Customer {}", contact.name),
             Self::CustomerUpdate { contact, .. } => format!("Edit Customer {}", contact.name),
@@ -401,17 +429,39 @@ impl Command {
                 name,
                 kind,
                 description,
-            } => Some(
-                c.add_account(&number, &name, kind, &description)?
-                    .to_string(),
-            ),
+                parent,
+            } => {
+                let id = c.add_account(&number, &name, kind, &description)?;
+                if parent.is_some() {
+                    c.set_account_parent(id, parent)?;
+                }
+                Some(id.to_string())
+            }
             Self::AccountUpdate {
                 id,
                 number,
                 name,
                 description,
+                parent,
             } => {
                 c.update_account(id, &number, &name, &description)?;
+                c.set_account_parent(id, parent)?;
+                None
+            }
+            Self::AccountMerge { from, into } => {
+                c.merge_accounts(from, into)?;
+                None
+            }
+            Self::CustomerMerge { from, into } => {
+                c.merge_customers(from, into)?;
+                None
+            }
+            Self::VendorMerge { from, into } => {
+                c.merge_vendors(from, into)?;
+                None
+            }
+            Self::ItemMerge { from, into } => {
+                c.merge_items(from, into)?;
                 None
             }
             Self::AccountSetActive { id, active } => {

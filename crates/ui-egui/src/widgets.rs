@@ -6,7 +6,7 @@ use std::hash::Hash;
 use eframe::egui::{self, Align, Layout, RichText, Ui};
 use ledgercraft_core::Money;
 use ledgercraft_ledger::{
-    Account, AccountId, AccountType, Company, CustomerId, ItemId, Party, TxnBody, TxnId, VendorId,
+    AccountId, AccountType, Company, CustomerId, ItemId, Party, TxnBody, TxnId, VendorId,
 };
 use ledgercraft_reports::{Cell, Report, RowKind};
 
@@ -62,17 +62,19 @@ pub(crate) fn account_combo_width(
     allow: impl Fn(AccountType) -> bool,
     width: f32,
 ) {
+    // Sub-accounts show under their parents, by their full names
+    // ("Utilities:Electric").
     let text = (*value)
-        .and_then(|id| c.account(id))
-        .map(Account::display_name)
+        .filter(|id| c.account(*id).is_some())
+        .map(|id| c.account_full_name(id))
         .unwrap_or_else(|| "Choose account…".into());
     egui::ComboBox::from_id_salt(salt)
         .selected_text(text)
         .width(width)
         .show_ui(ui, |ui| {
-            for a in c.sorted_accounts() {
+            for (a, _) in c.accounts_in_tree_order() {
                 if a.active && allow(a.kind) {
-                    let label = format!("{}   ({})", a.display_name(), a.kind.label());
+                    let label = format!("{}   ({})", c.account_full_name(a.id), a.kind.label());
                     ui.selectable_value(value, Some(a.id), label);
                 }
             }

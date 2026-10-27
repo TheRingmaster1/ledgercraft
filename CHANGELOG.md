@@ -9,6 +9,24 @@ docs/releasing.md.
 ## [Unreleased]
 
 ### Added
+- Merging duplicates (M2.8): customers, vendors, items and accounts have
+  Merge into in their Edit panels. Everything of the one merged moves to the
+  one kept (transactions, lines, payments; for accounts also items, bank
+  rules and downloads), then it is removed; Edit > Undo puts it back.
+  Accounts merge only into the same type, and a reconciled account cannot be
+  merged away. Merges that would change closed transactions follow the
+  closing date. Commands `customer.merge`, `vendor.merge`, `item.merge`,
+  `account.merge`.
+- Sub-accounts (M2.8): accounts can be a sub-account of another of the same
+  type (Subaccount of, when adding or editing). The chart lists them
+  indented, pickers show `Utilities:Electric`, the Profit & Loss and Balance
+  Sheet show each parent with its sub-accounts and a total, and the Trial
+  Balance uses full names. `account.create` and `account.update` take
+  `parent`.
+- Accounts can be edited: Edit in the Chart of Accounts changes the number,
+  name, description and parent, and merges.
+- The sample company has a duplicate customer, Maple St. Cafe, to practise
+  merging, and Accumulated Depreciation as a sub-account of Equipment.
 - Daily backups (M2.9). Before the first save of each day, the company file
   as it was is copied into a `LedgerCraft Backups` folder beside it (still
   encrypted if protected); the last 10 are kept, set in Preferences > Files

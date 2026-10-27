@@ -12,6 +12,7 @@ mod company;
 mod error;
 mod ids;
 mod item;
+mod merge;
 mod party;
 mod print;
 mod reconcile;
