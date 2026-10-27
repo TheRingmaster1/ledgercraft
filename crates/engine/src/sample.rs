@@ -15,9 +15,11 @@
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_ledger::{
     tax_payment_memo, AccountId, AccountLine, AccountType, Address, Applied, BankRule, Bill, Check,
-    Company, Contact, CreditMemo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
-    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Logo, Party, PayBill,
-    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, TaxRate, TxnBody, TxnId, VendorId,
+    Company, Contact, CreditMemo, Logo, CustomerId, CustomerTax, Deposit, Invoice, InvoiceTax, ItemId,
+    ItemKind, ItemSpec, JournalEntry, JournalLine, LedgerError, LedgerResult, Party, PayBill,
+    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, TaxRate, TxnBody, TxnClassId,
+    TxnId,
+    VendorId,
 };
 
 fn d(y: i32, m: u32, day: u32) -> LedgerResult<Date> {
@@ -776,13 +778,37 @@ pub fn sample_company() -> LedgerResult<Company> {
         }),
     )?;
 
-    rest_of_year(
-        &mut c,
-        [maple, harbor, lin],
-        [lumber, power, landlord],
-        [table, chair, design],
-    )?;
+    rest_of_year(&mut c, [maple, harbor, lin], [lumber, power, landlord], [table, chair, design])?;
+    classes(&mut c)?;
     Ok(c)
+}
+
+/// Classes split the shop's own sales from the craft fairs for Profit &
+/// Loss by Class. Expenses are left unclassified, as many owners start.
+fn classes(c: &mut Company) -> LedgerResult<()> {
+    let shop = c.add_class("Shop")?;
+    let fairs = c.add_class("Craft fairs")?;
+    let online = c.add_class("Online")?;
+    // Tried, then dropped: inactive, so forms leave it off.
+    c.set_class_active(online, false)?;
+    let tags: Vec<(TxnId, TxnClassId)> = c
+        .transactions
+        .iter()
+        .filter_map(|t| match &t.body {
+            TxnBody::Invoice(_) => Some((t.id, shop)),
+            TxnBody::SalesReceipt(r) if r.customer.is_some() => Some((t.id, shop)),
+            // Walk-in sales at the fair, with no customer.
+            TxnBody::SalesReceipt(_) => Some((t.id, fairs)),
+            TxnBody::Check(k) if k.lines.iter().any(|l| l.description.contains("Craft fair")) => {
+                Some((t.id, fairs))
+            }
+            _ => None,
+        })
+        .collect();
+    for (id, class) in tags {
+        c.set_txn_class(id, Some(class))?;
+    }
+    Ok(())
 }
 
 /// April to October: the shop grows, registers for sales tax, finances a

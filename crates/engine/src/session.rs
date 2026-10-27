@@ -629,6 +629,7 @@ mod tests {
             number: t.number.clone(),
             memo: "Edited".into(),
             body: t.body.clone(),
+            class: None,
         })
         .unwrap();
         assert_eq!(s.company().txn(t.id).unwrap().memo, "Edited");
@@ -744,6 +745,7 @@ mod tests {
             number: january.number.clone(),
             memo: "Changed".into(),
             body: january.body.clone(),
+            class: None,
         };
         assert!(matches!(
             s.execute(edit.clone()),
@@ -927,6 +929,16 @@ mod tests {
             .customers
             .iter()
             .any(|x| x.contact.name == "Maple St. Cafe"));
+
+        // Classes: two in use (each on income), one inactive.
+        assert!(c.classes.iter().any(|k| !k.active));
+        for k in c.classes.iter().filter(|k| k.active) {
+            assert!(
+                c.transactions.iter().any(|t| t.class == Some(k.id)),
+                "{} unused",
+                k.name
+            );
+        }
 
         // A loan, partly repaid, and depreciation.
         let loan = c.account_balance(account("Loan Payable"), None);

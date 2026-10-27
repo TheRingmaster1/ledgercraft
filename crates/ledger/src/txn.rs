@@ -27,6 +27,9 @@ pub struct Transaction {
     /// Voided transactions stay in the file for the audit trail but post nothing.
     #[serde(default)]
     pub voided: bool,
+    /// The class (department, location…) it belongs to, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub class: Option<crate::TxnClassId>,
 }
 
 /// The forms a transaction can be entered on.

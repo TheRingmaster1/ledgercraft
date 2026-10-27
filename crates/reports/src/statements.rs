@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use ledgercraft_core::{Date, Money};
-use ledgercraft_ledger::{Account, AccountId, AccountType, Class, Company};
+use ledgercraft_ledger::{
+    Account, AccountId, AccountType, Class, Company, TxnClass, TxnClassId, TxnId,
+};
 
 use crate::{Cell, Report, RowKind};
 
@@ -31,6 +33,19 @@ fn sum(values: impl IntoIterator<Item = Money>) -> Money {
     values.into_iter().fold(Money::ZERO, Money::saturating_add)
 }
 
+/// Debit-positive activity per account, one amount per report column.
+type Columns = BTreeMap<AccountId, Vec<Money>>;
+
+fn add_into(total: &mut [Money], values: &[Money]) {
+    for (t, v) in total.iter_mut().zip(values) {
+        *t = t.saturating_add(*v);
+    }
+}
+
+fn all_zero(values: &[Money]) -> bool {
+    values.iter().all(|m| m.is_zero())
+}
+
 /// Adds a row per account of the given types with activity, sub-accounts
 /// indented under their parents with a total for each parent, and returns
 /// their natural-sign total.
@@ -41,7 +56,23 @@ fn account_rows(
     kinds: &[AccountType],
     indent: u8,
 ) -> Money {
-    let mut total = Money::ZERO;
+    let columns: Columns = amounts.iter().map(|(id, m)| (*id, vec![*m])).collect();
+    account_rows_in(report, company, &columns, 1, kinds, indent)
+        .first()
+        .copied()
+        .unwrap_or(Money::ZERO)
+}
+
+/// [`account_rows`] for `n` columns of amounts.
+fn account_rows_in(
+    report: &mut Report,
+    company: &Company,
+    amounts: &Columns,
+    n: usize,
+    kinds: &[AccountType],
+    indent: u8,
+) -> Vec<Money> {
+    let mut total = vec![Money::ZERO; n];
     // Top level here: no parent, or a parent of another type (which a
     // damaged file could have).
     let top = company.sorted_accounts().into_iter().filter(|a| {
@@ -51,8 +82,8 @@ fn account_rows(
                 .is_none_or(|p| !kinds.contains(&p.kind))
     });
     for a in top {
-        let value = tree_rows(report, company, amounts, a, indent, 0);
-        total = total.saturating_add(value);
+        let value = tree_rows(report, company, amounts, n, a, indent, 0);
+        add_into(&mut total, &value);
     }
     total
 }
@@ -60,21 +91,23 @@ fn account_rows(
 /// The raw activity of an account and everything under it.
 fn subtree_raw(
     company: &Company,
-    amounts: &BTreeMap<AccountId, Money>,
+    amounts: &Columns,
+    n: usize,
     a: &Account,
     depth: usize,
-) -> Money {
-    let own = amounts.get(&a.id).copied().unwrap_or(Money::ZERO);
+) -> Vec<Money> {
+    let mut total = amounts
+        .get(&a.id)
+        .cloned()
+        .unwrap_or_else(|| vec![Money::ZERO; n]);
     // Deeper than the chart is long means a loop in a damaged file.
     if depth > company.accounts.len() {
-        return own;
+        return total;
     }
-    company
-        .sub_accounts(a.id)
-        .into_iter()
-        .fold(own, |sum, child| {
-            sum.saturating_add(subtree_raw(company, amounts, child, depth + 1))
-        })
+    for child in company.sub_accounts(a.id) {
+        add_into(&mut total, &subtree_raw(company, amounts, n, child, depth + 1));
+    }
+    total
 }
 
 /// One account's rows: a plain line, or, when its sub-accounts have
@@ -83,51 +116,51 @@ fn subtree_raw(
 fn tree_rows(
     report: &mut Report,
     company: &Company,
-    amounts: &BTreeMap<AccountId, Money>,
+    amounts: &Columns,
+    n: usize,
     a: &Account,
     indent: u8,
     depth: usize,
-) -> Money {
-    let subtree = subtree_raw(company, amounts, a, depth);
-    if subtree.is_zero() {
-        return Money::ZERO;
+) -> Vec<Money> {
+    let subtree = subtree_raw(company, amounts, n, a, depth);
+    if all_zero(&subtree) {
+        return vec![Money::ZERO; n];
     }
-    let own = amounts.get(&a.id).copied().unwrap_or(Money::ZERO);
+    let natural_all =
+        |raw: &[Money]| -> Vec<Money> { raw.iter().map(|m| natural(a.kind, *m)).collect() };
+    let own = amounts
+        .get(&a.id)
+        .cloned()
+        .unwrap_or_else(|| vec![Money::ZERO; n]);
     let children: Vec<&Account> = if depth > company.accounts.len() {
         Vec::new()
     } else {
         company
             .sub_accounts(a.id)
             .into_iter()
-            .filter(|c| !subtree_raw(company, amounts, c, depth + 1).is_zero())
+            .filter(|c| !all_zero(&subtree_raw(company, amounts, n, c, depth + 1)))
             .collect()
     };
     let name = a.display_name();
     if children.is_empty() {
-        let value = natural(a.kind, own);
-        report.money(RowKind::Detail, &name, indent, &[value], Some(a.id));
+        let value = natural_all(&own);
+        report.money(RowKind::Detail, &name, indent, &value, Some(a.id));
         return value;
     }
     report.section(&name, indent);
     let inner = indent.saturating_add(1);
-    if !own.is_zero() {
-        report.money(
-            RowKind::Detail,
-            &name,
-            inner,
-            &[natural(a.kind, own)],
-            Some(a.id),
-        );
+    if !all_zero(&own) {
+        report.money(RowKind::Detail, &name, inner, &natural_all(&own), Some(a.id));
     }
     for child in children {
-        tree_rows(report, company, amounts, child, inner, depth + 1);
+        tree_rows(report, company, amounts, n, child, inner, depth + 1);
     }
-    let value = natural(a.kind, subtree);
+    let value = natural_all(&subtree);
     report.money(
         RowKind::Subtotal,
         &format!("Total {name}"),
         indent,
-        &[value],
+        &value,
         None,
     );
     value
@@ -176,50 +209,97 @@ pub fn profit_and_loss(company: &Company, from: Date, to: Date) -> Report {
         format!("{from} through {to}"),
         &["Amount"],
     );
-    let amounts = activity(company, Some(from), Some(to));
+    let amounts: Columns = activity(company, Some(from), Some(to))
+        .into_iter()
+        .map(|(id, m)| (id, vec![m]))
+        .collect();
+    profit_and_loss_rows(&mut r, company, &amounts, 1);
+    r
+}
 
+/// Profit & Loss with a column per class (those used in the period), then
+/// Unclassified and Total.
+pub fn profit_and_loss_by_class(company: &Company, from: Date, to: Date) -> Report {
+    let class_of: BTreeMap<TxnId, TxnClassId> = company
+        .transactions
+        .iter()
+        .filter_map(|t| Some((t.id, t.class?)))
+        .collect();
+    let entries: Vec<_> = company
+        .ledger_entries()
+        .into_iter()
+        .filter(|e| e.date >= from && e.date <= to)
+        .collect();
+    // Classes in the period, in list order; then Unclassified, then Total.
+    let used: Vec<&TxnClass> = company
+        .classes
+        .iter()
+        .filter(|k| entries.iter().any(|e| class_of.get(&e.txn) == Some(&k.id)))
+        .collect();
+    let mut headers: Vec<&str> = used.iter().map(|k| k.name.as_str()).collect();
+    headers.push("Unclassified");
+    headers.push("Total");
+    let n = headers.len();
+    let unclassified = n - 2;
+    let mut amounts = Columns::new();
+    for e in &entries {
+        let col = class_of
+            .get(&e.txn)
+            .and_then(|k| used.iter().position(|u| u.id == *k))
+            .unwrap_or(unclassified);
+        let slot = amounts
+            .entry(e.posting.account)
+            .or_insert_with(|| vec![Money::ZERO; n]);
+        for i in [col, n - 1] {
+            if let Some(m) = slot.get_mut(i) {
+                *m = m.saturating_add(e.posting.amount);
+            }
+        }
+    }
+    let mut r = Report::new(
+        "Profit & Loss by Class",
+        &company.info.name,
+        format!("{from} through {to}"),
+        &headers,
+    );
+    profit_and_loss_rows(&mut r, company, &amounts, n);
+    r
+}
+
+fn minus(a: &[Money], b: &[Money]) -> Vec<Money> {
+    a.iter().zip(b).map(|(x, y)| x.saturating_sub(*y)).collect()
+}
+
+/// The sections of a Profit & Loss, over `n` columns.
+fn profit_and_loss_rows(r: &mut Report, company: &Company, amounts: &Columns, n: usize) {
     r.section("Income", 0);
-    let income = account_rows(&mut r, company, &amounts, &[AccountType::Income], 1);
-    r.money(RowKind::Subtotal, "Total Income", 0, &[income], None);
+    let income = account_rows_in(r, company, amounts, n, &[AccountType::Income], 1);
+    r.money(RowKind::Subtotal, "Total Income", 0, &income, None);
 
     r.section("Cost of Goods Sold", 0);
-    let cogs = account_rows(
-        &mut r,
-        company,
-        &amounts,
-        &[AccountType::CostOfGoodsSold],
-        1,
-    );
-    r.money(RowKind::Subtotal, "Total COGS", 0, &[cogs], None);
-    let gross = income.saturating_sub(cogs);
-    r.money(RowKind::Subtotal, "Gross Profit", 0, &[gross], None);
+    let cogs = account_rows_in(r, company, amounts, n, &[AccountType::CostOfGoodsSold], 1);
+    r.money(RowKind::Subtotal, "Total COGS", 0, &cogs, None);
+    let gross = minus(&income, &cogs);
+    r.money(RowKind::Subtotal, "Gross Profit", 0, &gross, None);
 
     r.section("Expenses", 0);
-    let expenses = account_rows(&mut r, company, &amounts, &[AccountType::Expense], 1);
-    r.money(RowKind::Subtotal, "Total Expenses", 0, &[expenses], None);
-    let operating = gross.saturating_sub(expenses);
-    r.money(
-        RowKind::Subtotal,
-        "Net Operating Income",
-        0,
-        &[operating],
-        None,
-    );
+    let expenses = account_rows_in(r, company, amounts, n, &[AccountType::Expense], 1);
+    r.money(RowKind::Subtotal, "Total Expenses", 0, &expenses, None);
+    let operating = minus(&gross, &expenses);
+    r.money(RowKind::Subtotal, "Net Operating Income", 0, &operating, None);
 
     r.section("Other Income and Expense", 0);
-    let other_income = account_rows(&mut r, company, &amounts, &[AccountType::OtherIncome], 1);
-    let other_expense = account_rows(&mut r, company, &amounts, &[AccountType::OtherExpense], 1);
-    let net_other = other_income.saturating_sub(other_expense);
-    r.money(RowKind::Subtotal, "Net Other Income", 0, &[net_other], None);
+    let other_income = account_rows_in(r, company, amounts, n, &[AccountType::OtherIncome], 1);
+    let other_expense = account_rows_in(r, company, amounts, n, &[AccountType::OtherExpense], 1);
+    let net_other = minus(&other_income, &other_expense);
+    r.money(RowKind::Subtotal, "Net Other Income", 0, &net_other, None);
 
-    r.money(
-        RowKind::Total,
-        "Net Income",
-        0,
-        &[operating.saturating_add(net_other)],
-        None,
-    );
-    r
+    let net: Vec<Money> = operating
+        .iter()
+        .zip(&net_other)
+        .map(|(a, b)| a.saturating_add(*b))
+        .collect();
+    r.money(RowKind::Total, "Net Income", 0, &net, None);
 }
 
 /// Net income (income less expenses) from the given activity.

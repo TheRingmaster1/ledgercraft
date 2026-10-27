@@ -268,6 +268,12 @@ const LESSONS: &[Lesson] = &[
                  account cannot be merged away (merge the other into it instead). Edit > \
                  Undo puts it back.",
             ),
+            Text(
+                "When the two balances run opposite ways (Equipment and its Accumulated \
+                 Depreciation, say), Merge warns that this is usually an account and its \
+                 contra account, not a duplicate: merging would net them into one balance. \
+                 Tick \"I understand, merge anyway\" only if they really are the same.",
+            ),
             Tip(
                 "An account's type cannot be changed after it is created, so posted history \
                  always keeps its meaning. Choose carefully.",
@@ -734,6 +740,8 @@ const LESSONS: &[Lesson] = &[
             Bullets(&[
                 "Profit & Loss: income minus expenses for a date range. Is the business \
                  making money?",
+                "Profit & Loss by Class: the same, with a column for each class, then \
+                 Unclassified and Total (see the Classes lesson).",
                 "Balance Sheet: what you have, what you owe and the owner's equity on one \
                  date. Total assets always equal total liabilities and equity.",
                 "Trial Balance: every account's debit or credit balance. The two totals \
@@ -759,6 +767,36 @@ const LESSONS: &[Lesson] = &[
             ]),
         ],
         try_it: &[("Open Reports", Target::Page(Page::Reports))],
+    },
+    Lesson {
+        title: "Classes",
+        blocks: &[
+            Text(
+                "Classes track parts of the business across every account: a shop and its \
+                 craft fairs, two locations, or lines of business. Each transaction can \
+                 belong to one class, and Profit & Loss by Class shows each one's income, \
+                 expenses and net income side by side.",
+            ),
+            Steps(&[
+                "Open Lists > Classes, type a name under New class and click Add class.",
+                "Every form now shows a Class box under its heading. Choose the class \
+                 before you save; leave it (none) for anything that is not one class's.",
+                "To tag something already recorded, open it, choose the class and Save \
+                 Changes.",
+                "Open Reports > Profit & Loss by Class. Untagged transactions fall under \
+                 Unclassified, and the Total column matches the plain Profit & Loss.",
+            ]),
+            Bullets(&[
+                "Rename beside a class changes its name everywhere.",
+                "Make inactive leaves a class off the forms; its transactions keep it. \
+                 Show inactive lists it again.",
+            ]),
+            Tip(
+                "The sample company tags its own sales Shop and its walk-in fair sales and \
+                 booth fee Craft fairs, and leaves other expenses unclassified.",
+            ),
+        ],
+        try_it: &[("Open Classes", Target::Page(Page::Classes))],
     },
     Lesson {
         title: "Closing the books",

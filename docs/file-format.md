@@ -37,6 +37,10 @@ A company file is UTF-8 JSON:
   Backups` folder beside it, named `<company file name> YYYY-MM-DD.lcbooks`.
 * An account's `parent` is the account it is a sub-account of (same type);
   left out for a top-level account.
+* `classes` are the transaction classes (departments, locations, lines of
+  business): id, `name` and `active`. A transaction's `class` is the id of
+  the class it belongs to. Both are left out when there are none, so older
+  files open unchanged.
 * `closing`, when the books are closed: `date` (transactions dated then or
   before are locked) and, if set, `password`: a one-way Argon2id check value
   (`argon2id$memory$passes$lanes$salt$hash`), never the password itself.

@@ -86,6 +86,9 @@ pub struct Company {
     /// Every change made to the books, oldest first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audit: Vec<crate::AuditEntry>,
+    /// Classes transactions can be put in (departments, locations…).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub classes: Vec<crate::TxnClass>,
     #[serde(default)]
     next_id: u64,
 }
@@ -117,6 +120,7 @@ impl Company {
             tax_rates_checked: None,
             closing: None,
             audit: Vec::new(),
+            classes: Vec::new(),
             next_id: 0,
         }
     }
@@ -865,6 +869,7 @@ impl Company {
             memo: memo.to_string(),
             body,
             voided: false,
+            class: None,
         });
         Ok(id)
     }

@@ -21,8 +21,8 @@ usage:
   ledgercraft-cli commands
   ledgercraft-cli --version
 
-report KIND is one of: pl, balance-sheet, trial-balance, ar-aging, ap-aging, transactions,
-  sales-tax, sales-by-state, audit
+report KIND is one of: pl, pl-by-class, balance-sheet, trial-balance, ar-aging, ap-aging,
+  transactions, sales-tax, sales-by-state, audit
 dates are YYYY-MM-DD; --to is also the \"as of\" date
 invoice-pdf saves invoice NUMBER as a PDF (default: \"Invoice NUMBER.pdf\"); a sales
   receipt or credit memo with that number prints when no invoice has it
