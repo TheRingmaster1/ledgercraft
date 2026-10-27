@@ -767,6 +767,7 @@ impl LedgerApp {
             number,
             memo,
             body,
+            class,
         } = cmd
         else {
             return false;
@@ -779,6 +780,7 @@ impl LedgerApp {
                     && t.number == number.trim()
                     && t.memo.trim() == memo.trim()
                     && t.body == *body
+                    && t.class == *class
             })
     }
 
@@ -1126,6 +1128,7 @@ impl LedgerApp {
                             ("Customers", Page::Customers),
                             ("Vendors", Page::Vendors),
                             ("Products and Services", Page::Items),
+                            ("Classes", Page::Classes),
                             ("Sales Tax", Page::SalesTax),
                         ] {
                             if ui.button(label).clicked() {
@@ -1798,6 +1801,9 @@ impl eframe::App for LedgerApp {
                         .show(ui, |ui| match page {
                             Page::Home => pages::home(ui, company, stripe, &mut actions),
                             Page::Items => pages::items(ui, company, &mut self.lists, &mut actions),
+                            Page::Classes => {
+                                pages::classes(ui, company, &mut self.lists, &mut actions)
+                            }
                             Page::SalesTax => {
                                 salestax::page(ui, company, &mut self.sales_tax, &mut actions)
                             }
@@ -1922,6 +1928,7 @@ mod tests {
             number: t.number.clone(),
             memo: t.memo.clone(),
             body: t.body.clone(),
+            class: t.class,
         };
         assert!(app.changes_nothing(&cmd));
         if let Command::TxnUpdate { memo, .. } = &mut cmd {

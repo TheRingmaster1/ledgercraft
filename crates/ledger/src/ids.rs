@@ -47,3 +47,7 @@ define_id!(
     /// location (state + county + city ...), chosen on invoices.
     TaxGroupId, "G"
 );
+define_id!(
+    /// Identifies a class (a department, location or line of business).
+    TxnClassId, "K"
+);

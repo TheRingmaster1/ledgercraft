@@ -45,6 +45,7 @@ pub(crate) enum Page {
     Reconcile,
     BankImport,
     SalesTax,
+    Classes,
     Form(FormKind),
 }
 
@@ -97,6 +98,8 @@ pub(crate) enum Reset {
     EditedVendor,
     EditedItem,
     EditedAccount,
+    NewClass,
+    EditedClass,
 }
 
 // `Run` carries a whole `Command` (contacts are large); a handful per frame is fine.

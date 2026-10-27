@@ -7,6 +7,7 @@
 
 mod account;
 mod bankfeed;
+mod classes;
 mod closing;
 mod company;
 mod error;
@@ -25,7 +26,10 @@ pub use closing::{AuditEntry, Closing};
 pub use bankfeed::{BankRule, FeedAction, FeedEntry, FeedLine, FeedLink, MATCH_DAYS};
 pub use company::{Company, CompanyInfo, LedgerEntry};
 pub use error::{LedgerError, LedgerResult};
-pub use ids::{AccountId, CustomerId, ItemId, TaxComponentId, TaxGroupId, TxnId, VendorId};
+pub use classes::TxnClass;
+pub use ids::{
+    AccountId, CustomerId, ItemId, TaxComponentId, TaxGroupId, TxnClassId, TxnId, VendorId,
+};
 pub use item::{Item, ItemKind, ItemSpec};
 pub use party::{Address, Contact, Customer, Party, Vendor};
 pub use print::{base64_decode, base64_encode, Logo, PdfTemplate, PrintStyle, LOGO_MAX_BYTES};

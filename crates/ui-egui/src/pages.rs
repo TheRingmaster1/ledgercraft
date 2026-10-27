@@ -6,7 +6,7 @@ use ledgercraft_core::{Date, Money};
 use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
     AccountId, AccountType, Address, Company, Contact, Customer, CustomerId, CustomerTax, Item,
-    ItemId, ItemKind, ItemSpec, TxnId, VendorId,
+    ItemId, ItemKind, ItemSpec, TxnClassId, TxnId, VendorId,
 };
 use ledgercraft_reports::{account_register, ReportKind};
 
@@ -81,7 +81,16 @@ fn parent_combo(
 
 /// "Merge into": a picker of the other entries and a Merge button. Returns
 /// the one chosen when Merge is clicked.
-fn merge_row<T>(ui: &mut Ui, salt: &str, noun: &str, name: &str, others: &[(T, String)]) -> Option<T>
+/// `warn` looks at the one picked: a warning there must be acknowledged
+/// before Merge is enabled.
+fn merge_row<T>(
+    ui: &mut Ui,
+    salt: &str,
+    noun: &str,
+    name: &str,
+    others: &[(T, String)],
+    warn: impl Fn(T) -> Option<String>,
+) -> Option<T>
 where
     T: Copy + PartialEq + Send + Sync + 'static,
 {
@@ -94,6 +103,9 @@ where
         picked = None;
     }
     let mut merge = None;
+    let ack_id = egui::Id::NULL.with(("merge_ack", salt));
+    let mut acknowledged: bool = ui.data(|d| d.get_temp(ack_id)).unwrap_or(false);
+    let warning = picked.and_then(&warn);
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
         widgets::hint_label(ui, "Merge into");
@@ -105,23 +117,58 @@ where
             .width(240.0)
             .show_ui(ui, |ui| {
                 for (value, label) in others {
-                    ui.selectable_value(&mut picked, Some(*value), label.as_str());
+                    if ui
+                        .selectable_value(&mut picked, Some(*value), label.as_str())
+                        .clicked()
+                    {
+                        // A new choice needs its own acknowledgement.
+                        acknowledged = false;
+                    }
                 }
             });
         let hover = format!(
             "Moves everything of {name} to the {noun} chosen, then removes {name}: for \
              duplicates. Edit > Undo puts it back."
         );
+        let allowed = picked.is_some() && (warning.is_none() || acknowledged);
         if ui
-            .add_enabled(picked.is_some(), egui::Button::new("Merge"))
+            .add_enabled(allowed, egui::Button::new("Merge"))
             .on_hover_text(hover)
             .clicked()
         {
             merge = picked;
         }
     });
-    ui.data_mut(|d| d.insert_temp(id, picked));
+    if let Some(text) = &warning {
+        ui.label(RichText::new(format!("⚠ {text}")).color(theme::WARNING));
+        ui.checkbox(&mut acknowledged, "I understand, merge anyway");
+    }
+    if merge.is_some() {
+        acknowledged = false;
+    }
+    ui.data_mut(|d| {
+        d.insert_temp(id, picked);
+        d.insert_temp(ack_id, acknowledged);
+    });
     merge
+}
+
+/// Two accounts whose balances run opposite ways are usually an account
+/// and its contra account (Equipment and Accumulated Depreciation), not
+/// duplicates: merging them nets the two into one balance.
+fn contra_warning(c: &Company, from: AccountId, into: AccountId) -> Option<String> {
+    let a = c.account_balance(from, None);
+    let b = c.account_balance(into, None);
+    let opposite = (a.is_positive() && b.is_negative()) || (a.is_negative() && b.is_positive());
+    opposite.then(|| {
+        format!(
+            "{} ({a}) and {} ({b}) have balances running opposite ways. That is usually \
+             an account and its contra account, not a duplicate: merging nets them into one \
+             balance and loses the split on reports.",
+            c.account_name(from),
+            c.account_name(into),
+        )
+    })
 }
 
 #[derive(Default)]
@@ -266,6 +313,9 @@ pub(crate) struct ListState {
     pub editing_account: Option<(AccountId, NewAccount)>,
     /// Exemption certificate numbers being typed, by customer.
     pub exemption_notes: std::collections::BTreeMap<CustomerId, String>,
+    /// Lists > Classes: the name of a new class, and the class being renamed.
+    pub new_class: String,
+    pub editing_class: Option<(TxnClassId, String)>,
 }
 
 impl ListState {
@@ -279,6 +329,8 @@ impl ListState {
             Reset::EditedVendor => self.editing_vendor = None,
             Reset::EditedItem => self.editing_item = None,
             Reset::EditedAccount => self.editing_account = None,
+            Reset::NewClass => self.new_class.clear(),
+            Reset::EditedClass => self.editing_class = None,
             Reset::Nothing
             | Reset::Form(_)
             | Reset::NewTax
@@ -866,7 +918,9 @@ fn edit_account(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Actio
             .filter(|(o, _)| o.kind == a.kind && !c.descends_from(o.id, id))
             .map(|(o, _)| (o.id, c.account_full_name(o.id)))
             .collect();
-        if let Some(into) = merge_row(ui, "account", "account", &a.name, &others) {
+        if let Some(into) = merge_row(ui, "account", "account", &a.name, &others, |into| {
+            contra_warning(c, id, into)
+        }) {
             out.push(Action::Run {
                 cmd: Command::AccountMerge { from: id, into },
                 reset: Reset::EditedAccount,
@@ -1045,7 +1099,7 @@ fn edit_customer(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Acti
             .filter(|o| o.id != id)
             .map(|o| (o.id, o.contact.name.clone()))
             .collect();
-        if let Some(into) = merge_row(ui, "customer", "customer", &x.contact.name, &others) {
+        if let Some(into) = merge_row(ui, "customer", "customer", &x.contact.name, &others, |_| None) {
             out.push(Action::Run {
                 cmd: Command::CustomerMerge { from: id, into },
                 reset: Reset::EditedCustomer,
@@ -1093,7 +1147,7 @@ fn edit_vendor(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action
             .filter(|o| o.id != id)
             .map(|o| (o.id, o.contact.name.clone()))
             .collect();
-        if let Some(into) = merge_row(ui, "vendor", "vendor", &x.contact.name, &others) {
+        if let Some(into) = merge_row(ui, "vendor", "vendor", &x.contact.name, &others, |_| None) {
             out.push(Action::Run {
                 cmd: Command::VendorMerge { from: id, into },
                 reset: Reset::EditedVendor,
@@ -1420,7 +1474,7 @@ fn edit_item(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>)
             .filter(|o| o.id != id)
             .map(|o| (o.id, o.spec.name.clone()))
             .collect();
-        if let Some(into) = merge_row(ui, "item", "item", &x.spec.name, &others) {
+        if let Some(into) = merge_row(ui, "item", "item", &x.spec.name, &others, |_| None) {
             out.push(Action::Run {
                 cmd: Command::ItemMerge { from: id, into },
                 reset: Reset::EditedItem,
@@ -1498,6 +1552,108 @@ pub(crate) fn items(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<A
                 ui.end_row();
             }
         });
+}
+
+// ----- classes -------------------------------------------------------------------------
+
+/// Lists > Classes: departments, locations or lines of business that
+/// transactions can be tagged with, for Profit & Loss by Class.
+pub(crate) fn classes(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec<Action>) {
+    title(ui, "Classes");
+    ui.label(
+        RichText::new(
+            "Tag transactions with a class (a shop, a location, a line of business) and \
+             Reports > Profit & Loss by Class shows each one's income and expenses. \
+             Forms show a Class box once you add one here.",
+        )
+        .color(theme::MUTED),
+    );
+    ui.add_space(6.0);
+    ui.horizontal_wrapped(|ui| {
+        widgets::hint_label(ui, "New class");
+        field(ui, &mut s.new_class, 200.0, "e.g. Craft fairs");
+        if ui.button("Add class").clicked() {
+            let name = s.new_class.trim().to_string();
+            if name.is_empty() {
+                out.push(Action::Error("Give the class a name.".into()));
+            } else {
+                out.push(Action::Run {
+                    cmd: Command::ClassCreate { name },
+                    reset: Reset::NewClass,
+                });
+            }
+        }
+    });
+    ui.checkbox(&mut s.show_inactive, "Show inactive");
+    ui.add_space(6.0);
+    if c.classes.is_empty() {
+        ui.label(RichText::new("No classes yet.").color(theme::MUTED));
+        return;
+    }
+    let mut cancel = false;
+    egui::Grid::new("classes")
+        .striped(true)
+        .spacing([18.0, 4.0])
+        .show(ui, |ui| {
+            for h in ["Name", "Transactions", ""] {
+                widgets::column_header(ui, h);
+            }
+            ui.end_row();
+            let show_inactive = s.show_inactive;
+            for k in c.classes.iter().filter(|k| k.active || show_inactive) {
+                let used = c.transactions.iter().filter(|t| t.class == Some(k.id)).count();
+                match s.editing_class.as_mut() {
+                    Some((id, name)) if *id == k.id => {
+                        field(ui, name, 200.0, "");
+                        ui.label(used.to_string());
+                        ui.horizontal(|ui| {
+                            if ui.button("Save").clicked() {
+                                out.push(Action::Run {
+                                    cmd: Command::ClassUpdate {
+                                        id: k.id,
+                                        name: name.trim().to_string(),
+                                    },
+                                    reset: Reset::EditedClass,
+                                });
+                            }
+                            if ui.button("Cancel").clicked() {
+                                cancel = true;
+                            }
+                        });
+                    }
+                    _ => {
+                        list_name(ui, &k.name, k.active);
+                        ui.label(used.to_string());
+                        ui.horizontal(|ui| {
+                            if ui.small_button("Rename").clicked() {
+                                s.editing_class = Some((k.id, k.name.clone()));
+                            }
+                            let (label, hover) = if k.active {
+                                (
+                                    "Make inactive",
+                                    "Leave it off the forms. Its transactions keep it.",
+                                )
+                            } else {
+                                ("Make active", "List it on forms again.")
+                            };
+                            if ui.small_button(label).on_hover_text(hover).clicked() {
+                                out.push(Action::Run {
+                                    cmd: Command::ClassSetActive {
+                                        id: k.id,
+                                        active: !k.active,
+                                    },
+                                    reset: Reset::Nothing,
+                                });
+                            }
+                        });
+                    }
+                }
+                ui.end_row();
+            }
+        });
+    if cancel {
+        s.editing_class = None;
+    }
 }
 
 // ----- transactions -------------------------------------------------------------------
@@ -1705,6 +1861,7 @@ mod tests {
             vendors(ui, &c, &mut s, &mut out);
             items(ui, &c, &mut s, &mut out);
             accounts(ui, &c, &mut s, &mut out);
+            classes(ui, &c, &mut s, &mut out);
         });
         assert!(out.is_empty());
         assert!(s.editing_customer.is_some() && s.editing_item.is_some());

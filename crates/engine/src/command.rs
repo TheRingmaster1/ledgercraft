@@ -2,7 +2,7 @@ use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
     AccountId, AccountType, Address, Company, Contact, CustomerId, CustomerTax, FeedEntry,
     ImportedTax, ItemId, ItemSpec, LedgerResult, TaxComponentId, TaxGroupId, TaxRate, TxnBody,
-    TxnId, VendorId,
+    TxnClassId, TxnId, VendorId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -108,6 +108,9 @@ pub enum Command {
         #[serde(default)]
         memo: String,
         body: TxnBody,
+        /// The class it belongs to, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        class: Option<TxnClassId>,
     },
     #[serde(rename = "txn.update")]
     TxnUpdate {
@@ -118,7 +121,16 @@ pub enum Command {
         #[serde(default)]
         memo: String,
         body: TxnBody,
+        /// The class it belongs to; none takes it out of any class.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        class: Option<TxnClassId>,
     },
+    #[serde(rename = "class.create")]
+    ClassCreate { name: String },
+    #[serde(rename = "class.update")]
+    ClassUpdate { id: TxnClassId, name: String },
+    #[serde(rename = "class.setActive")]
+    ClassSetActive { id: TxnClassId, active: bool },
     #[serde(rename = "txn.void")]
     TxnVoid { id: TxnId },
     #[serde(rename = "account.reconcile")]
@@ -233,9 +245,12 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "item.create", summary: "Add a product or service. {spec:{name, rate, income_account, kind?, taxable?}}" },
     CommandInfo { id: "item.update", summary: "Change a product or service; recorded invoices keep their lines. {id, spec}" },
     CommandInfo { id: "item.setActive", summary: "Make an item active or inactive (inactive ones are left off forms). {id, active}" },
-    CommandInfo { id: "txn.post", summary: "Record a transaction. {date, number?, memo?, body:{type: invoice|sales_receipt|credit_memo|refund|receive_payment|bill|pay_bill|check|deposit|journal, …}}" },
-    CommandInfo { id: "txn.update", summary: "Edit a recorded transaction; it keeps its id and type. {id, date, number?, memo?, body}" },
+    CommandInfo { id: "txn.post", summary: "Record a transaction. {date, number?, memo?, body:{type: invoice|sales_receipt|credit_memo|refund|receive_payment|bill|pay_bill|check|deposit|journal, …}, class?}" },
+    CommandInfo { id: "txn.update", summary: "Edit a recorded transaction; it keeps its id and type. {id, date, number?, memo?, body, class?}" },
     CommandInfo { id: "txn.void", summary: "Void a transaction (it stays on file). {id}" },
+    CommandInfo { id: "class.create", summary: "Add a class (a department, location or line of business). {name}" },
+    CommandInfo { id: "class.update", summary: "Rename a class. {id, name}" },
+    CommandInfo { id: "class.setActive", summary: "Leave a class off the forms, or list it again. {id, active}" },
     CommandInfo { id: "account.reconcile", summary: "Reconcile a bank or credit card account against a statement; the cleared items must match the ending balance exactly. {account, statement_date, ending_balance, cleared:[txn ids]}" },
     CommandInfo { id: "account.undoReconciliation", summary: "Undo an account's last reconciliation. {account}" },
     CommandInfo { id: "bank.import", summary: "Bring downloaded bank lines into an account: match, add in a category, or skip each; lines imported before are passed over. {account, entries:[{line:{date, amount, payee?, memo?, number?, fit_id?}, action:{action: match|add|skip, txn? | category?, remember?}}]}" },
@@ -280,6 +295,9 @@ impl Command {
             Self::TxnPost { .. } => "txn.post",
             Self::TxnUpdate { .. } => "txn.update",
             Self::TxnVoid { .. } => "txn.void",
+            Self::ClassCreate { .. } => "class.create",
+            Self::ClassUpdate { .. } => "class.update",
+            Self::ClassSetActive { .. } => "class.setActive",
             Self::AccountReconcile { .. } => "account.reconcile",
             Self::AccountUndoReconciliation { .. } => "account.undoReconciliation",
             Self::BankImport { .. } => "bank.import",
@@ -327,6 +345,9 @@ impl Command {
             Self::TxnPost { body, .. } => body.label().to_string(),
             Self::TxnUpdate { body, .. } => format!("Edit {}", body.label()),
             Self::TxnVoid { id } => format!("Void {id}"),
+            Self::ClassCreate { name } => format!("New Class {name}"),
+            Self::ClassUpdate { name, .. } => format!("Rename Class {name}"),
+            Self::ClassSetActive { .. } => "Class Status".into(),
             Self::AccountReconcile { .. } => "Reconcile".into(),
             Self::AccountUndoReconciliation { .. } => "Undo Reconciliation".into(),
             Self::BankImport { .. } => "Import Bank Transactions".into(),
@@ -499,15 +520,33 @@ impl Command {
                 number,
                 memo,
                 body,
-            } => Some(c.post(date, &number, &memo, body)?.to_string()),
+                class,
+            } => {
+                let id = c.post(date, &number, &memo, body)?;
+                if class.is_some() {
+                    c.set_txn_class(id, class)?;
+                }
+                Some(id.to_string())
+            }
             Self::TxnUpdate {
                 id,
                 date,
                 number,
                 memo,
                 body,
+                class,
             } => {
                 c.update(id, date, &number, &memo, body)?;
+                c.set_txn_class(id, class)?;
+                None
+            }
+            Self::ClassCreate { name } => Some(c.add_class(&name)?.to_string()),
+            Self::ClassUpdate { id, name } => {
+                c.rename_class(id, &name)?;
+                None
+            }
+            Self::ClassSetActive { id, active } => {
+                c.set_class_active(id, active)?;
                 None
             }
             Self::TxnVoid { id } => {

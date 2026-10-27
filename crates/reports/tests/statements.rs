@@ -3,7 +3,8 @@
 use ledgercraft_core::{Date, Money, Qty};
 use ledgercraft_ledger::{AccountLine, Bill, Check, Company, Contact, Invoice, SalesLine, TxnBody};
 use ledgercraft_reports::{
-    ap_aging, ar_aging, balance_sheet, profit_and_loss, trial_balance, Cell, RowKind,
+    ap_aging, ar_aging, balance_sheet, profit_and_loss, profit_and_loss_by_class, trial_balance,
+    Cell, RowKind,
 };
 
 fn d(s: &str) -> Date {
@@ -183,4 +184,34 @@ fn sub_accounts_are_totalled_under_their_parent() {
         .rows
         .iter()
         .any(|row| row.label == "6310 · Rent:Storage unit"));
+}
+
+#[test]
+fn profit_and_loss_by_class_splits_the_columns() {
+    let mut c = books();
+    let shop = c.add_class("Shop").unwrap();
+    c.add_class("Never used").unwrap();
+    let check = c.transactions.iter().find(|t| t.number == "101").unwrap().id;
+    c.set_txn_class(check, Some(shop)).unwrap();
+    let r = profit_and_loss_by_class(&c, d("2026-01-01"), d("2026-12-31"));
+    // Classes with no activity in the period get no column.
+    assert_eq!(r.columns, ["Shop", "Unclassified", "Total"]);
+    let row = |label: &str| {
+        r.rows
+            .iter()
+            .find(|row| row.label.ends_with(label))
+            .unwrap()
+            .cells
+            .clone()
+    };
+    let m = |n: i64| Cell::Money(Money::from_dollars(n));
+    assert_eq!(row("Rent"), [m(300), m(0), m(300)]);
+    assert_eq!(row("Utilities"), [m(0), m(200), m(200)]);
+    assert_eq!(row("Net Income"), [m(-300), m(-200), m(-500)]);
+    // The Total column is the plain Profit & Loss.
+    let plain = profit_and_loss(&c, d("2026-01-01"), d("2026-12-31"));
+    assert_eq!(
+        last_money(&r, "Net Income"),
+        last_money(&plain, "Net Income")
+    );
 }

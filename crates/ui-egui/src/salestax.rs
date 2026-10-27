@@ -290,6 +290,7 @@ fn build_payment(c: &Company, p: &PayTax) -> Result<Command, String> {
         .sales_tax_account()
         .ok_or("There is no Sales Tax Payable account")?;
     Ok(Command::TxnPost {
+        class: None,
         date,
         number: p.number.trim().to_string(),
         memo: "Sales tax payment".into(),

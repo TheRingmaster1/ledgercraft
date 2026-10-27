@@ -10,8 +10,8 @@ use ledgercraft_engine::Command;
 use ledgercraft_ledger::{
     AccountId, Address, AccountLine, AccountType, Applied, Bill, Check, Company, CreditMemo, CustomerId,
     Deposit, Invoice, InvoiceTax, ItemId, JournalEntry, JournalLine, Party, PayBill,
-    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, Transaction, TxnBody, TxnId,
-    VendorId,
+    ReceivePayment, Refund, SalesLine, SalesReceipt, TaxGroupId, Transaction, TxnBody,
+    TxnClassId, TxnId, VendorId,
 };
 
 use crate::widgets::{self, field, money_label};
@@ -70,6 +70,8 @@ pub(crate) struct InvoiceForm {
     pub amounts: BTreeMap<TxnId, String>,
     /// Invoice: where the goods go, when not to the customer's address.
     pub ship_to: Option<Address>,
+    /// The class (department, location…) it belongs to.
+    pub class: Option<TxnClassId>,
 }
 
 impl Default for InvoiceForm {
@@ -88,6 +90,7 @@ impl Default for InvoiceForm {
             method: String::new(),
             amounts: BTreeMap::new(),
             ship_to: None,
+            class: None,
         }
     }
 }
@@ -122,6 +125,7 @@ pub(crate) struct PaymentForm {
     pub method: String,
     pub account: Option<AccountId>,
     pub amounts: BTreeMap<TxnId, String>,
+    pub class: Option<TxnClassId>,
 }
 
 impl Default for PaymentForm {
@@ -136,6 +140,7 @@ impl Default for PaymentForm {
             method: String::new(),
             account: None,
             amounts: BTreeMap::new(),
+            class: None,
         }
     }
 }
@@ -167,6 +172,7 @@ pub(crate) struct LinesForm {
     pub number: String,
     pub memo: String,
     pub lines: Vec<AccountLineInput>,
+    pub class: Option<TxnClassId>,
 }
 
 impl Default for LinesForm {
@@ -181,6 +187,7 @@ impl Default for LinesForm {
             number: String::new(),
             memo: String::new(),
             lines: vec![AccountLineInput::default()],
+            class: None,
         }
     }
 }
@@ -211,6 +218,7 @@ pub(crate) struct JournalForm {
     pub number: String,
     pub memo: String,
     pub lines: Vec<JournalLineInput>,
+    pub class: Option<TxnClassId>,
 }
 
 impl Default for JournalForm {
@@ -221,6 +229,7 @@ impl Default for JournalForm {
             number: String::new(),
             memo: String::new(),
             lines: vec![JournalLineInput::default(); 2],
+            class: None,
         }
     }
 }
@@ -272,6 +281,7 @@ impl Forms {
         // Invoices, sales receipts and credit memos share their lines and tax.
         let sale_form = |customer, lines: &[SalesLine], tax: &Option<InvoiceTax>| InvoiceForm {
             editing,
+            class: t.class,
             customer,
             date: date.clone(),
             number: number.clone(),
@@ -318,6 +328,7 @@ impl Forms {
             TxnBody::Refund(r) => {
                 self.refund = PaymentForm {
                     editing,
+                    class: t.class,
                     customer: Some(r.customer),
                     vendor: None,
                     date,
@@ -332,6 +343,7 @@ impl Forms {
             TxnBody::ReceivePayment(p) => {
                 self.receive = PaymentForm {
                     editing,
+                    class: t.class,
                     customer: Some(p.customer),
                     vendor: None,
                     date,
@@ -346,6 +358,7 @@ impl Forms {
             TxnBody::PayBill(p) => {
                 self.pay_bills = PaymentForm {
                     editing,
+                    class: t.class,
                     customer: None,
                     vendor: Some(p.vendor),
                     date,
@@ -360,6 +373,7 @@ impl Forms {
             TxnBody::Bill(b) => {
                 self.bill = LinesForm {
                     editing,
+                    class: t.class,
                     vendor: Some(b.vendor),
                     payee: None,
                     account: None,
@@ -374,6 +388,7 @@ impl Forms {
             TxnBody::Check(ch) => {
                 self.check = LinesForm {
                     editing,
+                    class: t.class,
                     vendor: None,
                     payee: ch.payee,
                     account: Some(ch.pay_from),
@@ -388,6 +403,7 @@ impl Forms {
             TxnBody::Deposit(d) => {
                 self.deposit = LinesForm {
                     editing,
+                    class: t.class,
                     vendor: None,
                     payee: None,
                     account: Some(d.deposit_to),
@@ -409,6 +425,7 @@ impl Forms {
                 };
                 self.journal = JournalForm {
                     editing,
+                    class: t.class,
                     date,
                     number,
                     memo,
@@ -546,6 +563,7 @@ fn command_for(editing: Option<TxnId>, built: Result<Command, String>) -> Result
                 number,
                 memo,
                 body,
+                class,
             },
         ) => Command::TxnUpdate {
             id,
@@ -553,6 +571,7 @@ fn command_for(editing: Option<TxnId>, built: Result<Command, String>) -> Result
             number,
             memo,
             body,
+            class,
         },
         (_, cmd) => cmd,
     })
@@ -623,6 +642,31 @@ fn head_grid(ui: &mut Ui, salt: &str, add: impl FnOnce(&mut Ui, HeadPairs)) {
         .num_columns(columns)
         .spacing([12.0, 6.0])
         .show(ui, |ui| add(ui, HeadPairs { two_per_row }));
+}
+
+/// The Class picker, once the company has classes (or the transaction
+/// already has one).
+fn class_choice(ui: &mut Ui, c: &Company, class: &mut Option<TxnClassId>) {
+    if c.classes.iter().all(|k| !k.active) && class.is_none() {
+        return;
+    }
+    ui.horizontal_wrapped(|ui| {
+        widgets::hint_label(ui, "Class");
+        let shown = class.map_or_else(|| "(none)".to_string(), |k| c.class_name(k));
+        egui::ComboBox::from_id_salt("txn_class")
+            .selected_text(shown)
+            .width(200.0)
+            .show_ui(ui, |ui| {
+                ui.selectable_value(class, None, "(none)");
+                // The chosen class stays listed even if made inactive since.
+                let chosen = *class;
+                for k in c.classes.iter().filter(|k| k.active || chosen == Some(k.id)) {
+                    ui.selectable_value(class, Some(k.id), k.name.as_str());
+                }
+            });
+    })
+    .response
+    .on_hover_text("The department, location or line of business it belongs to (Lists > Classes)");
 }
 
 /// Clear on a new form; Cancel on a form editing a recorded transaction.
@@ -731,6 +775,7 @@ fn sales_form(
             _ => {}
         }
     });
+    class_choice(ui, c, &mut f.class);
     if kind == FormKind::SalesReceipt && f.customer.is_none() {
         ui.label(
             RichText::new("A walk-in sale needs no customer.").color(theme::MUTED),
@@ -1142,6 +1187,7 @@ fn build_sale(c: &Company, f: &InvoiceForm, kind: FormKind) -> Result<Command, S
         (_, None) => return Err("Choose a customer".into()),
     };
     Ok(Command::TxnPost {
+        class: f.class,
         date,
         number,
         memo: f.memo.clone(),
@@ -1183,6 +1229,7 @@ pub(crate) fn receive_payment(
         field(ui, &mut f.method, 140.0, "Check #, ACH, card…");
         pairs.end(ui, true);
     });
+    class_choice(ui, c, &mut f.class);
     let docs: Vec<OpenDoc> = match f.customer {
         Some(id) => c
             .open_invoices_for(id, f.editing)
@@ -1252,6 +1299,7 @@ pub(crate) fn pay_bills(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut
         field(ui, &mut f.number, 100.0, &hint);
         pairs.end(ui, true);
     });
+    class_choice(ui, c, &mut f.class);
     let docs: Vec<OpenDoc> = match f.vendor {
         Some(id) => c
             .open_bills_for(id, f.editing)
@@ -1329,6 +1377,7 @@ pub(crate) fn refund(ui: &mut Ui, c: &Company, f: &mut PaymentForm, out: &mut Ve
         field(ui, &mut f.method, 140.0, "Check, card refund…");
         pairs.end(ui, false);
     });
+    class_choice(ui, c, &mut f.class);
     let docs: Vec<OpenDoc> = match f.customer {
         Some(id) => c
             .open_credits_for(id, f.editing)
@@ -1382,6 +1431,7 @@ fn build_refund(c: &Company, f: &PaymentForm, amount: Money) -> Result<Command, 
         return Err("Enter what to refund from each credit memo".into());
     }
     Ok(Command::TxnPost {
+        class: f.class,
         date: parse_date("Date", &f.date)?,
         number: f.number.clone(),
         memo: f.memo.clone(),
@@ -1480,6 +1530,7 @@ fn build_receive(c: &Company, f: &PaymentForm, amount: Money) -> Result<Command,
         .first_account_of(AccountType::AccountsReceivable)
         .ok_or("Add an Accounts Receivable account first")?;
     Ok(Command::TxnPost {
+        class: f.class,
         date: parse_date("Date", &f.date)?,
         number: f.number.clone(),
         memo: f.memo.clone(),
@@ -1508,6 +1559,7 @@ fn build_pay_bills(c: &Company, f: &PaymentForm, amount: Money) -> Result<Comman
         f.number.clone()
     };
     Ok(Command::TxnPost {
+        class: f.class,
         date: parse_date("Date", &f.date)?,
         number,
         memo: f.memo.clone(),
@@ -1603,6 +1655,7 @@ pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Ac
             }
         }
     });
+    class_choice(ui, c, &mut f.class);
     ui.add_space(8.0);
     let total = account_lines(ui, "bill_lines", c, &mut f.lines);
     ui.horizontal_wrapped(|ui| {
@@ -1633,6 +1686,7 @@ fn build_bill(c: &Company, f: &LinesForm) -> Result<Command, String> {
         .first_account_of(AccountType::AccountsPayable)
         .ok_or("Add an Accounts Payable account first")?;
     Ok(Command::TxnPost {
+        class: f.class,
         date,
         number: f.number.clone(),
         memo: f.memo.clone(),
@@ -1669,6 +1723,7 @@ pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<A
         field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
         pairs.end(ui, true);
     });
+    class_choice(ui, c, &mut f.class);
     ui.add_space(8.0);
     let total = account_lines(ui, "chk_lines", c, &mut f.lines);
     ui.horizontal_wrapped(|ui| {
@@ -1700,6 +1755,7 @@ fn build_check(c: &Company, f: &LinesForm) -> Result<Command, String> {
         f.number.clone()
     };
     Ok(Command::TxnPost {
+        class: f.class,
         date: parse_date("Date", &f.date)?,
         number,
         memo: f.memo.clone(),
@@ -1724,6 +1780,7 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
         field(ui, &mut f.date, 110.0, "YYYY-MM-DD");
         pairs.end(ui, true);
     });
+    class_choice(ui, c, &mut f.class);
     // Offer payments waiting in Undeposited Funds.
     if let Some(uf) = c.account_by_name("Undeposited Funds") {
         let waiting = c.account_balance(uf.id, None);
@@ -1766,6 +1823,7 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
 fn build_deposit(f: &LinesForm) -> Result<Command, String> {
     let deposit_to = f.account.ok_or("Choose the bank account")?;
     Ok(Command::TxnPost {
+        class: f.class,
         date: parse_date("Date", &f.date)?,
         number: f.number.clone(),
         memo: f.memo.clone(),
@@ -1786,6 +1844,7 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
         widgets::hint_label(ui, "Entry #");
         field(ui, &mut f.number, 80.0, "");
     });
+    class_choice(ui, c, &mut f.class);
     ui.add_space(8.0);
     let mut remove = None;
     let mut debits = Money::ZERO;
@@ -1881,6 +1940,7 @@ fn build_journal(f: &JournalForm) -> Result<Command, String> {
         });
     }
     Ok(Command::TxnPost {
+        class: f.class,
         date: parse_date("Date", &f.date)?,
         number: f.number.clone(),
         memo: f.memo.clone(),
@@ -2014,11 +2074,13 @@ mod tests {
                 number,
                 memo,
                 body,
+                class,
             } = built
             else {
                 continue;
             };
             assert_eq!(id, t.id);
+            assert_eq!(class, t.class, "{}", t.id);
             assert_eq!(date, t.date, "{}", t.id);
             assert_eq!(memo, t.memo, "{}", t.id);
             if !t.number.is_empty() {

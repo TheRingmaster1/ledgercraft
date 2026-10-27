@@ -24,7 +24,8 @@ pub use report::{Cell, Report, Row, RowKind};
 pub use salestax::sales_tax_liability;
 pub use statement_pdf::{statement_pdf, statement_pdf_name};
 pub use statements::{
-    account_register, balance_sheet, profit_and_loss, reconciliation_report, transaction_list,
+    account_register, balance_sheet, profit_and_loss, profit_and_loss_by_class,
+    reconciliation_report, transaction_list,
     trial_balance,
 };
 
@@ -32,6 +33,7 @@ pub use statements::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ReportKind {
     ProfitAndLoss,
+    ProfitAndLossByClass,
     BalanceSheet,
     TrialBalance,
     ArAging,
@@ -43,8 +45,9 @@ pub enum ReportKind {
 }
 
 impl ReportKind {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::ProfitAndLoss,
+        Self::ProfitAndLossByClass,
         Self::BalanceSheet,
         Self::TrialBalance,
         Self::ArAging,
@@ -58,6 +61,7 @@ impl ReportKind {
     pub fn label(self) -> &'static str {
         match self {
             Self::ProfitAndLoss => "Profit & Loss",
+            Self::ProfitAndLossByClass => "Profit & Loss by Class",
             Self::BalanceSheet => "Balance Sheet",
             Self::TrialBalance => "Trial Balance",
             Self::ArAging => "A/R Aging Summary",
@@ -73,6 +77,7 @@ impl ReportKind {
     pub fn cli_id(self) -> &'static str {
         match self {
             Self::ProfitAndLoss => "pl",
+            Self::ProfitAndLossByClass => "pl-by-class",
             Self::BalanceSheet => "balance-sheet",
             Self::TrialBalance => "trial-balance",
             Self::ArAging => "ar-aging",
@@ -93,6 +98,7 @@ impl ReportKind {
         matches!(
             self,
             Self::ProfitAndLoss
+                | Self::ProfitAndLossByClass
                 | Self::TransactionList
                 | Self::SalesTaxLiability
                 | Self::SalesByState
@@ -108,6 +114,7 @@ impl ReportKind {
     ) -> Report {
         match self {
             Self::ProfitAndLoss => profit_and_loss(company, from, to),
+            Self::ProfitAndLossByClass => profit_and_loss_by_class(company, from, to),
             Self::BalanceSheet => balance_sheet(company, to),
             Self::TrialBalance => trial_balance(company, to),
             Self::ArAging => ar_aging(company, to),
