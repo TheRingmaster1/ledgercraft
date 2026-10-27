@@ -1591,6 +1591,7 @@ pub(crate) fn classes(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
         return;
     }
     let mut cancel = false;
+    let mut rename = None;
     egui::Grid::new("classes")
         .striped(true)
         .spacing([18.0, 4.0])
@@ -1602,8 +1603,9 @@ pub(crate) fn classes(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
             let show_inactive = s.show_inactive;
             for k in c.classes.iter().filter(|k| k.active || show_inactive) {
                 let used = c.transactions.iter().filter(|t| t.class == Some(k.id)).count();
-                match s.editing_class.as_mut() {
-                    Some((id, name)) if *id == k.id => {
+                let renaming = s.editing_class.as_mut().filter(|(id, _)| *id == k.id);
+                match renaming {
+                    Some((_, name)) => {
                         field(ui, name, 200.0, "");
                         ui.label(used.to_string());
                         ui.horizontal(|ui| {
@@ -1626,7 +1628,7 @@ pub(crate) fn classes(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
                         ui.label(used.to_string());
                         ui.horizontal(|ui| {
                             if ui.small_button("Rename").clicked() {
-                                s.editing_class = Some((k.id, k.name.clone()));
+                                rename = Some((k.id, k.name.clone()));
                             }
                             let (label, hover) = if k.active {
                                 (
@@ -1653,6 +1655,9 @@ pub(crate) fn classes(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
         });
     if cancel {
         s.editing_class = None;
+    }
+    if rename.is_some() {
+        s.editing_class = rename;
     }
 }
 

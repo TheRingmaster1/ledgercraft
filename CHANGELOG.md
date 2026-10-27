@@ -23,6 +23,17 @@ docs/releasing.md.
   Sheet show each parent with its sub-accounts and a total, and the Trial
   Balance uses full names. `account.create` and `account.update` take
   `parent`.
+- Classes (M2.8): Lists > Classes adds departments, locations or lines of
+  business (rename, make inactive). Every transaction form shows a Class box
+  once a class exists, and Reports > Profit & Loss by Class (CLI
+  `pl-by-class`) shows a column per class used in the period, then
+  Unclassified and Total. Commands `class.create`, `class.update`,
+  `class.setActive`; `txn.post` and `txn.update` take `class`.
+- Merging accounts whose balances run opposite ways (an account and its
+  contra account, such as Equipment and Accumulated Depreciation) shows a
+  warning and needs "I understand, merge anyway" ticked before Merge is
+  enabled.
+- The sample company has classes: Shop, Craft fairs and an inactive Online.
 - Accounts can be edited: Edit in the Chart of Accounts changes the number,
   name, description and parent, and merges.
 - The sample company has a duplicate customer, Maple St. Cafe, to practise
