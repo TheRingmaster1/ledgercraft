@@ -613,16 +613,16 @@ const LESSONS: &[Lesson] = &[
         blocks: &[
             Text(
                 "Rent, a loan payment, a monthly retainer invoice: anything entered the same \
-                 way again and again can be memorized with a schedule. Invoices, sales \
+                 way again and again can be made recurring, with a schedule. Invoices, sales \
                  receipts, bills, checks, deposits and journal entries can recur.",
             ),
             Steps(&[
                 "Fill in the form as it should be each time (the date does not matter).",
-                "Click Memorize… beside Save. Name it, choose how often (every 2 weeks, \
+                "Click Make Recurring… beside Save. Name it, choose how often (every 2 weeks, \
                  monthly, quarterly…), the next date and, if it stops, an end date.",
                 "Choose Remind me to check each one before it is entered, or Enter it \
                  automatically for amounts that never change.",
-                "Click Memorize. The form itself is not saved by this: Save it too if this \
+                "Click Save Schedule. The form itself is not saved by this: Save it too if this \
                  one should be recorded now.",
             ]),
             Heading("When one is due"),
@@ -630,7 +630,8 @@ const LESSONS: &[Lesson] = &[
                 "Automatic ones are entered on their date when the company is opened on or \
                  after it (several at once if you have been away). Edit > Undo takes them \
                  back.",
-                "Reminders show on Home and in Lists > Recurring Transactions. Enter… opens \
+                "Reminders show on Home and in Recurring Transactions (the Lists menu, the \
+                 link at the top of Transactions, or the Banking card on Home). Enter… opens \
                  the next one in its form with its date filled in; change anything (this \
                  month's power bill amount, say), then Save. Skip moves to the next date \
                  without entering it.",

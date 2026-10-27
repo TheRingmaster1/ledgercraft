@@ -146,7 +146,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 ## Later (M3: small business)
 
 * Inventory (average cost), purchase orders, estimates → invoices
-* ~~Recurring (memorized) transactions and reminders~~ (done)
+* ~~Recurring transactions and reminders~~ (done)
 * Budgets; P&L by customer, by month (P&L by class done in M2.8)
 * IIF export; QuickBooks Online CSV export import (IIF/CSV list import done in 0.2)
 * Multi-currency transactions and exchange rates (display currency done in 0.2;

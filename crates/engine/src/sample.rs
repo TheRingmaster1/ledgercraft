@@ -780,14 +780,14 @@ pub fn sample_company() -> LedgerResult<Company> {
 
     rest_of_year(&mut c, [maple, harbor, lin], [lumber, power, landlord], [table, chair, design])?;
     classes(&mut c)?;
-    memorized(&mut c)?;
+    recurring_transactions(&mut c)?;
     Ok(c)
 }
 
 /// Recurring transactions: the rent check entered automatically on the
 /// first, the loan payment as a reminder (October's is due), and the
 /// quarterly depreciation entry.
-fn memorized(c: &mut Company) -> LedgerResult<()> {
+fn recurring_transactions(c: &mut Company) -> LedgerResult<()> {
     let latest = |c: &Company, memo: &str| {
         c.transactions
             .iter()

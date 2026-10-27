@@ -546,23 +546,23 @@ fn footer_with(
     (save, clear, more)
 }
 
-/// The footer with Memorize…: (save, clear or cancel, memorize).
-fn footer_memorize(ui: &mut Ui, editing: Option<TxnId>) -> (bool, bool, bool) {
-    let (save, clear, _, memorize) = footer_full(ui, editing, None, true);
-    (save, clear, memorize)
+/// The footer with Make Recurring…: (save, clear or cancel, make recurring).
+fn footer_recurring(ui: &mut Ui, editing: Option<TxnId>) -> (bool, bool, bool) {
+    let (save, clear, _, recur) = footer_full(ui, editing, None, true);
+    (save, clear, recur)
 }
 
-const MEMORIZE_HOVER: &str = "Save it as a recurring transaction (Lists > Recurring \
+const MAKE_RECURRING_HOVER: &str = "Save it as a recurring transaction (Lists > Recurring \
                               Transactions): entered for you on a schedule, or a reminder \
                               when it is due";
 
-/// Every footer: Save, an optional extra button, Memorize… when
-/// `memorize`, then Clear or Cancel.
+/// Every footer: Save, an optional extra button, Make Recurring… when
+/// `recur`, then Clear or Cancel.
 fn footer_full(
     ui: &mut Ui,
     editing: Option<TxnId>,
     extra: Option<(&str, &str)>,
-    memorize: bool,
+    recur: bool,
 ) -> (bool, bool, bool, bool) {
     ui.add_space(10.0);
     let mut save = false;
@@ -579,18 +579,18 @@ fn footer_full(
         if let Some((label, hover)) = extra {
             more = ui.button(label).on_hover_text(hover).clicked();
         }
-        if memorize {
-            memo = ui.button("Memorize…").on_hover_text(MEMORIZE_HOVER).clicked();
+        if recur {
+            memo = ui.button("Make Recurring…").on_hover_text(MAKE_RECURRING_HOVER).clicked();
         }
         clear = ui.button(clear_label).clicked();
     });
     (save, clear, more, memo)
 }
 
-/// Memorize…: what the form would record, for the recurring window.
-fn memorize(out: &mut Vec<Action>, kind: FormKind, built: Result<Command, String>) {
+/// Make Recurring…: what the form would record, for the recurring window.
+fn make_recurring(out: &mut Vec<Action>, kind: FormKind, built: Result<Command, String>) {
     match built {
-        Ok(cmd) => out.push(Action::Memorize(kind, Box::new(cmd))),
+        Ok(cmd) => out.push(Action::MakeRecurring(kind, Box::new(cmd))),
         Err(e) => out.push(Action::Error(e)),
     }
 }
@@ -975,14 +975,14 @@ fn sales_form(
     } else {
         "Record it, then save it as a PDF to email or print"
     };
-    let can_memorize = matches!(kind, FormKind::Invoice | FormKind::SalesReceipt);
+    let can_recur = matches!(kind, FormKind::Invoice | FormKind::SalesReceipt);
     let (save, clear, pdf, memo) =
-        footer_full(ui, f.editing, Some(("Save as PDF…", hover)), can_memorize);
+        footer_full(ui, f.editing, Some(("Save as PDF…", hover)), can_recur);
     if save {
         finish(out, kind, f.editing, build_sale(c, f, kind));
     }
     if memo {
-        memorize(out, kind, build_sale(c, f, kind));
+        make_recurring(out, kind, build_sale(c, f, kind));
     }
     if pdf {
         match command_for(f.editing, build_sale(c, f, kind)) {
@@ -1728,12 +1728,12 @@ pub(crate) fn bill(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<Ac
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Amount due", total);
-    let (save, clear, memo) = footer_memorize(ui, f.editing);
+    let (save, clear, memo) = footer_recurring(ui, f.editing);
     if save {
         finish(out, FormKind::Bill, f.editing, build_bill(c, f));
     }
     if memo {
-        memorize(out, FormKind::Bill, build_bill(c, f));
+        make_recurring(out, FormKind::Bill, build_bill(c, f));
     }
     if clear {
         let editing = f.editing;
@@ -1799,12 +1799,12 @@ pub(crate) fn check(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec<A
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Amount", total);
-    let (save, clear, memo) = footer_memorize(ui, f.editing);
+    let (save, clear, memo) = footer_recurring(ui, f.editing);
     if save {
         finish(out, FormKind::Check, f.editing, build_check(c, f));
     }
     if memo {
-        memorize(out, FormKind::Check, build_check(c, f));
+        make_recurring(out, FormKind::Check, build_check(c, f));
     }
     if clear {
         let editing = f.editing;
@@ -1880,12 +1880,12 @@ pub(crate) fn deposit(ui: &mut Ui, c: &Company, f: &mut LinesForm, out: &mut Vec
         field(ui, &mut f.memo, 360.0, "");
     });
     total_row(ui, "Deposit total", total);
-    let (save, clear, memo) = footer_memorize(ui, f.editing);
+    let (save, clear, memo) = footer_recurring(ui, f.editing);
     if save {
         finish(out, FormKind::Deposit, f.editing, build_deposit(f));
     }
     if memo {
-        memorize(out, FormKind::Deposit, build_deposit(f));
+        make_recurring(out, FormKind::Deposit, build_deposit(f));
     }
     if clear {
         let editing = f.editing;
@@ -1982,12 +1982,12 @@ pub(crate) fn journal(ui: &mut Ui, c: &Company, f: &mut JournalForm, out: &mut V
             ui.label(RichText::new(off).color(theme::NEGATIVE));
         }
     });
-    let (save, clear, memo) = footer_memorize(ui, f.editing);
+    let (save, clear, memo) = footer_recurring(ui, f.editing);
     if save {
         finish(out, FormKind::Journal, f.editing, build_journal(f));
     }
     if memo {
-        memorize(out, FormKind::Journal, build_journal(f));
+        make_recurring(out, FormKind::Journal, build_journal(f));
     }
     if clear {
         let editing = f.editing;

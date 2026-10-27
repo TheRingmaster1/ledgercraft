@@ -1,4 +1,4 @@
-//! Recurring (memorized) transactions: a transaction saved with a schedule,
+//! Recurring transactions: a transaction saved with a schedule,
 //! such as the monthly rent check or a retainer invoice. Each one either
 //! reminds you when it is due (you open it, check it and save it) or is
 //! entered automatically when the company is opened on or after its date.
@@ -86,7 +86,7 @@ pub struct RecurringSpec {
 /// The transaction a recurring transaction enters.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxnTemplate {
-    /// The date it was memorized with: due dates keep their distance from it.
+    /// The date it was made recurring with: due dates keep their distance from it.
     pub date: Date,
     #[serde(default)]
     pub memo: String,
@@ -173,7 +173,7 @@ impl Recurring {
     }
 }
 
-/// Only these can be memorized: payments, credits and refunds apply to
+/// Only these can recur: payments, credits and refunds apply to
 /// particular open invoices or bills, which a schedule cannot know.
 pub fn can_recur(body: &TxnBody) -> bool {
     matches!(
@@ -224,7 +224,7 @@ impl Company {
         Ok(name.to_string())
     }
 
-    /// Memorizes a transaction with a schedule. The transaction is checked
+    /// Makes a transaction recurring, with a schedule. The transaction is checked
     /// as if it were being entered.
     pub fn add_recurring(
         &mut self,

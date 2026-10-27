@@ -476,7 +476,10 @@ const BANKING: FlowCard = FlowCard {
         minor("Journal Entry", 0, 1, form(FormKind::Journal)),
     ],
     arrows: &[(0, 1)],
-    links: &[("Transactions", Go::Page(Page::Transactions))],
+    links: &[
+        ("Transactions", Go::Page(Page::Transactions)),
+        ("Recurring Transactions", Go::Page(Page::Recurring)),
+    ],
 };
 
 /// Flowchart boxes: widest and narrowest, heights, and the room between
@@ -1667,6 +1670,22 @@ pub(crate) fn classes(ui: &mut Ui, c: &Company, s: &mut ListState, out: &mut Vec
 
 pub(crate) fn transactions(ui: &mut Ui, c: &Company, out: &mut Vec<Action>) {
     title(ui, "Transactions");
+    ui.horizontal_wrapped(|ui| {
+        let due = c.recurring_due(Date::today()).len();
+        let label = match (c.recurring.len(), due) {
+            (0, _) => "Recurring Transactions".to_string(),
+            (n, 0) => format!("Recurring Transactions ({n})"),
+            (n, due) => format!("Recurring Transactions ({n}, {due} due)"),
+        };
+        if ui
+            .link(label)
+            .on_hover_text(Page::Recurring.hint())
+            .clicked()
+        {
+            out.push(Action::Go(Page::Recurring));
+        }
+    });
+    ui.add_space(4.0);
     let mut txns: Vec<_> = c.transactions.iter().collect();
     txns.sort_by_key(|t| std::cmp::Reverse((t.date, t.id)));
     egui::ScrollArea::both()

@@ -37,7 +37,7 @@ A company file is UTF-8 JSON:
   Backups` folder beside it, named `<company file name> YYYY-MM-DD.lcbooks`.
 * An account's `parent` is the account it is a sub-account of (same type);
   left out for a top-level account.
-* `recurring` lists memorized transactions: id, `name`, `frequency`
+* `recurring` lists recurring transactions: id, `name`, `frequency`
   (`daily`, `weekly`, `monthly`, `quarterly` or `yearly`), `every` (every N
   of those), `start` (the first occurrence), `done` (occurrences entered or
   skipped; the next is counted from `start`), `end` (optional), `mode`

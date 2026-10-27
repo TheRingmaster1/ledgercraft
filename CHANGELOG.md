@@ -23,10 +23,11 @@ docs/releasing.md.
   Sheet show each parent with its sub-accounts and a total, and the Trial
   Balance uses full names. `account.create` and `account.update` take
   `parent`.
-- Recurring transactions: Memorize… on an invoice, sales receipt, bill,
-  check, deposit or journal entry saves it with a schedule (every N days,
+- Recurring transactions: Make Recurring… on an invoice, sales receipt,
+  bill, check, deposit or journal entry saves it with a schedule (every N days,
   weeks, months, quarters or years, from a next date to an optional end
-  date). Reminders are listed on Home and Lists > Recurring Transactions,
+  date). Reminders are listed on Home and in Recurring Transactions (Lists
+  menu, the top of the Transactions page, or the Banking card on Home),
   where Enter… opens the next one in its form to check and save, and Skip
   moves past it; automatic ones are entered when the company is opened on or
   after their date, catching up any missed (one Undo takes them back).
