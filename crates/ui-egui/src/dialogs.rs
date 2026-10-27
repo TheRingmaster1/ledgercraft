@@ -122,7 +122,7 @@ pub(crate) fn pick_file_in(
         d = d.set_title(title);
     }
     for (name, extensions) in filters {
-        d = d.add_filter(*name, *extensions);
+        d = d.add_filter(*name, extensions);
     }
     let chosen = d.pick_file();
     match &chosen {
