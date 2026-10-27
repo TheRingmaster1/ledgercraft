@@ -1,8 +1,8 @@
 use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
     AccountId, AccountType, Address, Company, Contact, CustomerId, CustomerTax, FeedEntry,
-    ImportedTax, ItemId, ItemSpec, LedgerResult, TaxComponentId, TaxGroupId, TaxRate, TxnBody,
-    TxnClassId, TxnId, VendorId,
+    ImportedTax, ItemId, ItemSpec, LedgerResult, RecurringId, RecurringSpec, TaxComponentId,
+    TaxGroupId, TaxRate, TxnBody, TxnClassId, TxnId, TxnTemplate, VendorId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -131,6 +131,36 @@ pub enum Command {
     ClassUpdate { id: TxnClassId, name: String },
     #[serde(rename = "class.setActive")]
     ClassSetActive { id: TxnClassId, active: bool },
+    #[serde(rename = "recurring.create")]
+    RecurringCreate {
+        spec: RecurringSpec,
+        template: TxnTemplate,
+    },
+    #[serde(rename = "recurring.update")]
+    RecurringUpdate { id: RecurringId, spec: RecurringSpec },
+    #[serde(rename = "recurring.delete")]
+    RecurringDelete { id: RecurringId },
+    #[serde(rename = "recurring.setActive")]
+    RecurringSetActive { id: RecurringId, active: bool },
+    #[serde(rename = "recurring.skip")]
+    RecurringSkip { id: RecurringId },
+    /// Enters the next occurrence as given (checked and perhaps changed in
+    /// its form) and moves the schedule on.
+    #[serde(rename = "recurring.enter")]
+    RecurringEnter {
+        id: RecurringId,
+        date: Date,
+        #[serde(default)]
+        number: String,
+        #[serde(default)]
+        memo: String,
+        body: TxnBody,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        class: Option<TxnClassId>,
+    },
+    /// Enters every automatic recurring transaction due on or before `through`.
+    #[serde(rename = "recurring.enterDue")]
+    RecurringEnterDue { through: Date },
     #[serde(rename = "txn.void")]
     TxnVoid { id: TxnId },
     #[serde(rename = "account.reconcile")]
@@ -251,6 +281,13 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "class.create", summary: "Add a class (a department, location or line of business). {name}" },
     CommandInfo { id: "class.update", summary: "Rename a class. {id, name}" },
     CommandInfo { id: "class.setActive", summary: "Leave a class off the forms, or list it again. {id, active}" },
+    CommandInfo { id: "recurring.create", summary: "Memorize a transaction with a schedule. {spec:{name, frequency: daily|weekly|monthly|quarterly|yearly, every, next, end?, mode: remind|automatic}, template:{date, memo?, body, class?}}" },
+    CommandInfo { id: "recurring.update", summary: "Change a recurring transaction's name and schedule; next starts the schedule again. {id, spec}" },
+    CommandInfo { id: "recurring.delete", summary: "Forget a recurring transaction (what it entered stays). {id}" },
+    CommandInfo { id: "recurring.setActive", summary: "Pause a recurring transaction, or start it again. {id, active}" },
+    CommandInfo { id: "recurring.skip", summary: "Move a recurring transaction to its next date without entering it. {id}" },
+    CommandInfo { id: "recurring.enter", summary: "Enter a recurring transaction's next occurrence as given, and move it on. {id, date, number?, memo?, body, class?}" },
+    CommandInfo { id: "recurring.enterDue", summary: "Enter every automatic recurring transaction due on or before a date. {through}" },
     CommandInfo { id: "account.reconcile", summary: "Reconcile a bank or credit card account against a statement; the cleared items must match the ending balance exactly. {account, statement_date, ending_balance, cleared:[txn ids]}" },
     CommandInfo { id: "account.undoReconciliation", summary: "Undo an account's last reconciliation. {account}" },
     CommandInfo { id: "bank.import", summary: "Bring downloaded bank lines into an account: match, add in a category, or skip each; lines imported before are passed over. {account, entries:[{line:{date, amount, payee?, memo?, number?, fit_id?}, action:{action: match|add|skip, txn? | category?, remember?}}]}" },
@@ -298,6 +335,13 @@ impl Command {
             Self::ClassCreate { .. } => "class.create",
             Self::ClassUpdate { .. } => "class.update",
             Self::ClassSetActive { .. } => "class.setActive",
+            Self::RecurringCreate { .. } => "recurring.create",
+            Self::RecurringUpdate { .. } => "recurring.update",
+            Self::RecurringDelete { .. } => "recurring.delete",
+            Self::RecurringSetActive { .. } => "recurring.setActive",
+            Self::RecurringSkip { .. } => "recurring.skip",
+            Self::RecurringEnter { .. } => "recurring.enter",
+            Self::RecurringEnterDue { .. } => "recurring.enterDue",
             Self::AccountReconcile { .. } => "account.reconcile",
             Self::AccountUndoReconciliation { .. } => "account.undoReconciliation",
             Self::BankImport { .. } => "bank.import",
@@ -348,6 +392,13 @@ impl Command {
             Self::ClassCreate { name } => format!("New Class {name}"),
             Self::ClassUpdate { name, .. } => format!("Rename Class {name}"),
             Self::ClassSetActive { .. } => "Class Status".into(),
+            Self::RecurringCreate { spec, .. } => format!("Memorize {}", spec.name),
+            Self::RecurringUpdate { spec, .. } => format!("Edit Recurring {}", spec.name),
+            Self::RecurringDelete { .. } => "Delete Recurring Transaction".into(),
+            Self::RecurringSetActive { .. } => "Recurring Status".into(),
+            Self::RecurringSkip { .. } => "Skip Recurring Transaction".into(),
+            Self::RecurringEnter { body, .. } => body.label().to_string(),
+            Self::RecurringEnterDue { .. } => "Enter Recurring Transactions".into(),
             Self::AccountReconcile { .. } => "Reconcile".into(),
             Self::AccountUndoReconciliation { .. } => "Undo Reconciliation".into(),
             Self::BankImport { .. } => "Import Bank Transactions".into(),
@@ -548,6 +599,45 @@ impl Command {
             Self::ClassSetActive { id, active } => {
                 c.set_class_active(id, active)?;
                 None
+            }
+            Self::RecurringCreate { spec, template } => {
+                Some(c.add_recurring(spec, template)?.to_string())
+            }
+            Self::RecurringUpdate { id, spec } => {
+                c.update_recurring(id, spec)?;
+                None
+            }
+            Self::RecurringDelete { id } => {
+                c.delete_recurring(id)?;
+                None
+            }
+            Self::RecurringSetActive { id, active } => {
+                c.set_recurring_active(id, active)?;
+                None
+            }
+            Self::RecurringSkip { id } => {
+                c.skip_recurring(id)?;
+                None
+            }
+            Self::RecurringEnter {
+                id,
+                date,
+                number,
+                memo,
+                body,
+                class,
+            } => Some(
+                c.enter_recurring(id, date, &number, &memo, body, class)?
+                    .to_string(),
+            ),
+            Self::RecurringEnterDue { through } => {
+                let made = c.enter_due_recurring(through)?;
+                (!made.is_empty()).then(|| {
+                    made.iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
             }
             Self::TxnVoid { id } => {
                 c.void(id)?;
