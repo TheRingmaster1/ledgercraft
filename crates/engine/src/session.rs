@@ -144,7 +144,9 @@ impl Session {
     /// Whether `password` is the company file's password, to unlock a
     /// company locked while open. False for a file without one.
     pub fn password_matches(&self, password: &str) -> bool {
-        self.protection.as_ref().is_some_and(|p| p.matches(password))
+        self.protection
+            .as_ref()
+            .is_some_and(|p| p.matches(password))
     }
 
     /// Sets a new password (or removes it with `None`) and saves the file

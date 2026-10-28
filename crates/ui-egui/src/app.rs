@@ -579,11 +579,7 @@ impl LedgerApp {
         let Some(session) = self.session.as_ref() else {
             return false;
         };
-        let name = suggested_file_name(
-            stem,
-            session.path(),
-            &session.company().info.name,
-        );
+        let name = suggested_file_name(stem, session.path(), &session.company().info.name);
         // A copy starts in the folder the company is already in.
         let here = session.path().and_then(Path::parent).map(Path::to_path_buf);
         let Some(path) = dialogs::save_file(
@@ -1914,7 +1910,10 @@ impl LedgerApp {
         match created {
             Some(start::CreateOutcome::Create(company, summary, password)) => {
                 let name = company.info.name.clone();
-                let neutral = self.create.as_ref().is_some_and(NewCompanyForm::neutral_name);
+                let neutral = self
+                    .create
+                    .as_ref()
+                    .is_some_and(NewCompanyForm::neutral_name);
                 let mut session = Session::new(*company);
                 // No location yet, so this only sets the key; the file is
                 // written encrypted when it is saved just below.
@@ -2327,7 +2326,10 @@ mod tests {
             suggested_file_name(None, Some(&current), "Secret Co"),
             "Books.lcbooks"
         );
-        assert_eq!(suggested_file_name(None, None, "Secret Co"), "Secret Co.lcbooks");
+        assert_eq!(
+            suggested_file_name(None, None, "Secret Co"),
+            "Secret Co.lcbooks"
+        );
     }
 
     #[test]
