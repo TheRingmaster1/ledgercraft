@@ -26,9 +26,12 @@ pub const KDF: &str = "argon2id";
 /// Shortest password accepted for a new company file.
 pub const MIN_PASSWORD_CHARS: usize = 12;
 
-/// Argon2id cost settings. The defaults follow OWASP's current guidance
-/// (19 MiB of memory, 2 passes, 1 lane): fast enough to open a file in well
-/// under a second, slow enough to make guessing passwords expensive.
+/// Argon2id cost settings. The defaults (64 MiB of memory, 3 passes, 1
+/// lane) follow the stronger of RFC 9106's recommended settings: a file
+/// still opens in well under a second, while every password guess costs an
+/// attacker 64 MiB and three passes over it. Files written with older,
+/// lighter settings (19 MiB, 2 passes) still open, and take the new
+/// settings the next time they are saved.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KdfParams {
     pub memory_kib: u32,
@@ -39,14 +42,19 @@ pub struct KdfParams {
 impl Default for KdfParams {
     fn default() -> Self {
         Self {
-            memory_kib: 19 * 1024,
-            iterations: 2,
+            memory_kib: 64 * 1024,
+            iterations: 3,
             parallelism: 1,
         }
     }
 }
 
 impl KdfParams {
+    /// Cheaper to guess against than `other` in memory or passes.
+    pub fn is_weaker_than(&self, other: &Self) -> bool {
+        self.memory_kib < other.memory_kib || self.iterations < other.iterations
+    }
+
     /// Settings read from a file are untrusted: refuse ones that would take
     /// absurd memory or time rather than hang or exhaust the machine.
     fn check(&self) -> Result<(), FileError> {
@@ -93,11 +101,41 @@ impl Protection {
     /// Protection for a new password, with a fresh random salt.
     pub fn new(password: &str) -> Result<Self, FileError> {
         check_new_password(password).map_err(FileError::WeakPassword)?;
+        Self::derived(password, KdfParams::default())
+    }
+
+    /// A fresh salt and the key for `password` with `params`.
+    fn derived(password: &str, params: KdfParams) -> Result<Self, FileError> {
         let mut salt = [0u8; 16];
         getrandom::getrandom(&mut salt).map_err(|e| FileError::Crypto(e.to_string()))?;
-        let params = KdfParams::default();
         let key = derive(password, &salt, params)?;
         Ok(Self { salt, params, key })
+    }
+
+    /// Protection with the older, lighter settings, to test upgrading.
+    #[cfg(test)]
+    pub(crate) fn with_params(password: &str, params: KdfParams) -> Result<Self, FileError> {
+        Self::derived(password, params)
+    }
+
+    /// The key-derivation settings the file is saved with.
+    pub fn params(&self) -> KdfParams {
+        self.params
+    }
+
+    /// Whether `password` is this file's password (for unlocking a company
+    /// locked while open). Compares every byte, so the time taken says
+    /// nothing about how close a guess was.
+    pub fn matches(&self, password: &str) -> bool {
+        match derive(password, &self.salt, self.params) {
+            Ok(key) => {
+                key.iter()
+                    .zip(self.key.iter())
+                    .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+                    == 0
+            }
+            Err(_) => false,
+        }
     }
 
     /// Encrypts `plain` into a header and ciphertext, with a fresh nonce.
@@ -156,14 +194,18 @@ impl Protection {
                 },
             )
             .map_err(|_| FileError::WrongPassword)?;
-        Ok((
-            Zeroizing::new(plain),
+        // Opened with older, lighter settings: save with the current ones
+        // from now on (a new salt and key; the password is right).
+        let protection = if header.params.is_weaker_than(&KdfParams::default()) {
+            Self::derived(password, KdfParams::default())?
+        } else {
             Self {
                 salt,
                 params: header.params,
                 key,
-            },
-        ))
+            }
+        };
+        Ok((Zeroizing::new(plain), protection))
     }
 }
 

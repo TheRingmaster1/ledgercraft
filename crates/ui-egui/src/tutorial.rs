@@ -194,6 +194,16 @@ const LESSONS: &[Lesson] = &[
                  offers to protect them when you open one; say yes, or use File > \
                  Password… later, and the file is upgraded to an encrypted one.",
             ),
+            Heading("Locking and file names"),
+            Bullets(&[
+                "A company with a password locks itself after 15 minutes without use \
+                 (change it, or turn it off, in Preferences > Security). Type the password \
+                 to carry on; unsaved changes are kept. File > Lock Now locks it straight \
+                 away when you step away.",
+                "The password encrypts everything inside the file, but not the file's \
+                 name. If the company's name is itself private, tick \"Save it as \
+                 Books.lcbooks\" in Create a Company, or choose a neutral name in Save As.",
+            ]),
             Heading("Backups"),
             Text(
                 "Before the first save of each day, LedgerCraft copies the company file as \

@@ -234,9 +234,19 @@ pub(crate) struct NewCompanyForm {
     show_password: bool,
     /// "I understand a forgotten password cannot be recovered."
     understood: bool,
+    /// Save as Books.lcbooks rather than under the company's name (the
+    /// file name is not encrypted).
+    neutral_name: bool,
     /// The list the next CSV file holds.
     csv_kind: ListKind,
     error: Option<String>,
+}
+
+impl NewCompanyForm {
+    /// Save it under a neutral file name rather than the company's.
+    pub(crate) fn neutral_name(&self) -> bool {
+        self.neutral_name
+    }
 }
 
 impl Default for NewCompanyForm {
@@ -258,6 +268,7 @@ impl Default for NewCompanyForm {
             strength: None,
             show_password: false,
             understood: false,
+            neutral_name: false,
             csv_kind: ListKind::Customers,
             error: None,
         }
@@ -567,6 +578,16 @@ fn password_section(ui: &mut egui::Ui, form: &mut NewCompanyForm) {
     ui.checkbox(
         &mut form.understood,
         "I understand, and I will keep the password safe",
+    );
+    ui.add_space(6.0);
+    ui.checkbox(
+        &mut form.neutral_name,
+        "Save it as \"Books.lcbooks\" instead of under the company's name",
+    )
+    .on_hover_text(
+        "The password encrypts everything inside the file, but not its name, which anyone \
+         who can see the folder can read. Choose this when the company's name is itself \
+         private.",
     );
 }
 

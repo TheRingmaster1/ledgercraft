@@ -98,11 +98,12 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 1. ~~Password strength meter on every password field; refuse common and easily
    guessed passwords, not only short ones (`zxcvbn`, MIT)~~ (done)
 2. ~~Raise the minimum password length from 8 to 12 and suggest passphrases in the hints~~ (done)
-3. Stronger Argon2id settings for new and re-saved files (e.g. 64 MiB, 3 passes);
-   existing files keep the settings stored in their header and still open
-4. Lock the open company after a period of inactivity (re-enter the password)
-5. File names are not encrypted: say so in the docs and Create a Company, and
-   offer a neutral file name when the company name is sensitive
+3. ~~Stronger Argon2id settings for new and re-saved files (64 MiB, 3 passes);
+   existing files keep the settings stored in their header and still open~~ (done)
+4. ~~Lock the open company after a period of inactivity (re-enter the password)~~
+   (done: Preferences > Security, default 15 minutes; File > Lock Now)
+5. ~~File names are not encrypted: say so in the docs and Create a Company, and
+   offer a neutral file name when the company name is sensitive~~ (done)
 
 ## Next (M2: usable for a real sole proprietor)
 
