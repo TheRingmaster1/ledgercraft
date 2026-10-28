@@ -8,6 +8,20 @@ docs/releasing.md.
 
 ## [Unreleased]
 
+### Security
+- Stronger password protection: new and re-saved company files derive their
+  key with Argon2id at 64 MiB and 3 passes (was 19 MiB and 2). Older files
+  still open and take the new settings the next time they are saved; closing
+  date passwords set from now on use them too.
+- A password-protected company locks after a while without use: the books
+  are hidden until its password is typed again, and unsaved changes are
+  kept. 15 minutes by default; Preferences > Security (new) sets 5 minutes to
+  an hour, or never. File > Lock Now locks it straight away.
+- File names are not encrypted, and the app now says so: Create a Company
+  can save as `Books.lcbooks` instead of the company's name, Save As
+  suggests the current file name rather than the company name, and
+  docs/file-format.md lists what a password does not hide.
+
 ### Added
 - Merging duplicates (M2.8): customers, vendors, items and accounts have
   Merge into in their Edit panels. Everything of the one merged moves to the

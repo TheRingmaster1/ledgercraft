@@ -310,18 +310,42 @@ mod tests {
         let protection = Protection::new("a long passphrase").unwrap();
         let text = to_file_text(&company, Some(&protection)).unwrap();
         // Weaken the stored settings: the header is authenticated, so this fails.
-        let tampered = text.replace("\"iterations\": 2", "\"iterations\": 1");
+        let tampered = text.replace("\"iterations\": 3", "\"iterations\": 1");
         assert_ne!(tampered, text);
         assert!(matches!(
             from_file_text(&tampered, Some("a long passphrase")),
             Err(FileError::WrongPassword)
         ));
         // Absurd settings are refused before any work is done.
-        let huge = text.replace("\"memory_kib\": 19456", "\"memory_kib\": 4000000000");
+        let huge = text.replace("\"memory_kib\": 65536", "\"memory_kib\": 4000000000");
         assert!(matches!(
             from_file_text(&huge, Some("a long passphrase")),
             Err(FileError::Damaged(_))
         ));
+    }
+
+    #[test]
+    fn files_with_older_settings_open_and_are_saved_stronger() {
+        let company = Company::new("Old Settings Co");
+        let old = crypto::KdfParams {
+            memory_kib: 19 * 1024,
+            iterations: 2,
+            parallelism: 1,
+        };
+        let protection = Protection::with_params("an older passphrase", old).unwrap();
+        let text = to_file_text(&company, Some(&protection)).unwrap();
+        assert!(text.contains("\"memory_kib\": 19456"));
+        let (opened, again) = from_file_text(&text, Some("an older passphrase")).unwrap();
+        assert_eq!(opened, company);
+        let again = again.unwrap();
+        assert_eq!(again.params(), crypto::KdfParams::default());
+        let resaved = to_file_text(&company, Some(&again)).unwrap();
+        assert!(resaved.contains("\"memory_kib\": 65536"));
+        assert!(resaved.contains("\"iterations\": 3"));
+        assert!(from_file_text(&resaved, Some("an older passphrase")).is_ok());
+        // The lock screen's check.
+        assert!(again.matches("an older passphrase"));
+        assert!(!again.matches("not the passphrase"));
     }
 
     #[test]

@@ -49,6 +49,21 @@ pub(crate) struct Prefs {
     pub(crate) hinting: bool,
     /// How many daily backups of each company file to keep (0: none).
     pub(crate) backups: u8,
+    /// Lock a password-protected company after this many minutes without
+    /// use (0: never).
+    pub(crate) lock_minutes: u16,
+}
+
+/// The lock after inactivity when nothing is chosen, and the choices offered.
+pub(crate) const DEFAULT_LOCK_MINUTES: u16 = 15;
+const LOCK_CHOICES: [u16; 6] = [5, 10, 15, 30, 60, 0];
+
+fn lock_label(minutes: u16) -> String {
+    match minutes {
+        0 => "Never".into(),
+        60 => "1 hour".into(),
+        m => format!("{m} minutes"),
+    }
 }
 
 /// The daily backups kept when nothing is chosen, and the most offered.
@@ -68,6 +83,7 @@ impl Default for Prefs {
             text_grey: 0,
             hinting: true,
             backups: DEFAULT_BACKUPS,
+            lock_minutes: DEFAULT_LOCK_MINUTES,
         }
     }
 }
@@ -184,10 +200,17 @@ pub(crate) enum PrefsPage {
     Currency,
     Text,
     Files,
+    Security,
 }
 
 impl PrefsPage {
-    const ALL: [Self; 4] = [Self::General, Self::Currency, Self::Text, Self::Files];
+    const ALL: [Self; 5] = [
+        Self::General,
+        Self::Currency,
+        Self::Text,
+        Self::Files,
+        Self::Security,
+    ];
 
     fn label(self) -> &'static str {
         match self {
@@ -195,6 +218,7 @@ impl PrefsPage {
             Self::Currency => "Currency",
             Self::Text => "Text",
             Self::Files => "Files",
+            Self::Security => "Security",
         }
     }
 
@@ -205,6 +229,7 @@ impl PrefsPage {
             Self::Currency => "How amounts are shown.",
             Self::Text => "The font and size of all text.",
             Self::Files => "Daily backups, and opening company files by double-clicking them.",
+            Self::Security => "Locking password-protected companies while you are away.",
         }
     }
 }
@@ -251,6 +276,7 @@ pub(crate) fn window(ctx: &egui::Context, open: &mut bool, prefs: &mut Prefs) {
                             PrefsPage::Currency => currency_section(ui, prefs),
                             PrefsPage::Text => text_section(ui, prefs),
                             PrefsPage::Files => files_section(ui, prefs),
+                            PrefsPage::Security => security_section(ui, prefs),
                         });
                 });
             });
@@ -324,6 +350,45 @@ fn files_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
     ui.add_space(10.0);
     ui.label(RichText::new("Opening company files").strong());
     crate::assoc::section(ui);
+}
+
+/// Locking a password-protected company after a while without use.
+fn security_section(ui: &mut egui::Ui, prefs: &mut Prefs) {
+    ui.label(RichText::new("Lock when idle").strong());
+    ui.horizontal(|ui| {
+        ui.label("Lock a password-protected company after");
+        egui::ComboBox::from_id_salt("prefs_lock")
+            .selected_text(lock_label(prefs.lock_minutes))
+            .width(110.0)
+            .show_ui(ui, |ui| {
+                for m in LOCK_CHOICES {
+                    ui.selectable_value(&mut prefs.lock_minutes, m, lock_label(m));
+                }
+            });
+        ui.label("without use");
+    });
+    ui.label(
+        RichText::new(
+            "A locked company is hidden until its password is typed again, so no one can \
+             read or change your books at a computer left unattended. Unsaved changes are \
+             kept. The books stay in the app's memory while locked; to clear them from \
+             memory too, close the company (File > Close Company). Companies without a \
+             password are never locked: there is no password to unlock them with.",
+        )
+        .small()
+        .color(theme::MUTED),
+    );
+    ui.add_space(10.0);
+    ui.label(RichText::new("File names").strong());
+    ui.label(
+        RichText::new(
+            "A password encrypts everything inside a company file, but not its name, which \
+             anyone who can see the folder can read. If the company's name is itself \
+             private, save it under a neutral name such as \"Books.lcbooks\".",
+        )
+        .small()
+        .color(theme::MUTED),
+    );
 }
 
 /// The text font and size, applied to the whole app straight away.
@@ -574,6 +639,7 @@ mod tests {
             text_grey: 60,
             hinting: false,
             backups: 3,
+            lock_minutes: 30,
         };
         save_to(&path, &prefs).unwrap();
         assert_eq!(load_from(&path), prefs);
@@ -655,6 +721,7 @@ mod tests {
             text_grey: 90,
             hinting: false,
             backups: 0,
+            lock_minutes: 0,
         };
         prefs.reset_global();
         // The currency is not a General setting, so Reset leaves it.

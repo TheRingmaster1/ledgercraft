@@ -66,6 +66,13 @@ pub struct LedgerApp {
     entering: Option<(FormKind, RecurringId)>,
     /// The day automatic recurring transactions were last entered.
     recurring_checked: Option<ledgercraft_ledger::Date>,
+    /// When the person last did something, for locking after inactivity.
+    last_active: std::time::Instant,
+    /// Locked after inactivity (or File > Lock Now): only the unlock screen
+    /// shows until the company file's password is typed.
+    locked: bool,
+    unlock_text: String,
+    unlock_error: Option<String>,
     /// Offer to protect the unprotected file just opened.
     offer_protection: bool,
     /// What the last import brought in, shown until closed.
@@ -195,6 +202,10 @@ impl LedgerApp {
             recurring: RecurringState::default(),
             entering: None,
             recurring_checked: None,
+            last_active: std::time::Instant::now(),
+            locked: false,
+            unlock_text: String::new(),
+            unlock_error: None,
             offer_protection: false,
             start: StartPage::default(),
             page: Page::Home,
@@ -512,6 +523,7 @@ impl LedgerApp {
         self.recurring = RecurringState::default();
         self.entering = None;
         self.recurring_checked = None;
+        self.unlock_screen_reset();
         self.page = Page::Home;
     }
 
@@ -532,6 +544,7 @@ impl LedgerApp {
         self.recurring = RecurringState::default();
         self.entering = None;
         self.recurring_checked = None;
+        self.unlock_screen_reset();
         self.page = Page::Home;
     }
 
@@ -557,13 +570,19 @@ impl LedgerApp {
     }
 
     fn save_as(&mut self) -> bool {
+        self.save_as_suggesting(None)
+    }
+
+    /// Save As, suggesting `stem` for the file's name; otherwise the
+    /// current file's name (which may be a neutral one), else the company's.
+    fn save_as_suggesting(&mut self, stem: Option<&str>) -> bool {
         let Some(session) = self.session.as_ref() else {
             return false;
         };
-        let name = format!(
-            "{}.{}",
-            session.company().info.name,
-            ledgercraft_file::EXTENSION
+        let name = suggested_file_name(
+            stem,
+            session.path(),
+            &session.company().info.name,
         );
         // A copy starts in the folder the company is already in.
         let here = session.path().and_then(Path::parent).map(Path::to_path_buf);
@@ -980,6 +999,104 @@ impl LedgerApp {
         }
     }
 
+    /// Locks a password-protected company: the books are hidden until its
+    /// password is typed again.
+    fn lock(&mut self) {
+        if self.session.as_ref().is_some_and(Session::is_protected) {
+            self.locked = true;
+            self.unlock_text.clear();
+            self.unlock_error = None;
+        }
+    }
+
+    fn unlock_screen_reset(&mut self) {
+        self.locked = false;
+        self.unlock_text.clear();
+        self.unlock_error = None;
+        self.last_active = std::time::Instant::now();
+    }
+
+    /// Locks a password-protected company after the minutes chosen in
+    /// Preferences > Security without any input.
+    fn watch_idle(&mut self, ctx: &egui::Context) {
+        let minutes = u64::from(self.prefs.lock_minutes);
+        let protected = self.session.as_ref().is_some_and(Session::is_protected);
+        let active = ctx.input(|i| !i.events.is_empty());
+        if self.locked || minutes == 0 || !protected {
+            self.last_active = std::time::Instant::now();
+            return;
+        }
+        let limit = std::time::Duration::from_secs(minutes.saturating_mul(60));
+        // Idle time is measured before this frame's input counts: coming
+        // back after the limit locks even though moving the mouse is input.
+        let idle = self.last_active.elapsed();
+        if idle >= limit {
+            self.lock();
+            return;
+        }
+        if active {
+            self.last_active = std::time::Instant::now();
+        }
+        let left = limit.saturating_sub(self.last_active.elapsed());
+        ctx.request_repaint_after(left);
+    }
+
+    /// The screen shown while locked: the password, and nothing of the books.
+    fn lock_screen(&mut self, ui: &mut egui::Ui) {
+        let mut unlock = false;
+        egui::CentralPanel::default().show(ui, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(ui.available_height() * 0.25);
+                ui.label(RichText::new("Locked").heading().color(theme::ACCENT));
+                ui.add_space(6.0);
+                ui.label(
+                    RichText::new(
+                        "The company was locked after a while without use. Type its password \
+                         to carry on where you left off; unsaved changes are kept.",
+                    )
+                    .color(theme::MUTED),
+                );
+                ui.add_space(10.0);
+                let field = crate::security::password_field(
+                    ui,
+                    &mut self.unlock_text,
+                    "Company file password",
+                    false,
+                );
+                field.request_focus();
+                if field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+                    unlock = true;
+                }
+                ui.add_space(6.0);
+                if ui.button(RichText::new("Unlock").strong()).clicked() {
+                    unlock = true;
+                }
+                if let Some(e) = &self.unlock_error {
+                    ui.add_space(6.0);
+                    ui.label(RichText::new(e.as_str()).color(theme::NEGATIVE));
+                }
+            });
+        });
+        if unlock {
+            self.try_unlock();
+        }
+    }
+
+    /// Unlocks if what was typed is the company file's password.
+    fn try_unlock(&mut self) {
+        let ok = self
+            .session
+            .as_ref()
+            .is_some_and(|s| s.password_matches(&self.unlock_text));
+        zeroize::Zeroize::zeroize(&mut self.unlock_text);
+        if ok {
+            self.unlock_screen_reset();
+            self.info("Unlocked.");
+        } else {
+            self.unlock_error = Some("That is not the company file's password.".into());
+        }
+    }
+
     fn open_txn(&mut self, id: TxnId) {
         let Some(t) = self
             .session
@@ -1159,6 +1276,17 @@ impl LedgerApp {
                         if password.clicked() {
                             ui.close();
                             self.password = Some(PasswordForm::default());
+                        }
+                        let protected = self.session.as_ref().is_some_and(Session::is_protected);
+                        let lock = ui
+                            .add_enabled(protected, egui::Button::new("Lock Now"))
+                            .on_hover_text(
+                                "Hide the books until the company file's password is typed \
+                                 again (only for a company with a password).",
+                            );
+                        if lock.clicked() {
+                            ui.close();
+                            self.lock();
                         }
                         let close = ui
                             .add_enabled(has_company, egui::Button::new("Close Company"))
@@ -1724,6 +1852,12 @@ impl LedgerApp {
     }
 
     fn dialogs(&mut self, ctx: &egui::Context) {
+        self.unsaved_prompt(ctx);
+        self.windows(ctx);
+    }
+
+    /// "Your company file has changes that are not saved yet."
+    fn unsaved_prompt(&mut self, ctx: &egui::Context) {
         if let Some(what) = self.pending {
             let mut choice = None;
             egui::Window::new("Unsaved changes")
@@ -1760,6 +1894,10 @@ impl LedgerApp {
                 None => {}
             }
         }
+    }
+
+    /// Every other window: Create a Company, Closing Date, Make Recurring…
+    fn windows(&mut self, ctx: &egui::Context) {
         let created = match self.create.as_mut() {
             Some(form) => start::new_company_window(ctx, form),
             None => None,
@@ -1767,6 +1905,7 @@ impl LedgerApp {
         match created {
             Some(start::CreateOutcome::Create(company, summary, password)) => {
                 let name = company.info.name.clone();
+                let neutral = self.create.as_ref().is_some_and(NewCompanyForm::neutral_name);
                 let mut session = Session::new(*company);
                 // No location yet, so this only sets the key; the file is
                 // written encrypted when it is saved just below.
@@ -1782,7 +1921,8 @@ impl LedgerApp {
                 }
                 self.import_report = summary;
                 // Ask where it lives straight away, as desktop apps do.
-                if !self.save_as() && !self.status_is_error {
+                let suggested = neutral.then_some(NEUTRAL_FILE_NAME);
+                if !self.save_as_suggesting(suggested) && !self.status_is_error {
                     self.info(format!(
                         "Created {name}. It is not saved yet: use File > Save As to choose where it lives."
                     ));
@@ -1838,6 +1978,22 @@ impl LedgerApp {
             None => {}
         }
     }
+}
+
+/// The neutral name Create a Company offers when the company's name is
+/// itself private (file names are not encrypted).
+const NEUTRAL_FILE_NAME: &str = "Books";
+
+/// The name Save As suggests: `stem` if given, else the current file's
+/// name, else the company's name.
+fn suggested_file_name(stem: Option<&str>, current: Option<&Path>, company: &str) -> String {
+    if let Some(stem) = stem {
+        return format!("{stem}.{}", ledgercraft_file::EXTENSION);
+    }
+    if let Some(name) = current.and_then(Path::file_name) {
+        return name.to_string_lossy().into_owned();
+    }
+    format!("{company}.{}", ledgercraft_file::EXTENSION)
 }
 
 /// "Pine Ridge Woodworks.lcbooks" from a full path, for the status bar.
@@ -1900,6 +2056,15 @@ impl eframe::App for LedgerApp {
         }
         self.apply_prefs(ctx);
         self.save_prefs(ctx);
+
+        self.watch_idle(ctx);
+        if self.locked {
+            self.lock_screen(ui);
+            // Quitting still asks about unsaved changes (it shows no books).
+            self.unsaved_prompt(ctx);
+            self.save_state();
+            return;
+        }
 
         self.shortcuts(ctx);
         // Panels first, the central page last.
@@ -2143,9 +2308,48 @@ mod tests {
     }
 
     #[test]
+    fn save_as_keeps_a_neutral_file_name() {
+        assert_eq!(
+            suggested_file_name(Some(NEUTRAL_FILE_NAME), None, "Secret Co"),
+            "Books.lcbooks"
+        );
+        let current = std::env::temp_dir().join("Books.lcbooks");
+        assert_eq!(
+            suggested_file_name(None, Some(&current), "Secret Co"),
+            "Books.lcbooks"
+        );
+        assert_eq!(suggested_file_name(None, None, "Secret Co"), "Secret Co.lcbooks");
+    }
+
+    #[test]
     fn the_status_bar_shows_the_file_name_not_the_whole_path() {
         let path = std::env::temp_dir().join("Pine Ridge Woodworks.lcbooks");
         assert_eq!(file_name(&path), "Pine Ridge Woodworks.lcbooks");
+    }
+
+    #[test]
+    fn a_protected_company_locks_and_unlocks_with_its_password() {
+        let mut session = Session::new(new_company("Locked Co"));
+        session
+            .set_password(Some("a long lock passphrase"))
+            .unwrap();
+        let mut app = LedgerApp::with_session(session);
+        app.lock();
+        assert!(app.locked);
+        app.unlock_text = "not the passphrase".into();
+        app.try_unlock();
+        assert!(app.locked);
+        assert!(app.unlock_error.is_some());
+        assert!(app.unlock_text.is_empty(), "what was typed is wiped");
+        app.unlock_text = "a long lock passphrase".into();
+        app.try_unlock();
+        assert!(!app.locked);
+        assert!(app.unlock_error.is_none());
+
+        // Without a password there is nothing to unlock with: never locked.
+        let mut plain = LedgerApp::with_session(Session::new(new_company("Plain Co")));
+        plain.lock();
+        assert!(!plain.locked);
     }
 
     #[test]

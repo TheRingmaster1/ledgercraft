@@ -93,7 +93,7 @@ A company with a password is saved as:
   "encryption": {
     "cipher": "xchacha20poly1305",
     "kdf": "argon2id",
-    "params": { "memory_kib": 19456, "iterations": 2, "parallelism": 1 },
+    "params": { "memory_kib": 65536, "iterations": 3, "parallelism": 1 },
     "salt": "<16 bytes, base64>",
     "nonce": "<24 bytes, base64>"
   },
@@ -106,13 +106,32 @@ A company with a password is saved as:
 * The ciphertext is **XChaCha20-Poly1305** of the complete version 1 file
   text (the plain JSON above), with this associated data binding the header:
   `ledgercraft:2:<cipher>:<kdf>:<memory_kib>:<iterations>:<parallelism>:<salt>`.
+* New files use 64 MiB, 3 passes and 1 lane (RFC 9106's second recommended
+  setting). Files saved before 0.2.2 used 19 MiB and 2 passes; they still
+  open, and are saved with the current settings (and a new salt) from then
+  on.
 * A fresh random nonce is used for every save; the salt changes when the
-  password does.
+  password or the settings do.
 * Readers must refuse parameters outside memory 8 KiB to 1 GiB, iterations
   1 to 16 and parallelism 1 to 16, so a damaged or hostile file cannot make
   them hang.
 * Only the encrypted form is ever written to disk, including the temporary
   file used for atomic saves. There is no password recovery.
+
+### What a password does not hide
+
+* **The file name.** "Smith Divorce Settlement.lcbooks" tells anyone who
+  can see the folder something, encrypted or not. Create a Company offers a
+  neutral name (`Books.lcbooks`), and Save As suggests the current file name
+  rather than the company name.
+* **The backup folder and its file names**, which follow the file name.
+* **That it is a LedgerCraft file**, its size, and when it was saved.
+* **The recent companies list** (`state.json` in the per-user settings
+  folder) holds the paths of recently opened files, in plain text.
+* **The open books in memory.** While a company is open, and while it is
+  locked after inactivity (Preferences > Security), its books are decrypted
+  in the app's memory. Close the company to clear them; the key is wiped
+  when it closes.
 
 ### Upgrading a version 1 file
 
