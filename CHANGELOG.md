@@ -76,6 +76,11 @@ docs/releasing.md.
   tarball. The Release workflow can be run by hand (Actions > Release > Run
   workflow) to build the packages without releasing, to try them first.
 
+### Fixed
+- Resizing the app window no longer resizes the Tutorial's window too
+  (issue #9). The Tutorial opens at a share of the app window's size, then
+  the two are resized separately.
+
 ## [0.2.1] - 2026-10-23
 
 ### Added
