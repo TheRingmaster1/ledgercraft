@@ -13,6 +13,7 @@ mod currency;
 mod dialogs;
 mod forms;
 mod hints;
+mod importing;
 mod licenses;
 mod pages;
 mod prefs;
@@ -48,6 +49,7 @@ pub(crate) enum Page {
     SalesTax,
     Classes,
     Recurring,
+    OpeningBalances,
     Form(FormKind),
 }
 
@@ -103,6 +105,7 @@ pub(crate) enum Reset {
     NewClass,
     EditedClass,
     EditedRecurring,
+    OpeningBalances,
 }
 
 // `Run` carries a whole `Command` (contacts are large); a handful per frame is fine.

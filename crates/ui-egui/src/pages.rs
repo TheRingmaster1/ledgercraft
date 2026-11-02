@@ -334,6 +334,7 @@ impl ListState {
             Reset::EditedClass => self.editing_class = None,
             Reset::Nothing
             | Reset::EditedRecurring
+            | Reset::OpeningBalances
             | Reset::Form(_)
             | Reset::NewTax
             | Reset::NewTaxGroup

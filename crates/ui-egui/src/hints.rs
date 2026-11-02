@@ -78,6 +78,10 @@ impl Page {
                 "Check a bank or credit card account against its statement, item by item, \
                  so you know the books match the bank."
             }
+            Self::OpeningBalances => {
+                "Where the books stood when LedgerCraft took over: bank and loan balances, \
+                 and what customers and vendors owed."
+            }
             Self::Recurring => {
                 "Transactions entered for you on a schedule, or listed here when they are \
                  due."

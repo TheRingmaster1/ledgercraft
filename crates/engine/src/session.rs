@@ -226,7 +226,9 @@ impl Session {
         }
         let txn_date = |id: &TxnId| self.company.txn(*id).map(|t| t.date);
         let dates: Vec<Date> = match cmd {
-            Command::TxnPost { date, .. } | Command::RecurringEnter { date, .. } => vec![*date],
+            Command::TxnPost { date, .. }
+            | Command::RecurringEnter { date, .. }
+            | Command::CompanyOpeningBalances { date, .. } => vec![*date],
             Command::TxnUpdate { id, date, .. } => {
                 txn_date(id).into_iter().chain([*date]).collect()
             }
@@ -830,6 +832,52 @@ mod tests {
         s.undo();
         assert!(s.company().transactions.is_empty());
         assert_eq!(s.company().recurring[0].next(), Some(d("2026-02-28")));
+    }
+
+    #[test]
+    fn lists_and_opening_balances_come_in_as_one_undoable_change_each() {
+        use ledgercraft_core::{Date, Money};
+        use ledgercraft_ledger::Company;
+        let mut s = Session::new(Company::with_default_accounts("Moving Co"));
+        let import = serde_json::json!({
+            "command": "import.lists",
+            "files": [
+                {"list": "customers", "text": "Name,Terms\nAcme,Net 30\nBeta,15\n", "name": "c.csv"},
+                {"list": "accounts", "text": "Name,Type\nChecking,Bank\nPetty Cash,Bank\n"}
+            ]
+        });
+        let outcome = s.execute_json(&import.to_string()).unwrap();
+        // Checking was already there: skipped, not an error.
+        assert!(outcome.created.unwrap().contains("1 accounts, 2 customers"));
+        assert_eq!(s.company().customers.len(), 2);
+        assert_eq!(s.undo_label(), Some("Import Lists"));
+
+        let acme = s.company().customers[0].id;
+        let petty = s.company().account_by_name("Petty Cash").unwrap().id;
+        let opening = crate::Command::CompanyOpeningBalances {
+            date: Date::parse("2025-12-31").unwrap(),
+            balances: ledgercraft_ledger::OpeningBalances {
+                accounts: vec![(petty, Money::from_dollars(50))],
+                customers: vec![(acme, Money::from_dollars(400))],
+                vendors: Vec::new(),
+            },
+        };
+        // Not into closed books.
+        s.execute(crate::Command::CompanySetClosing {
+            date: Some(Date::parse("2025-12-31").unwrap()),
+            password: None,
+            keep_password: false,
+        })
+        .unwrap();
+        assert!(matches!(s.execute(opening.clone()), Err(EngineError::Closed(_))));
+        s.undo();
+        s.execute(opening).unwrap();
+        assert_eq!(s.company().transactions.len(), 2);
+        assert_eq!(s.company().open_invoices(acme).len(), 1);
+        s.undo();
+        assert!(s.company().transactions.is_empty());
+        s.undo();
+        assert!(s.company().customers.is_empty());
     }
 
     #[test]

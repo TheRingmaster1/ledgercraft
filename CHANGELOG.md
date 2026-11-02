@@ -8,6 +8,19 @@ docs/releasing.md.
 
 ## [Unreleased]
 
+### Added (moving your books over)
+- File > Import Lists… adds accounts, customers, vendors and products and
+  services from IIF or CSV files to an open company, as one change Edit >
+  Undo takes back. Names already in the company are skipped and listed in
+  Import Results. Command `import.lists`.
+- File > Opening Balances… records where the books stood on a date: bank,
+  card, loan and other balance sheet accounts in one journal entry, an
+  opening invoice for each customer and an opening bill for each vendor (so
+  Receive Payments and Pay Bills settle them), all balanced against a new
+  Opening Balance Equity account. Typed in, or filled from a CSV file with
+  Name and Balance columns. Follows the closing date. Command
+  `company.openingBalances`.
+
 ### Security
 - Stronger password protection: new and re-saved company files derive their
   key with Argon2id at 64 MiB and 3 passes (was 19 MiB and 2). Older files

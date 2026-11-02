@@ -79,8 +79,9 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
    - ~~App icon~~ (done: open-ledger icon in the title bar, taskbar and .exe; Linux desktop entry)
    - ~~High-DPI check~~ (done: window fits and resizes on mixed-DPI monitors)
    - ~~Start page, Create a Company window and Close Company~~ (done)
-   - ~~Import lists (IIF, CSV) when creating a company~~ (done); next: File > Import
-     for an open company, opening balances, transactions
+   - ~~Import lists (IIF, CSV) when creating a company~~ (done); ~~File > Import
+     Lists… for an open company, File > Opening Balances…~~ (done); next: importing
+     past transactions (IIF `TRNS`/`SPL`, CSV)
    - ~~Password protection and encryption at rest~~ (done, with upgrade of older files)
    - ~~File association for `.lcbooks`~~ (done: Windows from Preferences, Linux from install.sh)
    - ~~Remembered window size, side bar and last company~~ (done)

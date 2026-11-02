@@ -14,6 +14,7 @@ mod error;
 mod ids;
 mod item;
 mod merge;
+mod opening;
 mod party;
 mod print;
 mod reconcile;
@@ -35,6 +36,9 @@ pub use ids::{
 pub use item::{Item, ItemKind, ItemSpec};
 pub use party::{Address, Contact, Customer, Party, Vendor};
 pub use print::{base64_decode, base64_encode, Logo, PdfTemplate, PrintStyle, LOGO_MAX_BYTES};
+pub use opening::{
+    takes_opening_balance, OpeningBalances, OPENING_BALANCE_EQUITY, OPENING_BALANCE_MEMO,
+};
 pub use reconcile::{ReconcileItem, Reconciliation};
 pub use recurring::{
     can_recur, Frequency, Recurring, RecurringMode, RecurringSpec, TxnTemplate, MAX_CATCH_UP,
