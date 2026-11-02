@@ -16,6 +16,7 @@ use crate::widgets;
 use crate::prefs::{self, Prefs};
 use crate::recent::{AppState, WindowState};
 use crate::reconcile::{self, ReconcileState};
+use crate::importing::{self, ImportListsForm, ImportListsOutcome, OpeningState};
 use crate::recurring::{self, RecurringOutcome, RecurringState};
 use crate::salestax::{self, SalesTaxState};
 use crate::security::{
@@ -77,6 +78,10 @@ pub struct LedgerApp {
     offer_protection: bool,
     /// What the last import brought in, shown until closed.
     import_report: Option<ledgercraft_file::import::ImportSummary>,
+    /// File > Import Lists…, while open.
+    import_lists: Option<ImportListsForm>,
+    /// File > Opening Balances….
+    opening: OpeningState,
     start: StartPage,
     page: Page,
     forms: Forms,
@@ -192,6 +197,8 @@ impl LedgerApp {
             session,
             create: None,
             import_report: None,
+            import_lists: None,
+            opening: OpeningState::default(),
             unlock: None,
             password: None,
             company_info: None,
@@ -523,6 +530,8 @@ impl LedgerApp {
         self.recurring = RecurringState::default();
         self.entering = None;
         self.recurring_checked = None;
+        self.import_lists = None;
+        self.opening = OpeningState::default();
         self.unlock_screen_reset();
         self.page = Page::Home;
     }
@@ -544,6 +553,8 @@ impl LedgerApp {
         self.recurring = RecurringState::default();
         self.entering = None;
         self.recurring_checked = None;
+        self.import_lists = None;
+        self.opening = OpeningState::default();
         self.unlock_screen_reset();
         self.page = Page::Home;
     }
@@ -794,6 +805,9 @@ impl LedgerApp {
                 self.lists.reset(reset);
                 self.sales_tax.reset(reset);
                 self.recurring.reset(reset);
+                if reset == Reset::OpeningBalances {
+                    self.opening = OpeningState::for_company(session.company());
+                }
                 if was_edit {
                     self.info(format!(
                         "{label}: changes saved. Edit > Undo puts the original back."
@@ -996,6 +1010,38 @@ impl LedgerApp {
                 if n == 1 { "" } else { "s" },
                 if n == 1 { "it" } else { "them" },
             ));
+        }
+    }
+
+    /// Runs an import: worked out on a copy first for the results window
+    /// (what was skipped and why), then recorded as one undoable change.
+    fn import_lists_now(&mut self, cmd: Command) {
+        let Command::ImportLists { files } = &cmd else {
+            return;
+        };
+        let Some(c) = self.session.as_ref().map(Session::company) else {
+            self.import_lists = None;
+            return;
+        };
+        let mut copy = c.clone();
+        let summary = match ledgercraft_file::import::import_all(&mut copy, files) {
+            Ok(summary) => summary,
+            Err(e) => {
+                if let Some(form) = self.import_lists.as_mut() {
+                    form.set_error(e);
+                }
+                return;
+            }
+        };
+        if summary.added() == 0 {
+            self.import_lists = None;
+            self.info("Nothing new to import: everything in those files is already here.");
+            self.import_report = Some(summary);
+            return;
+        }
+        if self.run(cmd, Reset::Nothing).is_some() {
+            self.import_lists = None;
+            self.import_report = Some(summary);
         }
     }
 
@@ -1255,6 +1301,31 @@ impl LedgerApp {
                                 .as_ref()
                                 .map(|s| CompanyInfoForm::from_company(s.company()));
                         }
+                        ui.separator();
+                        let import = ui
+                            .add_enabled(has_company, egui::Button::new("Import Lists…"))
+                            .on_hover_text(
+                                "Add accounts, customers, vendors and products and services \
+                                 from IIF or CSV files.",
+                            );
+                        if import.clicked() {
+                            ui.close();
+                            self.import_lists = Some(ImportListsForm::default());
+                        }
+                        let opening = ui
+                            .add_enabled(has_company, egui::Button::new("Opening Balances…"))
+                            .on_hover_text(
+                                "Enter where the books stood when you started with \
+                                 LedgerCraft.",
+                            );
+                        if opening.clicked() {
+                            ui.close();
+                            if let Some(s) = self.session.as_ref() {
+                                self.opening = OpeningState::for_company(s.company());
+                            }
+                            self.page = Page::OpeningBalances;
+                        }
+                        ui.separator();
                         let closing = ui
                             .add_enabled(has_company, egui::Button::new("Closing Date…"))
                             .on_hover_text(
@@ -1931,6 +2002,16 @@ impl LedgerApp {
             Some(start::CreateOutcome::Cancel) => self.create = None,
             None => {}
         }
+        // File > Import Lists…
+        let chosen = self
+            .import_lists
+            .as_mut()
+            .and_then(|form| importing::import_lists_window(ctx, form));
+        match chosen {
+            Some(ImportListsOutcome::Import(cmd)) => self.import_lists_now(*cmd),
+            Some(ImportListsOutcome::Cancel) => self.import_lists = None,
+            None => {}
+        }
         start::import_report_window(ctx, &mut self.import_report);
         self.security_windows(ctx);
         let mut open = self.show_about;
@@ -2113,6 +2194,12 @@ impl eframe::App for LedgerApp {
                             Page::Recurring => {
                                 recurring::page(ui, company, &mut self.recurring, &mut actions)
                             }
+                            Page::OpeningBalances => importing::opening_page(
+                                ui,
+                                company,
+                                &mut self.opening,
+                                &mut actions,
+                            ),
                             Page::SalesTax => {
                                 salestax::page(ui, company, &mut self.sales_tax, &mut actions)
                             }

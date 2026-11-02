@@ -1,7 +1,7 @@
 use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
     AccountId, AccountType, Address, Company, Contact, CustomerId, CustomerTax, FeedEntry,
-    ImportedTax, ItemId, ItemSpec, LedgerResult, RecurringId, RecurringSpec, TaxComponentId,
+    ImportedTax, ItemId, ItemSpec, LedgerResult, OpeningBalances, RecurringId, RecurringSpec, TaxComponentId,
     TaxGroupId, TaxRate, TxnBody, TxnClassId, TxnId, TxnTemplate, VendorId,
 };
 use serde::{Deserialize, Serialize};
@@ -131,6 +131,18 @@ pub enum Command {
     ClassUpdate { id: TxnClassId, name: String },
     #[serde(rename = "class.setActive")]
     ClassSetActive { id: TxnClassId, active: bool },
+    /// Adds lists from IIF or CSV files' text; names already in the
+    /// company are skipped.
+    #[serde(rename = "import.lists")]
+    ImportLists {
+        files: Vec<ledgercraft_file::import::ImportText>,
+    },
+    /// Enters opening balances as of a date.
+    #[serde(rename = "company.openingBalances")]
+    CompanyOpeningBalances {
+        date: Date,
+        balances: OpeningBalances,
+    },
     #[serde(rename = "recurring.create")]
     RecurringCreate {
         spec: RecurringSpec,
@@ -281,6 +293,8 @@ pub const CATALOG: &[CommandInfo] = &[
     CommandInfo { id: "class.create", summary: "Add a class (a department, location or line of business). {name}" },
     CommandInfo { id: "class.update", summary: "Rename a class. {id, name}" },
     CommandInfo { id: "class.setActive", summary: "Leave a class off the forms, or list it again. {id, active}" },
+    CommandInfo { id: "import.lists", summary: "Add accounts, customers, vendors and items from IIF or CSV text; names already in the company are skipped. {files:[{list?: accounts|customers|vendors|items (none for IIF), text, name?}]}" },
+    CommandInfo { id: "company.openingBalances", summary: "Enter opening balances: a journal entry for accounts, an opening invoice per customer and bill per vendor, offset to Opening Balance Equity. {date, balances:{accounts?:[[id, amount]], customers?:[[id, amount]], vendors?:[[id, amount]]}}" },
     CommandInfo { id: "recurring.create", summary: "Make a transaction recurring, with a schedule. {spec:{name, frequency: daily|weekly|monthly|quarterly|yearly, every, next, end?, mode: remind|automatic}, template:{date, memo?, body, class?}}" },
     CommandInfo { id: "recurring.update", summary: "Change a recurring transaction's name and schedule; next starts the schedule again. {id, spec}" },
     CommandInfo { id: "recurring.delete", summary: "Forget a recurring transaction (what it entered stays). {id}" },
@@ -335,6 +349,8 @@ impl Command {
             Self::ClassCreate { .. } => "class.create",
             Self::ClassUpdate { .. } => "class.update",
             Self::ClassSetActive { .. } => "class.setActive",
+            Self::ImportLists { .. } => "import.lists",
+            Self::CompanyOpeningBalances { .. } => "company.openingBalances",
             Self::RecurringCreate { .. } => "recurring.create",
             Self::RecurringUpdate { .. } => "recurring.update",
             Self::RecurringDelete { .. } => "recurring.delete",
@@ -392,6 +408,8 @@ impl Command {
             Self::ClassCreate { name } => format!("New Class {name}"),
             Self::ClassUpdate { name, .. } => format!("Rename Class {name}"),
             Self::ClassSetActive { .. } => "Class Status".into(),
+            Self::ImportLists { .. } => "Import Lists".into(),
+            Self::CompanyOpeningBalances { .. } => "Opening Balances".into(),
             Self::RecurringCreate { spec, .. } => format!("New Recurring {}", spec.name),
             Self::RecurringUpdate { spec, .. } => format!("Edit Recurring {}", spec.name),
             Self::RecurringDelete { .. } => "Delete Recurring Transaction".into(),
@@ -599,6 +617,20 @@ impl Command {
             Self::ClassSetActive { id, active } => {
                 c.set_class_active(id, active)?;
                 None
+            }
+            Self::ImportLists { files } => {
+                let summary = ledgercraft_file::import::import_all(c, &files)
+                    .map_err(ledgercraft_ledger::LedgerError::Invalid)?;
+                Some(summary.to_string())
+            }
+            Self::CompanyOpeningBalances { date, balances } => {
+                let made = c.enter_opening_balances(date, &balances)?;
+                Some(
+                    made.iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                )
             }
             Self::RecurringCreate { spec, template } => {
                 Some(c.add_recurring(spec, template)?.to_string())

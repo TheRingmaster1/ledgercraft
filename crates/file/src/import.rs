@@ -15,9 +15,11 @@
 use std::fmt;
 
 use ledgercraft_ledger::{AccountType, Address, Company, Contact, ItemKind, ItemSpec, Money};
+use serde::{Deserialize, Serialize};
 
 /// Which list a CSV file holds.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ListKind {
     Accounts,
     Customers,
@@ -86,6 +88,42 @@ impl fmt::Display for ImportSummary {
         }
         Ok(())
     }
+}
+
+/// One file's text to import: an IIF file (`list` none), or a CSV file
+/// holding one list.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportText {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list: Option<ListKind>,
+    pub text: String,
+    /// The file's name, for messages.
+    #[serde(default)]
+    pub name: String,
+}
+
+/// Imports several files: IIF first, then CSV lists with accounts before
+/// the items that name them. A CSV file that cannot be read at all stops
+/// the import; bad rows are skipped and listed.
+pub fn import_all(company: &mut Company, files: &[ImportText]) -> Result<ImportSummary, String> {
+    let mut order: Vec<&ImportText> = files.iter().collect();
+    order.sort_by_key(|f| {
+        f.list.map_or(0, |k| {
+            1 + ListKind::ALL.iter().position(|x| *x == k).unwrap_or(0)
+        })
+    });
+    let mut summary = ImportSummary::default();
+    for file in order {
+        match file.list {
+            None => summary.merge(import_iif(company, &file.text)),
+            Some(kind) => {
+                let part = import_csv(company, kind, &file.text)
+                    .map_err(|e| format!("{}: {e}", file.name))?;
+                summary.merge(part);
+            }
+        }
+    }
+    Ok(summary)
 }
 
 /// Refuse absurdly large inputs (hostile or corrupt files).
@@ -375,6 +413,11 @@ pub fn import_csv(
         }
     }
     Ok(summary)
+}
+
+/// The rows of a CSV file (the header first), for other CSV readers.
+pub fn parse_rows(text: &str) -> Vec<Vec<String>> {
+    parse_csv(text)
 }
 
 /// RFC 4180 CSV: quoted fields may hold commas, quotes ("") and line breaks.

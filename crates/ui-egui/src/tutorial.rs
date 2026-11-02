@@ -160,6 +160,20 @@ const LESSONS: &[Lesson] = &[
                 "File > Close Company puts the books away and returns to the start page. \
                  If there are unsaved changes, it asks first.",
             ]),
+            Heading("Moving your books over"),
+            Steps(&[
+                "File > Import Lists… adds accounts, customers, vendors and products and \
+                 services from IIF or CSV files to the open company. Names already there \
+                 are skipped and listed, so nothing is doubled.",
+                "File > Opening Balances… records where the books stood the day before you \
+                 started: the balance of each bank account, card and loan from its last \
+                 statement, and what each customer owed you and you owed each vendor.",
+                "Customers get an opening invoice and vendors an opening bill, so Receive \
+                 Payments and Pay Bills settle them like any other. Everything is balanced \
+                 against an Opening Balance Equity account.",
+                "Fill From CSV… fills the boxes from a file with Name and Balance columns. \
+                 Edit > Undo takes an import or the opening balances back in one step.",
+            ]),
             Heading("Saving"),
             Text(
                 "Use File > Save (Ctrl+S) or Save As. Until you save, the title bar shows \
