@@ -869,7 +869,10 @@ mod tests {
             keep_password: false,
         })
         .unwrap();
-        assert!(matches!(s.execute(opening.clone()), Err(EngineError::Closed(_))));
+        assert!(matches!(
+            s.execute(opening.clone()),
+            Err(EngineError::Closed(_))
+        ));
         s.undo();
         s.execute(opening).unwrap();
         assert_eq!(s.company().transactions.len(), 2);

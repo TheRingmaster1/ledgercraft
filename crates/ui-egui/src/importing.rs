@@ -210,9 +210,10 @@ pub(crate) fn import_lists_window(
                 if import.clicked() {
                     match form.picks.read() {
                         Ok(files) => {
-                            outcome = Some(ImportListsOutcome::Import(Box::new(
-                                Command::ImportLists { files },
-                            )));
+                            outcome =
+                                Some(ImportListsOutcome::Import(Box::new(Command::ImportLists {
+                                    files,
+                                })));
                         }
                         Err(e) => form.error = Some(e),
                     }
@@ -254,7 +255,9 @@ impl OpeningState {
                 .filter(|(a, _)| {
                     a.active
                         && takes_opening_balance(a.kind)
-                        && !a.name.eq_ignore_ascii_case(ledgercraft_ledger::OPENING_BALANCE_EQUITY)
+                        && !a
+                            .name
+                            .eq_ignore_ascii_case(ledgercraft_ledger::OPENING_BALANCE_EQUITY)
                 })
                 .map(|(a, _)| (a.id, String::new()))
                 .collect(),
@@ -310,10 +313,9 @@ impl OpeningState {
             .map(|h| h.trim().to_uppercase())
             .collect();
         let col = |names: &[&str]| header.iter().position(|h| names.contains(&h.as_str()));
-        let name_col = col(&["NAME", "ACCOUNT", "CUSTOMER", "VENDOR"])
-            .ok_or("no Name column")?;
-        let amount_col = col(&["BALANCE", "AMOUNT", "OPENING BALANCE"])
-            .ok_or("no Balance column")?;
+        let name_col = col(&["NAME", "ACCOUNT", "CUSTOMER", "VENDOR"]).ok_or("no Name column")?;
+        let amount_col =
+            col(&["BALANCE", "AMOUNT", "OPENING BALANCE"]).ok_or("no Balance column")?;
         let mut unmatched = Vec::new();
         for row in rows {
             let (Some(name), Some(amount)) = (row.get(name_col), row.get(amount_col)) else {
@@ -395,7 +397,11 @@ fn amount_rows<T: Copy>(
 }
 
 pub(crate) fn opening_page(ui: &mut Ui, c: &Company, s: &mut OpeningState, out: &mut Vec<Action>) {
-    ui.label(RichText::new("Opening Balances").heading().color(theme::ACCENT));
+    ui.label(
+        RichText::new("Opening Balances")
+            .heading()
+            .color(theme::ACCENT),
+    );
     ui.add_space(6.0);
     ui.label(
         RichText::new(

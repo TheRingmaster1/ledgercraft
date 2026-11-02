@@ -292,7 +292,6 @@ impl NewCompanyForm {
     }
 }
 
-
 /// What happened in the Create a Company window this frame.
 pub(crate) enum CreateOutcome {
     /// The new company, what was imported into it (if anything), and the

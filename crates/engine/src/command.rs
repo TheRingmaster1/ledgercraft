@@ -1,8 +1,8 @@
 use ledgercraft_core::{Date, Money};
 use ledgercraft_ledger::{
     AccountId, AccountType, Address, Company, Contact, CustomerId, CustomerTax, FeedEntry,
-    ImportedTax, ItemId, ItemSpec, LedgerResult, OpeningBalances, RecurringId, RecurringSpec, TaxComponentId,
-    TaxGroupId, TaxRate, TxnBody, TxnClassId, TxnId, TxnTemplate, VendorId,
+    ImportedTax, ItemId, ItemSpec, LedgerResult, OpeningBalances, RecurringId, RecurringSpec,
+    TaxComponentId, TaxGroupId, TaxRate, TxnBody, TxnClassId, TxnId, TxnTemplate, VendorId,
 };
 use serde::{Deserialize, Serialize};
 

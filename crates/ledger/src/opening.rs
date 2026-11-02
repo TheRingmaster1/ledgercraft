@@ -46,19 +46,19 @@ impl OpeningBalances {
 /// Accounts that take an opening balance directly: the balance sheet,
 /// except receivables and payables (those come from customers and vendors).
 pub fn takes_opening_balance(kind: AccountType) -> bool {
-    !kind.needs_party() && matches!(kind.class(), Class::Asset | Class::Liability | Class::Equity)
+    !kind.needs_party()
+        && matches!(
+            kind.class(),
+            Class::Asset | Class::Liability | Class::Equity
+        )
 }
 
 impl Company {
     /// The Opening Balance Equity account, created if there is none.
     pub fn opening_balance_equity(&mut self) -> LedgerResult<AccountId> {
-        if let Some(a) = self
-            .accounts
-            .iter()
-            .find(|a| {
-                a.kind == AccountType::Equity && a.name.eq_ignore_ascii_case(OPENING_BALANCE_EQUITY)
-            })
-        {
+        if let Some(a) = self.accounts.iter().find(|a| {
+            a.kind == AccountType::Equity && a.name.eq_ignore_ascii_case(OPENING_BALANCE_EQUITY)
+        }) {
             return Ok(a.id);
         }
         let description = "Offsets opening balances";
@@ -70,7 +70,9 @@ impl Company {
         ) {
             Ok(id) => Ok(id),
             // The number is taken: add it without one.
-            Err(_) => self.add_account("", OPENING_BALANCE_EQUITY, AccountType::Equity, description),
+            Err(_) => {
+                self.add_account("", OPENING_BALANCE_EQUITY, AccountType::Equity, description)
+            }
         }
     }
 
@@ -274,11 +276,19 @@ mod tests {
             customers: vec![(customer, Money::from_dollars(300))],
             vendors: vec![(vendor, Money::from_dollars(120))],
         };
-        let made = c.enter_opening_balances(d("2026-01-01"), &balances).unwrap();
+        let made = c
+            .enter_opening_balances(d("2026-01-01"), &balances)
+            .unwrap();
         assert_eq!(made.len(), 3, "a journal entry, an invoice and a bill");
         let as_of = Some(d("2026-01-01"));
-        assert_eq!(c.account_balance(id(&c, "Checking"), as_of), Money::from_dollars(5_000));
-        assert_eq!(c.account_balance(id(&c, "Loan Payable"), as_of), Money::from_dollars(2_000));
+        assert_eq!(
+            c.account_balance(id(&c, "Checking"), as_of),
+            Money::from_dollars(5_000)
+        );
+        assert_eq!(
+            c.account_balance(id(&c, "Loan Payable"), as_of),
+            Money::from_dollars(2_000)
+        );
         assert_eq!(
             c.account_balance(id(&c, "Accounts Receivable"), as_of),
             Money::from_dollars(300)
@@ -309,7 +319,9 @@ mod tests {
             customers: vec![(customer, Money::from_dollars(-5))],
             vendors: Vec::new(),
         };
-        assert!(c.enter_opening_balances(d("2026-01-01"), &balances).is_err());
+        assert!(c
+            .enter_opening_balances(d("2026-01-01"), &balances)
+            .is_err());
         assert_eq!(c, before);
         // Receivables take theirs from customers.
         let ar = OpeningBalances {
@@ -325,7 +337,8 @@ mod tests {
             accounts: vec![(id(&c, "Checking"), Money::from_dollars(-40))],
             ..OpeningBalances::default()
         };
-        c.enter_opening_balances(d("2026-01-01"), &overdrawn).unwrap();
+        c.enter_opening_balances(d("2026-01-01"), &overdrawn)
+            .unwrap();
         assert_eq!(
             c.account_balance(id(&c, "Checking"), None),
             Money::from_dollars(-40)
