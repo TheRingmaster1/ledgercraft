@@ -188,9 +188,9 @@ pub(crate) fn import_lists_window(
             ui.set_max_width(560.0);
             ui.label(
                 RichText::new(
-                    "Add accounts, customers, vendors and products and services from IIF or \\
-                     CSV files to this company. Anything with a name already in the company \\
-                     is skipped and listed afterwards, so importing the same file twice adds \\
+                    "Add accounts, customers, vendors and products and services from IIF or \
+                     CSV files to this company. Anything with a name already in the company \
+                     is skipped and listed afterwards, so importing the same file twice adds \
                      nothing. Edit > Undo takes the whole import back.",
                 )
                 .color(theme::MUTED),
@@ -399,10 +399,10 @@ pub(crate) fn opening_page(ui: &mut Ui, c: &Company, s: &mut OpeningState, out: 
     ui.add_space(6.0);
     ui.label(
         RichText::new(
-            "Where the books stood on the day before LedgerCraft takes over: the balance of \\
-             each bank account, loan and card on your last statement, and what each customer \\
-             owed you and you owed each vendor. Leave a box empty for nothing. Customers \\
-             get an opening invoice and vendors an opening bill, so payments apply to them; \\
+            "Where the books stood on the day before LedgerCraft takes over: the balance of \
+             each bank account, loan and card on your last statement, and what each customer \
+             owed you and you owed each vendor. Leave a box empty for nothing. Customers \
+             get an opening invoice and vendors an opening bill, so payments apply to them; \
              everything is balanced against Opening Balance Equity.",
         )
         .color(theme::MUTED),
@@ -413,7 +413,7 @@ pub(crate) fn opening_page(ui: &mut Ui, c: &Company, s: &mut OpeningState, out: 
         field(ui, &mut s.date, 110.0, "YYYY-MM-DD");
         ui.separator();
         let load = ui.button("Fill From CSV…").on_hover_text(
-            "A CSV file with Name and Balance columns: an account's name or number, or a \\
+            "A CSV file with Name and Balance columns: an account's name or number, or a \
              customer's or vendor's name, and its balance",
         );
         if load.clicked() {
@@ -437,8 +437,8 @@ pub(crate) fn opening_page(ui: &mut Ui, c: &Company, s: &mut OpeningState, out: 
         ui,
         "accounts",
         "Accounts",
-        "Bank, savings, cards, loans and other balance sheet accounts. Positive is the \\
-         usual balance: money in the bank, or what you owe on a card or loan. An \\
+        "Bank, savings, cards, loans and other balance sheet accounts. Positive is the \
+         usual balance: money in the bank, or what you owe on a card or loan. An \
          overdrawn account is negative.",
         &mut s.accounts,
         |id| c.account_full_name(id),
@@ -497,7 +497,7 @@ mod tests {
         let c = ledgercraft_engine::sample_company().unwrap();
         let mut s = OpeningState::for_company(&c);
         assert!(s.build().is_err(), "nothing entered");
-        let csv = "Name,Balance\\nChecking,\\"1,250.00\\"\\nMaple Street Cafe,300\\nNobody,5\\n";
+        let csv = "Name,Balance\nChecking,\"1,250.00\"\nMaple Street Cafe,300\nNobody,5\n";
         let unmatched = s.load_csv(&c, csv).unwrap();
         assert_eq!(unmatched, ["Nobody"]);
         let cmd = s.build().unwrap();
