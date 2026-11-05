@@ -942,6 +942,25 @@ pub(crate) struct Tutorial {
     /// Frames left in which to bring the window to the front. A new window
     /// can open behind the app, so it asks for a few frames running.
     focus_frames: u8,
+    /// The size the window opened at. egui resizes a window whenever the
+    /// size asked for changes, so it is worked out once, on opening: asking
+    /// for a share of the app window every frame made resizing the app
+    /// resize the tutorial too.
+    size: egui::Vec2,
+}
+
+impl Tutorial {
+    /// Notes the window showing this frame and returns the size to ask for.
+    /// On opening, that is a share of `screen` (the app window); after that
+    /// the same size every frame, so the window is the user's to resize.
+    fn opening(&mut self, screen: egui::Vec2) -> egui::Vec2 {
+        if !self.showing {
+            self.showing = true;
+            self.focus_frames = FOCUS_FRAMES;
+            self.size = window_size(screen);
+        }
+        self.size
+    }
 }
 
 /// Frames the tutorial asks to come to the front for after it opens.
@@ -982,15 +1001,11 @@ pub(crate) fn window(
         state.showing = false;
         return None;
     }
-    if !state.showing {
-        state.showing = true;
-        state.focus_frames = FOCUS_FRAMES;
-    }
+    // It starts at a share of the app window's size; then it is the user's
+    // to move and resize, apart from the app window.
+    let size = state.opening(ctx.content_rect().size());
     let last = LESSONS.len().saturating_sub(1);
     state.lesson = state.lesson.min(last);
-    // It starts at a share of the app window's size; then it is the user's
-    // to move and resize.
-    let size = window_size(ctx.content_rect().size());
     let builder = egui::ViewportBuilder::default()
         .with_title("LedgerCraft Tutorial")
         .with_inner_size(size)
@@ -1176,6 +1191,29 @@ mod tests {
             (laptop.x - 896.0).abs() < 0.5 && (laptop.y - 600.0).abs() < 0.5,
             "{laptop:?}"
         );
+    }
+
+    /// Issue #9: resizing the app window resized the tutorial's window too.
+    #[test]
+    fn resizing_the_app_leaves_the_tutorial_alone() {
+        let mut state = Tutorial::default();
+        let opened = state.opening(egui::vec2(1280.0, 800.0));
+        assert_eq!(opened, window_size(egui::vec2(1280.0, 800.0)));
+        // The app window is made wider, narrower and taller while it shows.
+        for screen in [
+            egui::vec2(1900.0, 800.0),
+            egui::vec2(700.0, 800.0),
+            egui::vec2(1280.0, 1200.0),
+        ] {
+            assert_eq!(state.opening(screen), opened, "{screen:?}");
+        }
+        // Closed and opened again, it fits the app window as it is now.
+        let mut open = false;
+        let mut prefs = Prefs::default();
+        let ctx = egui::Context::default();
+        assert!(window(&ctx, &mut open, &mut prefs, &mut state).is_none());
+        let reopened = state.opening(egui::vec2(700.0, 500.0));
+        assert_eq!(reopened, window_size(egui::vec2(700.0, 500.0)));
     }
 
     /// Adding a form without teaching it fails here, as a reminder.
