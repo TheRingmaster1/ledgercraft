@@ -145,6 +145,32 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 8. ~~M2.8 Edit and merge list entries; sub-accounts; classes~~ (done)
 9. ~~M2.9 Native file dialogs that remember locations, recent files, auto-backup~~ (done)
 
+## International: VAT and GST (requested on GitHub)
+
+A South African business moving from QuickBooks Desktop asked for VAT
+support and offered to test it. Today LedgerCraft knows only US-style sales
+tax, and the currency is a display preference for the whole app. The plan:
+
+1. Per-company settings: the tax system (US sales tax, or VAT/GST), the
+   currency (e.g. ZAR, R) and the company's VAT registration number, stored
+   in the company file rather than in Preferences
+2. VAT rates per company, with dates they change (e.g. standard 15%,
+   zero-rated, exempt), chosen per line and defaulted from the item, customer
+   or vendor
+3. Output VAT on sales (invoices, sales receipts, credit memos, refunds) and
+   input VAT on purchases (bills, checks, card purchases), each posted to a
+   VAT control account
+4. VAT-inclusive pricing: amounts typed with VAT included, and the VAT split
+   out (a per-form switch, with a company default)
+5. A VAT return report for a tax period (output VAT, input VAT, net payable or
+   refundable), laid out for South Africa's VAT201 first, with the box layout
+   kept as data so other countries' returns (UK VAT100, Australian BAS, NZ
+   GST101…) can be added; Pay VAT and VAT refunds
+6. Tax invoices: "Tax Invoice" titles and the VAT numbers of both parties on
+   PDFs where the law requires them
+7. Testing with South African users before release; then GST (Australia, New
+   Zealand, Canada) on the same foundations
+
 ## Later (M3: small business)
 
 * Inventory (average cost), purchase orders, estimates → invoices
@@ -152,7 +178,7 @@ day to day; weighted by depth, LedgerCraft 0.2 covers roughly 25% of it.
 * Budgets; P&L by customer, by month (P&L by class done in M2.8)
 * IIF export; QuickBooks Online CSV export import (IIF/CSV list import done in 0.2)
 * Multi-currency transactions and exchange rates (display currency done in 0.2;
-  decide whether the currency is stored per company)
+  the currency moves into each company file with the VAT work above)
 * Agent interfaces: JSON control channel and MCP server over the command catalog
 * ~~Encryption at rest~~ (done in 0.2); next: multi-user access through a local server
 * Performance: copy-on-write company state, cached balances
